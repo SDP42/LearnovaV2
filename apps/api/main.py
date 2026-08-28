@@ -155,6 +155,29 @@ def health() -> dict:
     return {"status": "ok", "stages": STAGES, "auth_enabled": auth_enabled()}
 
 
+@app.get("/api/config")
+def config_status() -> dict:
+    """Which optional integrations are configured (booleans only — no values)."""
+    import os
+
+    from learnova.config import get_gemini_key, get_groq_key, get_nvidia_key
+
+    return {
+        "providers": {
+            "groq": bool(get_groq_key()),
+            "nvidia": bool(get_nvidia_key()),
+            "gemini": bool(get_gemini_key()),
+        },
+        "llm_available": bool(get_groq_key() or get_nvidia_key()),
+        "flags": {
+            "master_prompt": os.getenv("LEARNOVA_MASTER_PROMPT", "").lower() in {"1", "true", "yes", "on"},
+            "class_segmentation": os.getenv("LEARNOVA_USE_CLASS", "").lower() in {"1", "true", "yes", "on"},
+            "pptx_animation": os.getenv("LEARNOVA_PPTX_ANIM", "").lower() in {"1", "true", "yes", "on"},
+        },
+        "auth_enabled": auth_enabled(),
+    }
+
+
 @app.get("/api/themes")
 def themes() -> dict:
     return {

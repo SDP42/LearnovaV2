@@ -47,10 +47,21 @@ class GroqProvider(LLMProvider):
         """
         Create a chat completion.
         """
-        model = kwargs.get("model", "llama-3.1-8b-instant")
+        import os as _os
+
+        model = kwargs.get("model") or _os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
         temperature = kwargs.get("temperature", 0.3)
         max_tokens = kwargs.get("max_tokens", None)
         timeout = kwargs.get("timeout", None)
+
+        extra: Dict[str, Any] = {}
+        # gpt-oss / other reasoning models on Groq spend the token budget on
+        # chain-of-thought unless told otherwise, leaving `content` empty.
+        if "gpt-oss" in model or "reason" in model.lower():
+            extra["reasoning_effort"] = "low"
+            extra["reasoning_format"] = "hidden"
+            if max_tokens:
+                max_tokens = max(max_tokens, 512)
 
         completion = self.client.chat.completions.create(
             model=model,
@@ -58,8 +69,14 @@ class GroqProvider(LLMProvider):
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
+            **extra,
         )
-        return (completion.choices[0].message.content or "").strip()
+        msg = completion.choices[0].message
+        text = (getattr(msg, "content", None) or "").strip()
+        if not text:
+            # last resort — some models leave the answer in `reasoning`
+            text = (getattr(msg, "reasoning", None) or "").strip()
+        return text
 
     def rewrite(self, text: str, instructions: str, **kwargs: Any) -> str:
         """

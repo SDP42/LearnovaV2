@@ -9,12 +9,17 @@ import Audience from "./pages/Audience.jsx";
 import Create from "./pages/Create.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import DeckLibrary from "./pages/DeckLibrary.jsx";
+import DiagramView from "./pages/DiagramView.jsx";
+import Docs from "./pages/Docs.jsx";
 import Export from "./pages/Export.jsx";
 import Landing from "./pages/Landing.jsx";
-import Placeholder from "./pages/Placeholder.jsx";
+import Library from "./pages/Library.jsx";
 import Present from "./pages/Present.jsx";
+import Presentations from "./pages/Presentations.jsx";
 import Preview from "./pages/Preview.jsx";
+import Projects from "./pages/Projects.jsx";
 import Quizzes from "./pages/Quizzes.jsx";
+import Settings from "./pages/Settings.jsx";
 import Studio from "./pages/Studio.jsx";
 
 /**
@@ -83,13 +88,14 @@ export default function App() {
         <Route path="/app/present/:jobId" element={<Protected><Present /></Protected>} />
         <Route path="/app/audience/:jobId" element={<Protected><Audience /></Protected>} />
         <Route path="/app/export/:jobId" element={<Protected><Export /></Protected>} />
-        <Route path="/app/projects" element={<Protected><Placeholder title="Projects" /></Protected>} />
-        <Route path="/app/presentations" element={<Protected><Placeholder title="Presentations" /></Protected>} />
+        <Route path="/app/diagram/:jobId/:slide" element={<Protected><DiagramView /></Protected>} />
+        <Route path="/app/projects" element={<Protected><Projects /></Protected>} />
+        <Route path="/app/presentations" element={<Protected><Presentations /></Protected>} />
         <Route path="/app/quizzes" element={<Protected><Quizzes /></Protected>} />
         <Route path="/app/analytics" element={<Protected><Analytics /></Protected>} />
-        <Route path="/app/library" element={<Protected><Placeholder title="Library" /></Protected>} />
-        <Route path="/app/docs" element={<Protected><Placeholder title="Docs" /></Protected>} />
-        <Route path="/app/settings" element={<Protected><Placeholder title="Settings" /></Protected>} />
+        <Route path="/app/library" element={<Protected><Library /></Protected>} />
+        <Route path="/app/docs" element={<Protected><Docs /></Protected>} />
+        <Route path="/app/settings" element={<Protected><Settings /></Protected>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

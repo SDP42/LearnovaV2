@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
@@ -27,18 +27,24 @@ const DENSITIES = [
 
 export default function Create() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("upload");
+  const location = useLocation();
+  const tpl = location.state?.template;
+  const [tab, setTab] = useState(tpl ? "paste" : "upload");
 
   const [file, setFile] = useState(null);
-  const [topic, setTopic] = useState("");
-  const [typed, setTyped] = useState("");
+  const [topic, setTopic] = useState(tpl?.topic ?? "");
+  const [typed, setTyped] = useState(tpl?.text ?? "");
 
   const [job, setJob] = useState(null);
   const [markdown, setMarkdown] = useState("");
   const [sections, setSections] = useState(0);
 
-  const [density, setDensity] = useState("medium");
-  const [quizFreq, setQuizFreq] = useState("4");
+  const [density, setDensity] = useState(
+    () => localStorage.getItem("learnova-default-density") || "medium"
+  );
+  const [quizFreq, setQuizFreq] = useState(
+    () => localStorage.getItem("learnova-default-quizfreq") || "4"
+  );
   const [ocr, setOcr] = useState(true);
 
   const [phase, setPhase] = useState("input"); // input | review | generating | done

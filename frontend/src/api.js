@@ -41,6 +41,10 @@ export async function listThemes() {
   return json(await fetch(`${BASE}/api/themes`));
 }
 
+export async function getConfig() {
+  return json(await fetch(`${BASE}/api/config`));
+}
+
 // ── Jobs ──────────────────────────────────────────────────────────────────
 export async function uploadDocument(file, textbookMode = false) {
   const form = new FormData();

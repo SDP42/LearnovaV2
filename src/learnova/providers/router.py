@@ -41,14 +41,21 @@ TASK_PREFERENCE: Dict[str, Sequence[str]] = {
     TASK_DIAGRAM: ("groq", "nvidia"),
 }
 
+import os as _os
+
+# Groq periodically retires model ids (``llama-3.1-8b-instant`` started
+# returning 404 for newer accounts). Make it overridable and default to a
+# currently-GA fast model.
+_GROQ_MODEL = _os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+
 # Per-provider default model for each task.
 TASK_MODEL: Dict[str, Dict[str, str]] = {
     "groq": {
-        TASK_LAYOUT: "llama-3.1-8b-instant",
-        TASK_IMPROVE: "llama-3.1-8b-instant",
-        TASK_QUIZ: "llama-3.1-8b-instant",
-        TASK_ENHANCE: "llama-3.1-8b-instant",
-        TASK_DIAGRAM: "llama-3.1-8b-instant",
+        TASK_LAYOUT: _GROQ_MODEL,
+        TASK_IMPROVE: _GROQ_MODEL,
+        TASK_QUIZ: _GROQ_MODEL,
+        TASK_ENHANCE: _GROQ_MODEL,
+        TASK_DIAGRAM: _GROQ_MODEL,
     },
     # Quality-sensitive tasks run on Nemotron 3 Ultra (550B MoE, 55B active).
     # High-volume tasks stay on a small instruct model: Ultra answers a layout
@@ -74,11 +81,15 @@ PROVIDER_MIN_TIMEOUT: Dict[str, float] = {
 
 def _model_fits(provider_name: str, model: str) -> bool:
     """True when a model id belongs to the given provider's namespace."""
-    namespaced = "/" in model
+    # NVIDIA NIM ids are namespaced under a vendor ("meta/…", "nvidia/…"). Groq
+    # also uses namespaced ids now for the hosted OSS models
+    # ("openai/gpt-oss-20b", "moonshotai/…"), so match those explicitly rather
+    # than treating any "/" as NVIDIA.
+    nvidia_ns = model.startswith(("meta/", "nvidia/", "nv-", "mistralai/", "google/"))
     if provider_name == "nvidia":
-        return namespaced
+        return nvidia_ns
     if provider_name == "groq":
-        return not namespaced
+        return not nvidia_ns
     return True
 
 

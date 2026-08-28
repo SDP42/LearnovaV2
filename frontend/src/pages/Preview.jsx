@@ -243,6 +243,15 @@ export default function Preview() {
                   </Prop>
                 ) : null}
 
+                {cur.mermaid_code ||
+                (cur.family && /PROCESS|FLOW|DECISION|STATE/.test(cur.family)) ? (
+                  <Button asChild variant="outline" size="sm" className="w-full">
+                    <Link to={`/app/diagram/${jobId}/${selected}`}>
+                      Open in diagram editor
+                    </Link>
+                  </Button>
+                ) : null}
+
                 <Separator />
                 <div className="flex flex-col gap-1">
                   <span className="text-[11px] uppercase tracking-wide text-muted-foreground">

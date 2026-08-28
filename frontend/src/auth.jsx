@@ -43,4 +43,11 @@ export const UserButton = DEMO
 
 export const SignIn = Clerk.SignIn;
 export const SignUp = Clerk.SignUp;
+export const UserProfile = DEMO
+  ? () => (
+      <p className="p-6 text-sm text-muted-foreground">
+        Account management is available when signed in with Clerk.
+      </p>
+    )
+  : Clerk.UserProfile;
 export const ClerkProvider = Clerk.ClerkProvider;
