@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, List, Optional
 
 from learnova.config import DEFAULT_QUIZ_FREQUENCY
@@ -40,6 +40,7 @@ STAGES: List[str] = [
     "index",
     "layout",
     "visual_plan",
+    "expand",
     "enhance",
     "density",
     "quiz",
@@ -214,6 +215,21 @@ def generate(
     from learnova.scoring.scorer import score_all_slides
 
     config = config or PipelineConfig()
+
+    # Short typed input is a lesson outline the user wants *taught*, not a long
+    # document to compress. When they left the defaults, switch to the teaching
+    # profile + expansion so every step is explained rather than trimmed.
+    _typed_len = len(markdown_doc.markdown or "")
+    if (markdown_doc.converter == "typed"
+            and _typed_len < 2000
+            and config.text_density == DEFAULT_DENSITY
+            and config.content_mode == "compress"):
+        config = replace(config, text_density="teaching", content_mode="expand")
+        logger.info(
+            "short typed input (%d chars) — using 'teaching' density + expansion pass",
+            _typed_len,
+        )
+
     result = PipelineResult(
         source_name=markdown_doc.source_name,
         markdown=markdown_doc.markdown,
@@ -341,6 +357,30 @@ def generate(
     runner.run(
         "visual_plan", _visual_plan,
         skip=not config.enable_visual_planner, skip_reason="disabled",
+    )
+
+    # 6b. Expansion pass — turn terse bullets into full teaching sentences that
+    #     keep the reasoning. Only for lessons meant to be taught (content_mode
+    #     "expand" or the "teaching" density). LLM-backed; degrades to a no-op.
+    _do_expand = (
+        config.content_mode == "expand"
+        or str(config.text_density).lower() == "teaching"
+    )
+
+    def _expand():
+        from learnova.pipeline.expander import expand_deck
+
+        n = expand_deck(
+            result.improved,
+            density=config.text_density,
+            content_mode=config.content_mode,
+        )
+        return f"{n} slide(s) expanded"
+
+    runner.run(
+        "expand", _expand,
+        skip=not _do_expand,
+        skip_reason="not a teaching build (content_mode!='expand', density!='teaching')",
     )
 
     # 7. Pedagogical enhancement — examples, analogies, revision points.

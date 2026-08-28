@@ -145,6 +145,14 @@ _ATOMIC_LAYOUTS = {"METRIC", "QUIZ"}
 
 _CLAUSE_BREAK = re.compile(r"[,;:—–]\s")
 
+# A bullet that carries its own reasoning ("... because ...", "first ... then ...")
+# earns a wider budget before it is split — the connective clause is the point.
+_REASONING_CUE = re.compile(
+    r"\b(because|since|so that|in order to|which means|this means|as a result|"
+    r"therefore|hence|thus|so the|the reason|this is why|note that|"
+    r"first(?:ly)?|then|next|finally|step \d|begin by|start by)\b", re.I,
+)
+
 
 def get_profile(density: str) -> DensityProfile:
     return PROFILES.get((density or "").lower(), PROFILES[DEFAULT_DENSITY])
@@ -170,14 +178,18 @@ def split_bullet(text: str, profile: DensityProfile,
     if preserve or _VERBOSE_BULLETS:
         return [clean]
 
-    within_words = len(clean.split()) <= profile.max_words_per_bullet
-    within_chars = len(clean) <= profile.max_chars_per_bullet
+    # A reasoning bullet keeps 1.5x the word budget before it is worth splitting.
+    slack = 1.5 if _REASONING_CUE.search(clean) else 1.0
+    word_budget = int(profile.max_words_per_bullet * slack)
+    char_budget = int(profile.max_chars_per_bullet * slack)
+
+    within_words = len(clean.split()) <= word_budget
+    within_chars = len(clean) <= char_budget
     if within_words and within_chars:
         return [clean]
 
     def _fits(s: str) -> bool:
-        return (len(s.split()) <= profile.max_words_per_bullet
-                and len(s) <= profile.max_chars_per_bullet)
+        return (len(s.split()) <= word_budget and len(s) <= char_budget)
 
     # Break the sentence into clauses and regroup them into budget-sized pieces.
     parts = [p.strip(" ,;:—–") for p in _CLAUSE_BREAK.split(clean) if p.strip(" ,;:—–")]
@@ -210,17 +222,17 @@ def split_bullet(text: str, profile: DensityProfile,
             pieces.append(seg)
             continue
         words = seg.split()
-        head = " ".join(words[: profile.max_words_per_bullet])
-        if len(head) > profile.max_chars_per_bullet:
-            cut = head[: profile.max_chars_per_bullet].rsplit(" ", 1)[0]
-            head = cut or head[: profile.max_chars_per_bullet]
+        head = " ".join(words[: word_budget])
+        if len(head) > char_budget:
+            cut = head[: char_budget].rsplit(" ", 1)[0]
+            head = cut or head[: char_budget]
         rest = seg[len(head):].strip(" ,;:—–")
         pieces.append(head)
         if rest:
             queue.insert(0, rest)
 
     if not pieces:
-        return [clean[: profile.max_chars_per_bullet]]
+        return [clean[: char_budget]]
     return [pieces[0]] + [p if p.startswith("↳") else f"↳ {p}" for p in pieces[1:]]
 
 
@@ -270,8 +282,15 @@ def _should_preserve(improved: dict) -> bool:
         sents = classify_sentences(" ".join(p for p in parts if p))
         if not sents:
             return False
-        verbatim = sum(1 for s in sents if s.treatment == "VERBATIM")
-        return verbatim / len(sents) >= 0.4
+        # VERBATIM sentences count fully; KEEP_REASONING sentences count half —
+        # a slide that is mostly either should not be shortened.
+        weight = sum(
+            1.0 if s.treatment == "VERBATIM"
+            else 0.5 if s.treatment == "KEEP_REASONING"
+            else 0.0
+            for s in sents
+        )
+        return weight / len(sents) >= 0.4
     except Exception:
         return False
 

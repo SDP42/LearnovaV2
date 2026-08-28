@@ -97,7 +97,7 @@ export default function Settings() {
               >
                 <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["low", "medium", "heavy"].map((d) => (
+                  {["low", "medium", "teaching", "heavy"].map((d) => (
                     <SelectItem key={d} value={d}>{d[0].toUpperCase() + d.slice(1)}</SelectItem>
                   ))}
                 </SelectContent>

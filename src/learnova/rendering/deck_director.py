@@ -211,7 +211,8 @@ def choose_summary_directive(text: str, verbatim: List[str], n_sentences: int) -
 
 
 def build_speaker_notes(imp: Dict[str, Any], animation: Dict[str, Any],
-                        verbatim: List[str], directive: str, est_seconds: float) -> str:
+                        verbatim: List[str], directive: str, est_seconds: float,
+                        source_text: str = "") -> str:
     lines: List[str] = []
     takeaway = str(imp.get("takeaway", "")).strip()
     if takeaway:
@@ -227,6 +228,19 @@ def build_speaker_notes(imp: Dict[str, Any], animation: Dict[str, Any],
         lines.append("Read these exactly (do not paraphrase):")
         for v in verbatim[:4]:
             lines.append(f"  - {v}")
+
+    # The full detail from the source, so the teacher keeps the whole
+    # explanation even when the slide bullet is short. Only added when it says
+    # meaningfully more than the bullets already on the slide.
+    src = re.sub(r"\s+", " ", str(source_text or "")).strip()
+    bullets_join = " ".join(str(b) for b in (imp.get("bullets") or []))
+    if src and len(src) > len(bullets_join) * 1.25 and len(src) > 120:
+        lines.append("")
+        lines.append("Full detail (from the source):")
+        for sent in re.split(r"(?<=[.!?])\s+", src)[:8]:
+            sent = sent.strip()
+            if sent:
+                lines.append(f"  {sent}")
     hint = {
         "PRESERVE": "Wording matters here — slow down, keep it precise.",
         "COMPRESS": "Dense slide — talk to it, don't read every word.",
@@ -328,7 +342,10 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         if is_quiz:
             est += _SEC_QUIZ
         total_seconds += est
-        notes = build_speaker_notes(imp, animation, verbatim, directive, est)
+        notes = build_speaker_notes(
+            imp, animation, verbatim, directive, est,
+            source_text=str((original or {}).get("text") or ""),
+        )
 
         plan.slides.append(SlidePlan(
             index=i, title=title, treatment=treatment, family=family, variant=variant,

@@ -146,7 +146,7 @@ Each task names the exact files to touch.
 
 ### PHASE 3 — "Explain each thing in detail" (anti-summariser)
 
-- [ ] **3.1 — Add an expansion pass.**
+- [x] **3.1 — Add an expansion pass.**
   New stage between `layout` and `density`: for each terse step/bullet, if
   `content_mode == "expand"` (default it to expand for typed input < N chars),
   call the LLM to turn "Isolate x" → "Isolate x by subtracting 3 from both sides,
@@ -154,19 +154,19 @@ Each task names the exact files to touch.
   expansion as a reveal sub-line.
   *Files:* new `pipeline/expander.py`, `pipeline/orchestrator.py`, `ai/master_prompt.py`
 
-- [ ] **3.2 — Protect more teaching prose as VERBATIM-ish.**
+- [x] **3.2 — Protect more teaching prose as VERBATIM-ish.**
   Add a `KEEP_REASONING` treatment to `text_policy`: sentences containing
   causal/procedural cues ("because", "so that", "which means", "first / then /
   next / finally", "note that") are kept in full, only lightly cleaned.
   *Files:* `ai/text_policy.py`, `pipeline/density.py`
 
-- [ ] **3.3 — Speaker notes carry the full explanation.**
+- [x] **3.3 — Speaker notes carry the full explanation.**
   Even when the slide bullet is short, the speaker-notes pane (web presenter +
   PPTX notes) should hold the complete sentence the source had, so the teacher
   never loses the detail.
   *Files:* `rendering/deck_director.py` (`build_speaker_notes`)
 
-- [ ] **3.4 — "Density = teaching" profile.**
+- [x] **3.4 — "Density = teaching" profile.**
   Add a 4th density profile `teaching` (between medium and heavy): full-sentence
   bullets, every step kept, expansion pass on, reveal one-per-click. Make it the
   default for typed input.

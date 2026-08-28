@@ -22,6 +22,7 @@ const POLL_MS = 800;
 const DENSITIES = [
   { id: "low", label: "Low", desc: "Headline only — presenter-led decks." },
   { id: "medium", label: "Medium", desc: "Balanced — teaching and self-study." },
+  { id: "teaching", label: "Teaching", desc: "Explain every step, one reveal per click." },
   { id: "heavy", label: "Heavy", desc: "Study notes — examples and revision points." },
 ];
 
@@ -230,7 +231,7 @@ export default function Create() {
               <CardContent className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
                   <Label>Text density</Label>
-                  <RadioGroup value={density} onValueChange={setDensity} className="grid gap-2 sm:grid-cols-3">
+                  <RadioGroup value={density} onValueChange={setDensity} className="grid gap-2 sm:grid-cols-2">
                     {DENSITIES.map((d) => (
                       <label
                         key={d.id}

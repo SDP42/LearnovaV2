@@ -41,8 +41,20 @@ _FORMULA = re.compile(
     r"[A-Za-z]\s?=\s?[A-Za-z0-9]|[=≈≤≥±×÷√∑∫∂πΔ]|"
     r"\b\d+\s?[+\-*/^]\s?\d+\b|\bproportional to\b|\bequals\b(?!\s+the\s+number)",
 )
+# Sentences that *explain* — the causal / procedural connective is the teaching
+# value, and shortening the sentence away drops the "why". Kept in full (only
+# lightly cleaned), but not marked VERBATIM: the wording may still be improved,
+# it just must not be cut down to a headline.
+_REASONING = re.compile(
+    r"\b(because|since|so that|in order to|which means|this means|as a result|"
+    r"therefore|hence|thus|consequently|the reason|this is why|that is why|"
+    r"note that|keep in mind|for example|for instance|such as|"
+    r"first(?:ly)?|second(?:ly)?|third(?:ly)?|then|next|after that|finally|"
+    r"step \d|begin by|start by)\b",
+    re.I,
+)
 
-_TREATMENTS = ("VERBATIM", "TIGHTEN", "MERGE")
+_TREATMENTS = ("VERBATIM", "KEEP_REASONING", "TIGHTEN", "MERGE")
 
 
 @dataclass(frozen=True)
@@ -84,6 +96,10 @@ def classify_sentences(text: str) -> List[SentenceTreatment]:
             out.append(SentenceTreatment(s, "VERBATIM", reason))
         elif norm in seen_norm or _near_dup(norm, seen_norm):
             out.append(SentenceTreatment(s, "MERGE", "near-duplicate of an earlier sentence"))
+        elif _REASONING.search(s):
+            out.append(SentenceTreatment(
+                s, "KEEP_REASONING",
+                "explains the why / the ordered step — keep the reasoning intact"))
         else:
             out.append(SentenceTreatment(s, "TIGHTEN", "explanatory prose"))
         seen_norm[norm] = len(out) - 1
