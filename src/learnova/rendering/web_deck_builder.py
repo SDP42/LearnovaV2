@@ -14,25 +14,37 @@ from learnova.rendering.theme_engine import (
 )
 
 def _inline_quiz_html(quiz: dict, theme) -> str:
-    """Render a checkpoint question as a band at the foot of a web-deck slide."""
+    """
+    Render a checkpoint question as an interactive band at the foot of a slide:
+    click an option, get right/wrong feedback and the explanation. Same
+    ``lvQuizPick`` handler as the standalone QUIZ slide.
+    """
     if not quiz:
         return ""
     options = [str(o).strip() for o in (quiz.get("options") or []) if str(o).strip()][:4]
     letters = "ABCD"
-    chips = "".join(
-        f'<div style="flex:1 1 0;min-width:0;border:1px solid {theme.primary_hex};'
-        f'background:{theme.bg_hex};color:{theme.text_hex};padding:6px 10px;'
-        f'font-size:0.62em;border-radius:6px;">'
-        f'<b>{letters[i]}.</b> {html.escape(re.sub(r"^\s*[A-Da-d][).:]\s*", "", opt))}</div>'
+    correct = str(quiz.get("correct", "A")).strip()[:1].upper()
+    explanation = html.escape(str(quiz.get("explanation", "")))
+    difficulty = html.escape(str(quiz.get("difficulty", "")).upper())
+    btns = "".join(
+        f'<button onclick="lvQuizPick(this,{str(letters[i] == correct).lower()})" '
+        f'style="flex:1 1 0;min-width:0;border:1px solid {theme.primary_hex};'
+        f'background:{theme.bg_hex};color:{theme.text_hex};padding:7px 10px;'
+        f'font-size:0.62em;border-radius:6px;cursor:pointer;text-align:left;">'
+        f'<b>{letters[i]}.</b> {html.escape(re.sub(r"^\s*[A-Da-d][).:]\s*", "", opt))}</button>'
         for i, opt in enumerate(options)
     )
+    diff = (f'<span style="float:right;font-size:0.55em;color:{theme.subtext_hex};">{difficulty}</span>'
+            if difficulty else "")
     return f"""
-    <div style="margin-top:18px;border:2px solid {theme.accent_hex};
+    <div class="lv-quiz" style="margin-top:18px;border:2px solid {theme.accent_hex};
                 background:{theme.card_bg_hex};border-radius:10px;padding:12px 14px;">
       <div style="color:{theme.text_hex};font-weight:700;font-size:0.72em;margin-bottom:8px;">
-        Q{quiz.get('index', 1)}. {html.escape(str(quiz.get('question', '')))}
+        Q{quiz.get('index', 1)}. {html.escape(str(quiz.get('question', '')))}{diff}
       </div>
-      <div style="display:flex;gap:8px;">{chips}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">{btns}</div>
+      <div class="lv-quiz-exp" style="display:none;margin-top:10px;font-size:0.6em;
+           color:{theme.text_hex};line-height:1.4;">{explanation}</div>
     </div>"""
 
 
@@ -292,31 +304,40 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             </div>
             """
 
-        # ── 3. INTERLEAVED QUIZ LAYOUT ────────────────────────────────────────
+        # ── 3. CHECKPOINT QUIZ LAYOUT — interactive, no spoiler ───────────────
         elif layout_type == "QUIZ":
-            q_text = html.escape(imp.get("question", "Checkpoint Question"))
+            q_text = html.escape(str(imp.get("question", "Checkpoint Question")))
             options = imp.get("options", [])
-            correct_opt = html.escape(imp.get("correct", "A"))
-            explanation = html.escape(imp.get("explanation", ""))
+            correct_opt = str(imp.get("correct", "A")).strip()[:1].upper()
+            explanation = html.escape(str(imp.get("explanation", "")))
+            difficulty = html.escape(str(imp.get("difficulty", "")).upper())
+            letters = "ABCD"
 
             opt_buttons = ""
-            for opt in options:
-                opt_str = html.escape(str(opt))
-                is_correct = "true" if opt_str.startswith(correct_opt) else "false"
-                opt_buttons += f"""
-                <button onclick="checkAnswer(this, {is_correct})" style="width:48%; padding:15px; margin:1%; background:#ffffff; border:3px solid {theme.primary_hex}; font-weight:bold; font-size:1rem; cursor:pointer; transition:all 0.2s;">
-                    {opt_str}
-                </button>
-                """
+            for i, opt in enumerate(options[:4]):
+                opt_str = html.escape(re.sub(r"^\s*[A-Da-d][).:]\s*", "", str(opt)))
+                is_correct = "true" if letters[i] == correct_opt else "false"
+                opt_buttons += (
+                    f'<button onclick="lvQuizPick(this,{is_correct})" '
+                    f'style="flex:1 1 45%;padding:14px 16px;background:{theme.card_bg_hex};'
+                    f'border:2px solid {theme.primary_hex};border-radius:8px;font-size:0.95rem;'
+                    f'cursor:pointer;text-align:left;color:{theme.text_hex};">'
+                    f'<b>{letters[i]}.</b> {opt_str}</button>'
+                )
 
+            diff_badge = (
+                f'<span style="font-size:0.7rem;color:{theme.subtext_hex};'
+                f'border:1px solid {theme.subtext_hex};border-radius:10px;padding:1px 8px;'
+                f'margin-left:10px;">{difficulty}</span>' if difficulty else ""
+            )
             slide_body = f"""
-            <div style="text-align:left; background:#f4f6fb; border-left:6px solid {theme.primary_hex}; padding:20px; border-radius:8px; margin-top:20px;">
-                <h3 style="color:{theme.primary_hex}; margin-top:0;">❓ {q_text}</h3>
-                <div style="display:flex; flex-wrap:wrap; margin-top:15px;">
-                    {opt_buttons}
-                </div>
-                <div class="quiz-feedback" style="display:none; margin-top:15px; padding:12px; border-radius:6px; font-weight:bold;"></div>
-                <p class="quiz-exp" style="display:none; font-size:0.9rem; color:#444; margin-top:5px;">💡 {explanation}</p>
+            <div class="lv-quiz" style="text-align:left;background:{theme.card_bg_hex};
+                 border-left:6px solid {theme.accent_hex};padding:20px;border-radius:8px;margin-top:20px;">
+                <h3 style="color:{theme.primary_hex};margin-top:0;">{q_text}{diff_badge}</h3>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;">{opt_buttons}</div>
+                <div class="lv-quiz-exp" style="display:none;margin-top:14px;font-size:0.9rem;
+                     color:{theme.text_hex};line-height:1.5;background:{theme.bg_hex};
+                     border-radius:6px;padding:12px;">{explanation}</div>
             </div>
             """
 
@@ -517,6 +538,28 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                 else {{ window.__enableBuilds(); this.textContent = 'show all'; }}
             }});
         }})();
+
+        // Checkpoint quiz: mark the picked option, reveal the explanation.
+        // Locks after the first pick so the answer is not a click-through.
+        function lvQuizPick(btn, isCorrect) {{
+            var box = btn.closest('.lv-quiz');
+            if (!box || box.dataset.answered) return;
+            box.dataset.answered = '1';
+            var btns = box.querySelectorAll('button');
+            btns.forEach(function (b) {{ b.disabled = true; b.style.cursor = 'default'; }});
+            btn.style.borderColor = isCorrect ? '{theme.accent_hex}' : '#c0392b';
+            btn.style.background = isCorrect ? '{theme.accent_hex}22' : '#c0392b18';
+            if (!isCorrect) {{
+                btns.forEach(function (b) {{
+                    if (b.getAttribute('onclick').indexOf('true') > -1) {{
+                        b.style.borderColor = '{theme.accent_hex}';
+                        b.style.background = '{theme.accent_hex}22';
+                    }}
+                }});
+            }}
+            var exp = box.querySelector('.lv-quiz-exp');
+            if (exp) exp.style.display = 'block';
+        }}
 
         function checkAnswer(btn, isCorrect) {{
             const parent = btn.parentElement;

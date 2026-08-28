@@ -22,10 +22,19 @@ load_dotenv()
 DELAY_BETWEEN_CALLS = 0.5
 
 SYSTEM_PROMPT = (
-    "You are an educational quiz designer. "
-    "Generate 1 multiple choice question based on the content provided. "
-    "Return ONLY valid JSON: "
-    '{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": "A", "explanation": "..."}'
+    "You are an educational quiz designer writing ONE multiple-choice question "
+    "that checks whether a learner understood the key idea in the content.\n"
+    "Rules:\n"
+    "- Test understanding, not trivia recall. The stem should require reasoning.\n"
+    "- All four options must be plausible to someone who half-learned the "
+    "material: distractors are common misconceptions or near-misses on the SAME "
+    "concept, never obviously silly.\n"
+    "- 'explanation' says why the correct answer is right AND, in one clause each, "
+    "why the other three are wrong.\n"
+    "- 'difficulty' is one of: recall, apply, analyse.\n"
+    "Return ONLY valid JSON:\n"
+    '{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], '
+    '"correct": "A", "explanation": "...", "difficulty": "apply"}'
 )
 
 # Module-level singleton router — created once and reused. Avoids
@@ -102,6 +111,7 @@ def generate_quizzes(improved_results: list[dict]) -> list[dict]:
                 raw_correct = str(parsed.get("correct", "A")).strip()
                 match = re.search(r"([A-D])", raw_correct.upper())
                 parsed["correct"] = match.group(1) if match else "A"
+                parsed["difficulty"] = str(parsed.get("difficulty", "apply")).lower()
                 parsed["source_slides"] = source_slides
                 quizzes.append(parsed)
         except Exception as e:
@@ -115,25 +125,59 @@ def generate_quizzes(improved_results: list[dict]) -> list[dict]:
     return quizzes
 
 
+def _standalone_quiz_slide(q: dict, n: int) -> dict:
+    return {
+        "original": {"title": "Knowledge Checkpoint", "source": f"Quiz #{n}"},
+        "improved": {
+            "layout_type": "QUIZ",
+            "title": f"Checkpoint {n}",
+            "question": q.get("question", "What is the key takeaway so far?"),
+            "options": q.get("options", ["Option A", "Option B", "Option C", "Option D"]),
+            "correct": q.get("correct", "A"),
+            "explanation": q.get("explanation", "Review the previous takeaways."),
+            "difficulty": q.get("difficulty", "apply"),
+            "takeaway": "Answer, then check your reasoning.",
+        },
+    }
+
+
 def interleave_quizzes_into_slides(
     improved_results: list[dict],
     quizzes: list[dict],
     frequency: int = 4,
     inline: bool = True,
+    positions: list[int] | None = None,
 ) -> list[dict]:
     """
-    Attach a checkpoint question after every ``frequency`` slides.
+    Attach a checkpoint question into the deck.
 
-    With ``inline=True`` (the default) the question is fixed to the *bottom of
-    the slide that closes the run* as an ``inline_quiz`` payload, rather than
-    interrupting the deck with a standalone slide. A checkpoint reads better
-    beside the material it tests, and it keeps the slide count honest — the
-    old behaviour inflated a 12-slide deck to 15.
+    Placement:
+      * ``positions`` (1-indexed content-slide numbers) — a checkpoint goes in
+        immediately AFTER each of those slides. This is the "put a quiz after
+        slide 7" case the editor drives.
+      * otherwise — one checkpoint after every ``frequency`` slides.
 
-    Passing ``inline=False`` restores the separate QUIZ slide.
+    Style:
+      * ``inline=True`` (default) — a band at the foot of the slide that closes
+        the run, keeping the slide count honest.
+      * ``inline=False`` — a dedicated interactive QUIZ slide inserted after.
+        Forced on when ``positions`` is given (a chosen checkpoint deserves its
+        own slide).
     """
     if not quizzes:
         return improved_results
+
+    if positions:
+        inline = False
+        wanted = {p for p in positions if isinstance(p, int) and p >= 1}
+        final_deck: list[dict] = []
+        quiz_idx = 0
+        for pos, item in enumerate(improved_results, 1):
+            final_deck.append(item)
+            if pos in wanted and quiz_idx < len(quizzes):
+                final_deck.append(_standalone_quiz_slide(quizzes[quiz_idx], quiz_idx + 1))
+                quiz_idx += 1
+        return final_deck
 
     final_deck: list[dict] = []
     quiz_idx = 0
@@ -152,25 +196,14 @@ def interleave_quizzes_into_slides(
                 "options": q.get("options", [])[:4],
                 "correct": q.get("correct", "A"),
                 "explanation": q.get("explanation", ""),
+                "difficulty": q.get("difficulty", "apply"),
             }
             item = {**item, "improved": improved}
 
         final_deck.append(item)
 
         if due and not inline:
-            q = quizzes[quiz_idx]
+            final_deck.append(_standalone_quiz_slide(quizzes[quiz_idx], quiz_idx + 1))
             quiz_idx += 1
-            final_deck.append({
-                "original": {"title": "Knowledge Checkpoint", "source": f"Quiz #{quiz_idx}"},
-                "improved": {
-                    "layout_type": "QUIZ",
-                    "title": f"Checkpoint Quiz #{quiz_idx}",
-                    "question": q.get("question", "What is the key takeaway so far?"),
-                    "options": q.get("options", ["Option A", "Option B", "Option C", "Option D"]),
-                    "correct": q.get("correct", "A"),
-                    "explanation": q.get("explanation", "Review the previous takeaways."),
-                    "takeaway": "Test your active recall.",
-                },
-            })
 
     return final_deck

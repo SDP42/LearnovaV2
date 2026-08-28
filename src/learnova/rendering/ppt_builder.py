@@ -637,38 +637,61 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         elif layout_type == "QUIZ":
             q_text = imp.get("question", "Checkpoint Question")
             options = imp.get("options", [])
-            correct_opt = imp.get("correct", "A")
+            correct_opt = str(imp.get("correct", "A")).strip()[:1].upper()
+            explanation = str(imp.get("explanation", "")).strip()
+            difficulty = str(imp.get("difficulty", "")).strip()
 
-            qbox = slide.shapes.add_textbox(Inches(0.5), Inches(1.3), Inches(12.3), Inches(1.2))
+            qbox = slide.shapes.add_textbox(Inches(0.6), Inches(1.3), Inches(12.1), Inches(1.4))
             qtf = qbox.text_frame
             qtf.word_wrap = True
             qp = qtf.paragraphs[0]
-            qp.text = f"❓ Question: {q_text}"
-            qp.font.size = Pt(20)
+            qp.text = f"Q.  {q_text}"
+            qp.font.size = Pt(22)
             qp.font.bold = True
             qp.font.color.rgb = theme.primary_rgb
+            if difficulty:
+                dp = qtf.add_paragraph()
+                dp.text = difficulty.upper()
+                dp.font.size = Pt(11)
+                dp.font.color.rgb = theme.subtext_rgb
 
+            # Options — all neutral, no spoiler. The correct answer + why lives
+            # in a box that only appears on the final click (entrance animation).
             card_positions = [
-                (Inches(0.5), Inches(2.7)),
-                (Inches(6.8), Inches(2.7)),
-                (Inches(0.5), Inches(4.3)),
-                (Inches(6.8), Inches(4.3)),
+                (Inches(0.6), Inches(2.9)), (Inches(6.9), Inches(2.9)),
+                (Inches(0.6), Inches(4.3)), (Inches(6.9), Inches(4.3)),
             ]
             for idx, opt_text in enumerate(options[:4]):
                 c_left, c_top = card_positions[idx]
-                card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c_left, c_top, Inches(6.0), Inches(1.3))
+                card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c_left, c_top, Inches(5.8), Inches(1.2))
                 card.fill.solid()
-                card.fill.fore_color.rgb = theme.primary_rgb if str(opt_text).startswith(correct_opt) else theme.card_bg_rgb
+                card.fill.fore_color.rgb = theme.card_bg_rgb
                 card.line.color.rgb = theme.primary_rgb
-                card.line.width = Pt(2)
-
-                ctf = card.text_frame
-                ctf.word_wrap = True
-                cp = ctf.paragraphs[0]
+                card.line.width = Pt(1.5)
+                cp = card.text_frame.paragraphs[0]
+                card.text_frame.word_wrap = True
                 cp.text = str(opt_text)
-                cp.font.size = Pt(16)
-                cp.font.bold = True
-                cp.font.color.rgb = theme.accent_rgb if str(opt_text).startswith(correct_opt) else theme.text_rgb
+                cp.font.size = Pt(15)
+                cp.font.color.rgb = theme.text_rgb
+
+            ans = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
+                                         Inches(0.6), Inches(5.8), Inches(12.1), Inches(1.3))
+            ans.fill.solid()
+            ans.fill.fore_color.rgb = theme.primary_rgb
+            ans.line.color.rgb = theme.accent_rgb
+            ans.line.width = Pt(2)
+            atf = ans.text_frame
+            atf.word_wrap = True
+            ap = atf.paragraphs[0]
+            ap.text = f"Answer: {correct_opt}"
+            ap.font.size = Pt(16)
+            ap.font.bold = True
+            ap.font.color.rgb = theme.accent_rgb
+            if explanation:
+                ep = atf.add_paragraph()
+                ep.text = explanation
+                ep.font.size = Pt(12)
+                ep.font.color.rgb = theme.text_rgb
 
         # ── 4. FLOWCHART / PROCESS STEP CARDS ──────────────────────────────────
         elif layout_type == "FLOWCHART":
@@ -838,12 +861,23 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
         if animations_enabled():
             content_slides = list(prs.slides)[1:-1]  # skip title + thank-you
+            deck_layouts = [
+                str((e.get("improved") or {}).get("layout_type", "")).upper()
+                for e in slides_data
+            ]
             for idx, slide in enumerate(content_slides):
                 sp = deck_plan.by_index(idx) if deck_plan is not None else None
                 n_groups = len((getattr(sp, "animation", {}) or {}).get("steps", []) or []) if sp else 0
-                shape_ids = [s.shape_id for s in slide.shapes][2:8]
-                if n_groups >= 2:
-                    shape_ids = shape_ids[: max(2, n_groups)]
+                is_quiz = idx < len(deck_layouts) and deck_layouts[idx] == "QUIZ"
+                if is_quiz:
+                    # Question stays visible; options reveal one per click, the
+                    # answer + explanation box reveals last. Skip header(0),
+                    # title(1) and the question box(2).
+                    shape_ids = [s.shape_id for s in slide.shapes][3:9]
+                else:
+                    shape_ids = [s.shape_id for s in slide.shapes][2:8]
+                    if n_groups >= 2:
+                        shape_ids = shape_ids[: max(2, n_groups)]
                 apply_click_builds(slide, shape_ids)
 
             # Validate: the file must still round-trip through python-pptx.

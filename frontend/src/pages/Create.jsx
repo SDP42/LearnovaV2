@@ -46,6 +46,8 @@ export default function Create() {
   const [quizFreq, setQuizFreq] = useState(
     () => localStorage.getItem("learnova-default-quizfreq") || "4"
   );
+  const [quizStyle, setQuizStyle] = useState("inline"); // "inline" | "slide"
+  const [quizAfter, setQuizAfter] = useState(""); // e.g. "3, 7, 11"
   const [ocr, setOcr] = useState(true);
 
   const [phase, setPhase] = useState("input"); // input | review | generating | done
@@ -120,9 +122,15 @@ export default function Create() {
     setPhase("generating");
     try {
       await api.saveMarkdown(job.id, markdown);
+      const positions = quizAfter
+        .split(/[,\s]+/)
+        .map((n) => parseInt(n, 10))
+        .filter((n) => Number.isInteger(n) && n > 0);
       await api.startGenerate(job.id, {
         theme_id: "auto",
         quiz_frequency: Number(quizFreq),
+        quiz_style: quizStyle,
+        quiz_positions: positions.length ? positions : null,
         enable_vision_ocr: ocr,
         text_density: density,
         markdown,
@@ -260,7 +268,7 @@ export default function Create() {
                 <div className="flex flex-wrap items-center gap-6">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="qf" className="text-sm">Quiz every</Label>
-                    <Select value={quizFreq} onValueChange={setQuizFreq}>
+                    <Select value={quizFreq} onValueChange={setQuizFreq} disabled={!!quizAfter.trim()}>
                       <SelectTrigger id="qf" className="w-20">
                         <SelectValue />
                       </SelectTrigger>
@@ -273,9 +281,36 @@ export default function Create() {
                     <span className="text-sm text-muted-foreground">slides</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Label htmlFor="qstyle" className="text-sm">Checkpoint</Label>
+                    <Select value={quizStyle} onValueChange={setQuizStyle}>
+                      <SelectTrigger id="qstyle" className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inline">Inline band</SelectItem>
+                        <SelectItem value="slide">Full slide</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Switch id="ocr" checked={ocr} onCheckedChange={setOcr} />
                     <Label htmlFor="ocr" className="text-sm">Vision OCR for images</Label>
                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="qafter" className="text-sm whitespace-nowrap">
+                    …or after slides
+                  </Label>
+                  <Input
+                    id="qafter"
+                    value={quizAfter}
+                    onChange={(e) => setQuizAfter(e.target.value)}
+                    placeholder="e.g. 3, 7, 11"
+                    className="max-w-[180px]"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    a full checkpoint slide goes in after each
+                  </span>
                 </div>
 
                 <Button onClick={onGenerate} disabled={busy} className="self-start">

@@ -118,6 +118,8 @@ class GenerateRequest(BaseModel):
     theme_id: str = "auto"
     theme_spec: Optional[ThemeSpec] = None
     quiz_frequency: int = 4
+    quiz_positions: Optional[list[int]] = None
+    quiz_style: str = "inline"
     enable_vision_ocr: bool = True
     enable_quizzes: bool = True
     build_pptx: bool = True
@@ -138,6 +140,8 @@ def _config_from(request: GenerateRequest, textbook_mode: bool = False) -> Pipel
         theme_id=request.theme_id,
         theme_spec=spec or None,
         quiz_frequency=request.quiz_frequency,
+        quiz_positions=request.quiz_positions or None,
+        quiz_style=request.quiz_style,
         textbook_mode=textbook_mode,
         enable_vision_ocr=request.enable_vision_ocr,
         enable_quizzes=request.enable_quizzes,

@@ -208,7 +208,7 @@ Each task names the exact files to touch.
 
 ### PHASE 5 — Quizzes
 
-- [ ] **5.1 — Full interactive quiz slide, placement of choice.**
+- [x] **5.1 — Full interactive quiz slide, placement of choice.**
   Let the user mark "insert a checkpoint after slide N" (multiple allowed) in the
   editor. Generate a **standalone interactive** QUIZ slide there (not the inline
   band). Web = clickable; PPTX = the question on the slide with the answer +
@@ -216,17 +216,17 @@ Each task names the exact files to touch.
   *Files:* `ai/quiz_gen.py`, `pipeline/orchestrator.py`, `apps/api/main.py`,
   `frontend/src/pages/Create.jsx` / `Preview.jsx`
 
-- [ ] **5.2 — Confirm `quiz_frequency` reaches the backend.**
+- [x] **5.2 — Confirm `quiz_frequency` reaches the backend.**
   Trace Settings → `api.js` → `POST /api/jobs` → `PipelineConfig.quiz_frequency`.
   Add it to the Create form, not just Settings.
   *Files:* `frontend/src/api.js`, `frontend/src/pages/Create.jsx`, `apps/api/main.py`
 
-- [ ] **5.3 — Better PPTX quiz.**
+- [x] **5.3 — Better PPTX quiz.**
   Question slide → reveal options on click → reveal correct + explanation on final
   click (using the same `apply_click_builds`). No more static wall.
   *Files:* `rendering/ppt_builder.py`, `rendering/pptx_animation.py`
 
-- [ ] **5.4 — Quiz quality.**
+- [x] **5.4 — Quiz quality.** _(prompt + difficulty + why-wrong done; per-concept frequency deferred)_
   One MCQ per 3 slides is thin. Generate 1 per *concept*, tag difficulty, ensure
   distractors are plausible (near-miss on the same concept), add a short "why the
   others are wrong" line.

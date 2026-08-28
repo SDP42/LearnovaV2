@@ -63,6 +63,12 @@ class PipelineConfig:
     # When present it overrides theme_id entirely.
     theme_spec: Optional[Dict[str, Any]] = None
     quiz_frequency: int = DEFAULT_QUIZ_FREQUENCY
+    # Explicit 1-indexed content-slide numbers to drop a checkpoint AFTER. When
+    # set, overrides quiz_frequency and forces a standalone quiz slide.
+    quiz_positions: Optional[List[int]] = None
+    # "inline" = a band at the foot of a slide; "slide" = a dedicated
+    # interactive checkpoint slide.
+    quiz_style: str = "inline"
     textbook_mode: bool = False
     enable_vision_ocr: bool = True
     enable_quizzes: bool = True
@@ -436,7 +442,10 @@ def generate(
     def _quiz():
         result.quizzes = generate_quizzes(result.improved)
         result.final_deck = interleave_quizzes_into_slides(
-            result.improved, result.quizzes, frequency=config.quiz_frequency
+            result.improved, result.quizzes,
+            frequency=config.quiz_frequency,
+            inline=(config.quiz_style != "slide"),
+            positions=config.quiz_positions or None,
         )
         return len(result.final_deck)
 
