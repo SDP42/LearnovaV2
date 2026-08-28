@@ -4,14 +4,66 @@ Generates a standalone, responsive 60fps HTML5 presentation powered by Reveal.js
 Supports live interactive quizzes, flowcharts, tables, metric cards, and smooth slide transitions.
 """
 
+import functools
 import html
 import os
 import re
 import json
+from pathlib import Path
 from learnova.rendering.theme_engine import (
     get_theme, auto_detect_theme, select_slide_layout, resolve_theme,
     readable_text_hex, THEMES,
 )
+
+_VENDOR = Path(__file__).parent / "vendor"
+
+
+@functools.lru_cache(maxsize=8)
+def _vendor(name: str) -> str:
+    """Read a bundled Reveal.js asset. Returns '' if it is missing, so the
+    builder can fall back to the CDN <script>/<link>."""
+    try:
+        return (_VENDOR / name).read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _head_assets(font_query: str) -> str:
+    """Inline the Reveal CSS (offline-safe); keep Google Fonts on its host,
+    which the artifact CSP allows. Falls back to the CDN if a bundle is missing."""
+    css = _vendor("reveal.min.css")
+    theme_css = _vendor("theme-white.min.css")
+    if css and theme_css:
+        return (
+            f"<style>{css}</style>\n<style>{theme_css}</style>\n"
+            f'<link href="https://fonts.googleapis.com/css2?family={font_query}&display=swap" rel="stylesheet">'
+        )
+    return (
+        '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css" crossorigin="anonymous">\n'
+        '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/white.min.css" crossorigin="anonymous">\n'
+        f'<link href="https://fonts.googleapis.com/css2?family={font_query}&display=swap" rel="stylesheet">'
+    )
+
+
+def _body_scripts() -> str:
+    """Inline Reveal + the notes plugin so the deck runs with no network.
+    Mermaid stays on the CDN (700 KB, and the native step flow rarely needs it)."""
+    reveal = _vendor("reveal.min.js")
+    notes = _vendor("notes.js")
+    if reveal:
+        parts = [f"<script>{reveal}</script>"]
+        if notes:
+            parts.append(f"<script>{notes}</script>")
+        parts.append(
+            '<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js" crossorigin="anonymous"></script>'
+        )
+        return "\n".join(parts)
+    return (
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.js" crossorigin="anonymous"></script>\n'
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/notes/notes.js" crossorigin="anonymous"></script>\n'
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js" crossorigin="anonymous"></script>'
+    )
+
 
 def _inline_quiz_html(quiz: dict, theme) -> str:
     """
@@ -402,11 +454,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{html.escape(topic_title)} – Learnova Interactive Presentation</title>
-    <!-- Reveal.js CSS (pinned stable 4.6.1) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/white.min.css" crossorigin="anonymous">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family={_font_query(theme)}&display=swap" rel="stylesheet">
+    {_head_assets(_font_query(theme))}
     <style>
         body, .reveal {{
             font-family: '{theme.body_font}', sans-serif !important;
@@ -427,13 +475,8 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         </div>
     </div>
 
-    <!-- Reveal.js (pinned stable 4.6.1, classic UMD build) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.js" crossorigin="anonymous"></script>
-    <!-- Presenter view (speaker notes + next-slide preview + timer): press 's' -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/notes/notes.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.js" crossorigin="anonymous"></script>
-    <!-- Mermaid.js (cdnjs UMD standalone build – works in local file:// and data URIs) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js" crossorigin="anonymous"></script>
+    <!-- Reveal.js + notes plugin: bundled inline (offline-safe). Mermaid on CDN. -->
+    {_body_scripts()}
     <script>
         // Progressive reveal (one idea per click) is ON by default whenever the
         // deck is opened directly — a teacher double-clicking the .html gets the

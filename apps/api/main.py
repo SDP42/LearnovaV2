@@ -326,6 +326,26 @@ def start_generate(
             payload = _slides_payload(finished.result.final_deck)
         except Exception:
             payload = None
+        editable = None
+        if payload:
+            editable = [
+                {
+                    "layout_type": s.get("layout_type", "MINIMAL_TEXT"),
+                    "title": s.get("title", ""),
+                    "bullets": list(s.get("bullets") or []),
+                    "takeaway": s.get("takeaway", ""),
+                    "family": s.get("family"),
+                    "mermaid_code": s.get("mermaid_code"),
+                    "table_headers": s.get("table_headers"),
+                    "table_rows": s.get("table_rows"),
+                    "question": s.get("question"),
+                    "options": s.get("options"),
+                    "correct": s.get("correct"),
+                    "explanation": s.get("explanation"),
+                    "source_text": s.get("source_text", ""),
+                }
+                for s in payload
+            ]
         deck_library.save_deck(
             user_id=finished.user_id or ANONYMOUS_USER,
             result=finished.result,
@@ -333,6 +353,7 @@ def start_generate(
             theme_spec=config.theme_spec,
             title=finished.source_name,
             slides_payload=payload,
+            editable_slides=editable,
         )
 
     try:
@@ -344,59 +365,7 @@ def start_generate(
     return job.to_dict()
 
 
-def _slides_payload(final_deck: List[dict]) -> List[dict]:
-    # The Deck Director assigns the whole-deck presentation decisions
-    # (visual family/variant, inter-slide transition, animation timeline,
-    # summarisation directive, speaker notes). Failure here must not break the
-    # deck response, so it is best-effort.
-    plan_by_index: dict = {}
-    try:
-        from learnova.rendering.deck_director import plan_deck
-
-        for sp in plan_deck(final_deck).slides:
-            plan_by_index[sp.index] = sp
-    except Exception:  # pragma: no cover - director is advisory here
-        plan_by_index = {}
-
-    slides = []
-    for index, entry in enumerate(final_deck):
-        improved = entry.get("improved", {})
-        original = entry.get("original", {})
-        sp = plan_by_index.get(index)
-        slides.append(
-            {
-                "index": index,
-                "layout_type": improved.get("layout_type", "MINIMAL_TEXT").upper(),
-                "title": improved.get("title", f"Slide {index + 1}"),
-                "bullets": improved.get("bullets", []),
-                "takeaway": improved.get("takeaway", ""),
-                "mermaid_code": improved.get("mermaid_code"),
-                "table_headers": improved.get("table_headers"),
-                "table_rows": improved.get("table_rows"),
-                "metric_value": improved.get("metric_value"),
-                "metric_label": improved.get("metric_label"),
-                "metric_desc": improved.get("metric_desc"),
-                "question": improved.get("question"),
-                "options": improved.get("options"),
-                "correct": improved.get("correct"),
-                "visual_source": improved.get("visual_source", "router"),
-                "continued": bool(improved.get("continued")),
-                "has_image": bool(original.get("image")),
-                "source_text": original.get("text", ""),
-                # Deck Director decisions (may be absent if the director failed)
-                "family": getattr(sp, "family", None),
-                "variant": getattr(sp, "variant", None),
-                "treatment": getattr(sp, "treatment", None),
-                "transition": getattr(sp, "transition", None),
-                "transition_reason": getattr(sp, "transition_reason", None),
-                "summary_directive": getattr(sp, "summary_directive", None),
-                "reveal_steps": len(getattr(sp, "animation", {}).get("steps", [])) if sp else 0,
-                "speaker_notes": getattr(sp, "speaker_notes", ""),
-                "est_seconds": getattr(sp, "est_seconds", None),
-                "is_section_start": getattr(sp, "is_section_start", False),
-            }
-        )
-    return slides
+from learnova.rendering.deck_payload import slides_payload as _slides_payload
 
 
 @app.get("/api/jobs/{job_id}/deck")
@@ -516,3 +485,81 @@ def delete_my_deck(deck_id: str, user_id: str = Depends(current_user)) -> Respon
     if not deck_library.delete_deck(user_id, deck_id):
         raise HTTPException(status_code=404, detail="deck not found")
     return Response(status_code=204)
+
+
+# ── Deck editor ───────────────────────────────────────────────────────────────
+@app.get("/api/decks/{deck_id}/editable")
+def get_editable_slides(deck_id: str, user_id: str = Depends(current_user)) -> dict:
+    record = deck_library.get_deck(user_id, deck_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    slides = deck_library.read_editable(user_id, deck_id) or []
+    return {
+        "deck_id": deck_id,
+        "title": record.get("title", ""),
+        "version": record.get("version", 1),
+        "versions": record.get("versions", []),
+        "slides": slides,
+    }
+
+
+class SlidesEdit(BaseModel):
+    slides: list[dict]
+    note: str = "edited"
+
+
+@app.put("/api/decks/{deck_id}/slides")
+def save_deck_slides(
+    deck_id: str, body: SlidesEdit, user_id: str = Depends(current_user)
+) -> JSONResponse:
+    record = deck_library.get_deck(user_id, deck_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    if not body.slides:
+        raise HTTPException(status_code=400, detail="no slides")
+
+    from learnova.storage import deck_edit
+
+    try:
+        built = deck_edit.rebuild(
+            body.slides,
+            title=record.get("title", "Presentation"),
+            theme_id=record.get("theme_id", "auto"),
+            theme_spec=record.get("theme_spec"),
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=f"re-render failed: {exc}") from exc
+
+    meta = deck_library.save_edit(
+        user_id, deck_id,
+        editable_slides=body.slides,
+        slides_payload=built["slides_payload"],
+        html_bytes=built["html_bytes"],
+        pptx_bytes=built["pptx_bytes"],
+        scores=built["scores"],
+        quizzes=built["quizzes"],
+        note=body.note,
+    )
+    if meta is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    return JSONResponse({
+        "deck_id": deck_id,
+        "version": meta.get("version"),
+        "summary": {
+            "source_name": meta.get("title", ""),
+            "slide_count": meta.get("slide_count", 0),
+            "quiz_count": meta.get("quiz_count", 0),
+            "overall_score": meta.get("overall_score", 0),
+        },
+        "slides": built["slides_payload"],
+    })
+
+
+@app.post("/api/decks/{deck_id}/versions/{v}/restore")
+def restore_deck_version(
+    deck_id: str, v: int, user_id: str = Depends(current_user)
+) -> dict:
+    meta = deck_library.restore_version(user_id, deck_id, v)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="version not found")
+    return {"deck_id": deck_id, "version": meta.get("version")}

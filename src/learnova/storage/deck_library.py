@@ -30,6 +30,8 @@ PPTX_FILE = "deck.pptx"
 HTML_FILE = "deck.html"
 META_FILE = "meta.json"
 SLIDES_FILE = "deck.json"   # the slides payload, so a saved deck opens without a live job
+EDIT_FILE = "deck_edit.json"  # the editable improved-slide list (title/bullets/family), for re-renders
+VERSIONS_DIR = "versions"
 
 
 @dataclass
@@ -48,6 +50,8 @@ class DeckRecord:
     has_html: bool = False
     source_type: str = ""
     stages: List[dict] = field(default_factory=list)
+    version: int = 1
+    versions: List[dict] = field(default_factory=list)  # [{v, at, note}]
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -75,6 +79,7 @@ def save_deck(
     theme_spec: Optional[dict] = None,
     title: Optional[str] = None,
     slides_payload: Optional[list] = None,
+    editable_slides: Optional[list] = None,
 ) -> DeckRecord:
     """Persist a ``PipelineResult`` for one user and return its record."""
     deck_id = uuid.uuid4().hex[:16]
@@ -98,6 +103,10 @@ def save_deck(
                 ensure_ascii=False,
             ),
             encoding="utf-8",
+        )
+    if editable_slides is not None:
+        (target / EDIT_FILE).write_text(
+            json.dumps({"slides": editable_slides}, ensure_ascii=False), encoding="utf-8"
         )
 
     record = DeckRecord(
@@ -171,6 +180,117 @@ def read_slides(user_id: str, deck_id: str) -> Optional[dict]:
         return None
 
 
+def read_editable(user_id: str, deck_id: str) -> Optional[list]:
+    """The editable improved-slide list, falling back to the display payload."""
+    d = _deck_dir(user_id, deck_id)
+    path = d / EDIT_FILE
+    if path.is_file():
+        try:
+            return json.loads(path.read_text(encoding="utf-8")).get("slides")
+        except (OSError, json.JSONDecodeError):
+            pass
+    # Fallback: reconstruct from the display payload (deck.json).
+    stored = read_slides(user_id, deck_id) or {}
+    out = []
+    for s in stored.get("slides", []):
+        out.append({
+            "layout_type": s.get("layout_type", "MINIMAL_TEXT"),
+            "title": s.get("title", ""),
+            "bullets": list(s.get("bullets") or []),
+            "takeaway": s.get("takeaway", ""),
+            "family": s.get("family"),
+            "mermaid_code": s.get("mermaid_code"),
+            "table_headers": s.get("table_headers"),
+            "table_rows": s.get("table_rows"),
+            "question": s.get("question"),
+            "options": s.get("options"),
+            "correct": s.get("correct"),
+            "explanation": s.get("explanation"),
+            "source_text": s.get("source_text", ""),
+        })
+    return out or None
+
+
+def save_edit(user_id: str, deck_id: str, *, editable_slides: list,
+              slides_payload: list, html_bytes: Optional[bytes],
+              pptx_bytes: Optional[bytes], scores: dict, quizzes: list,
+              note: str = "edited") -> Optional[dict]:
+    """
+    Overwrite a deck's artifacts with an edited re-render, archiving the previous
+    version under versions/v{n}/ first. Returns the updated meta dict.
+    """
+    d = _deck_dir(user_id, deck_id)
+    if not (d / META_FILE).is_file():
+        return None
+    meta = json.loads((d / META_FILE).read_text(encoding="utf-8"))
+    cur_v = int(meta.get("version", 1))
+
+    # Archive current artifacts.
+    vdir = d / VERSIONS_DIR / f"v{cur_v}"
+    vdir.mkdir(parents=True, exist_ok=True)
+    for name in (HTML_FILE, PPTX_FILE, SLIDES_FILE, EDIT_FILE):
+        src = d / name
+        if src.is_file():
+            shutil.copy2(src, vdir / name)
+
+    # Write the new version.
+    if html_bytes:
+        (d / HTML_FILE).write_bytes(html_bytes)
+    if pptx_bytes:
+        (d / PPTX_FILE).write_bytes(pptx_bytes)
+    (d / SLIDES_FILE).write_text(
+        json.dumps({"slides": slides_payload, "quizzes": quizzes, "scores": scores},
+                   ensure_ascii=False), encoding="utf-8")
+    (d / EDIT_FILE).write_text(
+        json.dumps({"slides": editable_slides}, ensure_ascii=False), encoding="utf-8")
+
+    versions = list(meta.get("versions") or [])
+    versions.append({"v": cur_v, "at": time.time(), "note": meta.get("_last_note", "original" if cur_v == 1 else "edited")})
+    meta.update({
+        "version": cur_v + 1,
+        "versions": versions,
+        "_last_note": note,
+        "slide_count": len(editable_slides),
+        "quiz_count": len(quizzes),
+        "overall_score": int((scores or {}).get("overall_score", meta.get("overall_score", 0)) or 0),
+        "has_pptx": bool(pptx_bytes) or meta.get("has_pptx", False),
+        "has_html": bool(html_bytes) or meta.get("has_html", False),
+    })
+    (d / META_FILE).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    logger.info("saved edit v%d for deck %s", cur_v + 1, deck_id)
+    return meta
+
+
+def restore_version(user_id: str, deck_id: str, v: int) -> Optional[dict]:
+    """Roll a deck's artifacts back to an archived version (itself archived first)."""
+    d = _deck_dir(user_id, deck_id)
+    vdir = d / VERSIONS_DIR / f"v{int(v)}"
+    if not vdir.is_dir() or not (d / META_FILE).is_file():
+        return None
+    meta = json.loads((d / META_FILE).read_text(encoding="utf-8"))
+    cur_v = int(meta.get("version", 1))
+    keep = d / VERSIONS_DIR / f"v{cur_v}"
+    keep.mkdir(parents=True, exist_ok=True)
+    for name in (HTML_FILE, PPTX_FILE, SLIDES_FILE, EDIT_FILE):
+        if (d / name).is_file():
+            shutil.copy2(d / name, keep / name)
+        if (vdir / name).is_file():
+            shutil.copy2(vdir / name, d / name)
+
+    slides = []
+    try:
+        slides = json.loads((d / EDIT_FILE).read_text(encoding="utf-8")).get("slides", [])
+    except Exception:
+        pass
+    versions = list(meta.get("versions") or [])
+    versions.append({"v": cur_v, "at": time.time(), "note": "before restore"})
+    meta.update({"version": cur_v + 1, "versions": versions,
+                 "_last_note": f"restored v{v}", "slide_count": len(slides)})
+    (d / META_FILE).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    logger.info("restored deck %s to v%d", deck_id, v)
+    return meta
+
+
 def read_artifact(user_id: str, deck_id: str, artifact: str) -> Optional[bytes]:
     """Read the stored ``pptx`` or ``html`` bytes for a deck."""
     filename = {"pptx": PPTX_FILE, "html": HTML_FILE}.get(artifact)
@@ -192,10 +312,13 @@ def delete_deck(user_id: str, deck_id: str) -> bool:
 __all__ = [
     "DeckRecord",
     "save_deck",
+    "save_edit",
+    "restore_version",
     "list_decks",
     "get_deck",
     "read_markdown",
     "read_slides",
+    "read_editable",
     "read_artifact",
     "delete_deck",
 ]

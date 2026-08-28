@@ -1,22 +1,66 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  Check,
   Clock,
   Download,
   FileDown,
+  History,
+  Loader2,
+  Pencil,
   Play,
+  RotateCcw,
   Sparkles,
+  X,
 } from "lucide-react";
 import * as api from "@/api";
 import { UserButton } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+
+const FAMILIES = [
+  ["", "Auto — let the engine choose"],
+  ["TEXT", "Plain text"],
+  ["PROCESS_LINEAR", "Flowchart / steps"],
+  ["PROCESS_CYCLIC", "Cycle"],
+  ["WORKED_EXAMPLE", "Worked example"],
+  ["TIMELINE", "Timeline"],
+  ["COMPARE_TABLE", "Comparison table"],
+  ["COMPARE_VISUAL", "Pros & cons"],
+  ["MATRIX_GRID", "2×2 matrix"],
+  ["HIERARCHY_NEST", "Pyramid"],
+  ["MIND_MAP", "Mind map"],
+  ["LIST_STRUCTURED", "Card grid"],
+  ["CHART_CATEGORICAL", "Bar chart"],
+  ["CHART_TREND", "Line chart"],
+  ["CHART_PART_TO_WHOLE", "Pie chart"],
+  ["SET_DIAGRAM", "Venn"],
+  ["DEFINITION", "Definition"],
+  ["QUOTE", "Quote"],
+  ["KPI", "Big number"],
+];
 
 function Prop({ label, children }) {
   return (
@@ -29,20 +73,37 @@ function Prop({ label, children }) {
 
 export default function Preview() {
   const { jobId } = useParams();
-  const navigate = useNavigate();
   const [deck, setDeck] = useState(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(0);
   const [htmlUrl, setHtmlUrl] = useState(null);
   const iframeRef = useRef(null);
 
-  useEffect(() => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(null); // editable slide list
+  const [meta, setMeta] = useState({ version: 1, versions: [] });
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  const loadDeck = useCallback(() => {
     api.getDeck(jobId).then(setDeck).catch((e) => setError(e.message));
   }, [jobId]);
 
+  useEffect(loadDeck, [loadDeck]);
+
   useEffect(() => {
-    let revoked = false;
+    api
+      .getEditableSlides(jobId)
+      .then((r) => {
+        setDraft(r.slides || []);
+        setMeta({ version: r.version || 1, versions: r.versions || [] });
+      })
+      .catch(() => setDraft([]));
+  }, [jobId]);
+
+  const loadHtml = useCallback(() => {
     let url;
+    let revoked = false;
     api
       .deckArtifactUrl(jobId, "html")
       .then((u) => {
@@ -57,12 +118,13 @@ export default function Preview() {
     };
   }, [jobId]);
 
+  useEffect(loadHtml, [loadHtml]);
+
   const slides = deck?.slides ?? [];
   const cur = slides[selected];
+  const curDraft = draft?.[selected];
   const summary = deck?.summary;
 
-  // Drive the embedded Reveal.js deck to the selected slide (title slide is #0).
-  // Retry: Reveal may not be initialised in the iframe yet on the first tick.
   useEffect(() => {
     let tries = 0;
     const tick = () => {
@@ -102,6 +164,45 @@ export default function Preview() {
     }
   }
 
+  function patchDraft(patch) {
+    setDraft((d) => d.map((s, i) => (i === selected ? { ...s, ...patch } : s)));
+    setDirty(true);
+  }
+
+  async function save() {
+    if (!draft?.length) return;
+    setSaving(true);
+    setError("");
+    try {
+      const r = await api.saveDeckSlides(jobId, draft);
+      setMeta((m) => ({ ...m, version: r.version }));
+      setDirty(false);
+      loadDeck();
+      loadHtml();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function restore(v) {
+    setSaving(true);
+    try {
+      await api.restoreDeckVersion(jobId, v);
+      const r = await api.getEditableSlides(jobId);
+      setDraft(r.slides || []);
+      setMeta({ version: r.version || 1, versions: r.versions || [] });
+      setDirty(false);
+      loadDeck();
+      loadHtml();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div data-learnova-app className="flex h-svh flex-col bg-background text-foreground">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3">
@@ -113,6 +214,9 @@ export default function Preview() {
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">
             {summary?.source_name || deck?.job_id || "Presentation"}
+            {meta.version > 1 ? (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">v{meta.version}</span>
+            ) : null}
           </p>
           <p className="text-xs text-muted-foreground">
             {summary ? `${summary.slide_count} slides · ${summary.quiz_count} quizzes` : "…"}
@@ -121,27 +225,72 @@ export default function Preview() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => download("html")}>
-            <Download /> Web deck
-          </Button>
-          <Button size="sm" onClick={() => download("pptx")}>
-            <FileDown /> PowerPoint
-          </Button>
-          <Button asChild variant="outline" size="sm" title="Open presenter view">
-            <Link to={`/app/present/${jobId}`}>
-              <Play /> Present
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="secondary">
-            <Link to={`/app/export/${jobId}`}>Finish</Link>
-          </Button>
+          {editing ? (
+            <>
+              <Button size="sm" onClick={save} disabled={saving || !dirty}>
+                {saving ? <Loader2 className="animate-spin" /> : <Check />}
+                {saving ? "Re-rendering…" : "Save & re-render"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                <X /> Done
+              </Button>
+            </>
+          ) : (
+            <>
+              {meta.versions?.length ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="ghost">
+                      <History /> History
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Restore a previous version</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {meta.versions
+                      .slice()
+                      .reverse()
+                      .map((v) => (
+                        <DropdownMenuItem key={v.v} onSelect={() => restore(v.v)}>
+                          <RotateCcw /> v{v.v} — {v.note}
+                        </DropdownMenuItem>
+                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                <Pencil /> Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => download("html")}>
+                <Download /> Web deck
+              </Button>
+              <Button size="sm" onClick={() => download("pptx")}>
+                <FileDown /> PowerPoint
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/app/present/${jobId}`}>
+                  <Play /> Present
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="secondary">
+                <Link to={`/app/export/${jobId}`}>Finish</Link>
+              </Button>
+            </>
+          )}
           <UserButton afterSignOutUrl="/" />
         </div>
       </header>
 
-      {error ? <p className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p>
+      ) : null}
+      {dirty && !editing ? (
+        <p className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+          You have unsaved edits — open Edit to save and re-render.
+        </p>
+      ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[220px_1fr_300px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[220px_1fr_320px]">
         {/* Slides rail */}
         <ScrollArea className="border-r">
           <ul className="flex flex-col gap-2 p-3">
@@ -167,14 +316,16 @@ export default function Preview() {
                           </span>
                         ) : null}
                       </div>
-                      <p className="line-clamp-2 font-medium">{s.title}</p>
+                      <p className="line-clamp-2 font-medium">
+                        {draft?.[i]?.title || s.title}
+                      </p>
                     </button>
                   </li>
                 ))}
           </ul>
         </ScrollArea>
 
-        {/* Reveal.js viewer */}
+        {/* Viewer */}
         <div className="flex min-w-0 items-center justify-center bg-muted/30 p-4">
           {htmlUrl ? (
             <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -184,9 +335,8 @@ export default function Preview() {
                 src={htmlUrl}
                 className="h-full w-full"
                 onLoad={() => {
-                  const R = iframeRef.current?.contentWindow?.Reveal;
                   try {
-                    R?.slide?.(selected + 1);
+                    iframeRef.current?.contentWindow?.Reveal?.slide?.(selected + 1);
                   } catch {
                     /* ignore */
                   }
@@ -198,19 +348,70 @@ export default function Preview() {
           )}
         </div>
 
-        {/* Properties */}
+        {/* Properties / editor */}
         <ScrollArea className="border-l">
           <div className="flex flex-col gap-4 p-4">
-            <p className="text-sm font-semibold">Slide {selected + 1}</p>
-            {!cur ? (
+            <p className="text-sm font-semibold">
+              {editing ? "Edit slide" : "Slide"} {selected + 1}
+            </p>
+
+            {editing && curDraft ? (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Title</label>
+                  <Input
+                    value={curDraft.title || ""}
+                    onChange={(e) => patchDraft({ title: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Points (one per line)
+                  </label>
+                  <Textarea
+                    rows={7}
+                    value={(curDraft.bullets || []).join("\n")}
+                    onChange={(e) =>
+                      patchDraft({
+                        bullets: e.target.value.split("\n").map((x) => x.trimEnd()).filter(Boolean),
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Visual</label>
+                  <Select
+                    value={curDraft.family || ""}
+                    onValueChange={(v) => patchDraft({ family: v || null })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FAMILIES.map(([v, label]) => (
+                        <SelectItem key={v || "auto"} value={v}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Takeaway</label>
+                  <Input
+                    value={curDraft.takeaway || ""}
+                    onChange={(e) => patchDraft({ takeaway: e.target.value })}
+                    placeholder="One-line key point (optional)"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Save re-runs the layout, animation and scoring for the whole deck.
+                  Figures from the original generation are not carried into an edit.
+                </p>
+              </>
+            ) : !cur ? (
               <Skeleton className="h-40" />
             ) : (
               <>
                 <Prop label="Visual">
                   <span className="font-medium">{cur.variant || cur.treatment || cur.layout_type}</span>
-                  {cur.family ? (
-                    <span className="text-muted-foreground"> · {cur.family}</span>
-                  ) : null}
+                  {cur.family ? <span className="text-muted-foreground"> · {cur.family}</span> : null}
                 </Prop>
                 <Prop label="Transition in">
                   <Badge variant="secondary">{cur.transition || "slide"}</Badge>
@@ -248,9 +449,7 @@ export default function Preview() {
                 {cur.mermaid_code ||
                 (cur.family && /PROCESS|FLOW|DECISION|STATE/.test(cur.family)) ? (
                   <Button asChild variant="outline" size="sm" className="w-full">
-                    <Link to={`/app/diagram/${jobId}/${selected}`}>
-                      Open in diagram editor
-                    </Link>
+                    <Link to={`/app/diagram/${jobId}/${selected}`}>Open in diagram editor</Link>
                   </Button>
                 ) : null}
 

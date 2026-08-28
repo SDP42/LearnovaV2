@@ -13,9 +13,11 @@ const PHASES = [
   { label: "Reading your content", stages: ["convert", "chunk"] },
   { label: "Extracting text & images", stages: ["vision_ocr", "index"] },
   { label: "Understanding structure", stages: ["layout", "visual_plan"] },
-  { label: "Designing visual layouts", stages: ["enhance", "density"] },
-  { label: "Creating checkpoint quiz", stages: ["quiz", "score"] },
-  { label: "Preparing your presentation", stages: ["build_pptx", "build_html"] },
+  { label: "Choosing visuals & data", stages: ["visual_data"] },
+  { label: "Explaining every step", stages: ["expand", "enhance"] },
+  { label: "Laying out slides", stages: ["density"] },
+  { label: "Writing checkpoint quizzes", stages: ["quiz", "score"] },
+  { label: "Building your two decks", stages: ["build_pptx", "build_html"] },
 ];
 
 const ORDER = PHASES.flatMap((p) => p.stages);

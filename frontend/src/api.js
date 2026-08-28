@@ -127,6 +127,32 @@ export async function deleteDeck(deckId) {
   );
 }
 
+// ── Deck editor ───────────────────────────────────────────────────────────
+export async function getEditableSlides(deckId) {
+  return json(
+    await fetch(`${BASE}/api/decks/${deckId}/editable`, { headers: await authHeaders() })
+  );
+}
+
+export async function saveDeckSlides(deckId, slides, note = "edited") {
+  return json(
+    await fetch(`${BASE}/api/decks/${deckId}/slides`, {
+      method: "PUT",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ slides, note }),
+    })
+  );
+}
+
+export async function restoreDeckVersion(deckId, v) {
+  return json(
+    await fetch(`${BASE}/api/decks/${deckId}/versions/${v}/restore`, {
+      method: "POST",
+      headers: await authHeaders(),
+    })
+  );
+}
+
 /**
  * Downloads must carry the Authorization header, so a plain <a href> will not
  * work — fetch the bytes, then hand the browser a temporary object URL.
