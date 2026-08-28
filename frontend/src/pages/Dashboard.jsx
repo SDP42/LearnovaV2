@@ -4,8 +4,10 @@ import { useUser } from "@/auth";
 import {
   FileStack,
   Images,
+  Lightbulb,
   ListChecks,
   Presentation,
+  Rocket,
   Sparkles,
   TrendingUp,
 } from "lucide-react";
@@ -139,6 +141,75 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="lv-card">
+            <CardHeader className="flex flex-row items-center gap-2">
+              <Rocket className="size-4 text-primary" />
+              <CardTitle className="text-base">Getting started</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ol className="flex flex-col gap-3 text-sm">
+                {[
+                  ["Add source material", "Paste a syllabus or upload a PPTX/PDF on the Create screen."],
+                  ["Check the structure", "Edit the markdown the engine will reason over — headings and lists drive the visual choices."],
+                  ["Generate", "Layout, visuals, reveal timing, quizzes and scoring run in one pass."],
+                  ["Present or export", "Open the presenter console, or download the animated PPTX and web deck."],
+                ].map(([t, d], i) => (
+                  <li key={t} className="flex gap-3">
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                      {i + 1}
+                    </span>
+                    <span>
+                      <span className="font-medium text-foreground">{t}</span>{" "}
+                      <span className="text-muted-foreground">— {d}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <Button asChild size="sm" className="mt-4">
+                <Link to="/app/create">
+                  <Sparkles /> Start now
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="lv-card">
+            <CardHeader className="flex flex-row items-center gap-2">
+              <Lightbulb className="size-4 text-primary" />
+              <CardTitle className="text-base">Tips for better decks</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="flex flex-col gap-3 text-sm text-muted-foreground">
+                <li>
+                  <span className="font-medium text-foreground">Use headings.</span> Every{" "}
+                  <code className="rounded bg-muted px-1">##</code> becomes a slide boundary the
+                  engine can reason about.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Number your steps.</span> Three or
+                  more ordered items turn into a flowchart with progressive reveal.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Keep definitions tight.</span>{" "}
+                  Precise wording is detected and kept verbatim — don't pad it.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Add an LLM key.</span> Groq or NVIDIA
+                  unlocks rewriting, analogies and checkpoint quizzes.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Watch the PSF score.</span> Below 70
+                  usually means a slide is still text-heavy — split it.
+                </li>
+              </ul>
+              <Button asChild variant="ghost" size="sm" className="mt-3">
+                <Link to="/app/docs">Read the docs</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </AppLayout>
   );

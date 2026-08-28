@@ -1,5 +1,14 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, FlaskConical, LineChart, Workflow } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  Columns2,
+  FlaskConical,
+  GitBranch,
+  History,
+  LineChart,
+  Workflow,
+} from "lucide-react";
 import AppLayout from "@/components/app/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +62,52 @@ The second law states that the total entropy of an isolated system can never dec
 
 ## Heat Engines
 A heat engine converts thermal energy into mechanical work by exploiting a temperature difference between a hot and a cold reservoir.`,
+  },
+  {
+    icon: History,
+    title: "Timeline / history",
+    hint: "Dated events → timeline with progressive reveal",
+    topic: "A Short History of the Internet",
+    text: `## Key Milestones
+- 1969: ARPANET connects its first four university nodes
+- 1983: ARPANET adopts TCP/IP, marking the birth of the modern internet
+- 1989: Tim Berners-Lee proposes the World Wide Web at CERN
+- 1993: The Mosaic browser brings the web to a general audience
+- 2004: The rise of social platforms shifts the web toward user-generated content
+- 2007: The smartphone makes the internet mobile-first
+
+## Why It Matters
+Each step lowered the barrier to being online, moving the network from a research tool to everyday infrastructure.`,
+  },
+  {
+    icon: Columns2,
+    title: "Comparison / trade-offs",
+    hint: "Two options across the same aspects → comparison",
+    topic: "SQL vs NoSQL Databases",
+    text: `## SQL vs NoSQL
+SQL databases use a fixed schema, guarantee ACID transactions, scale vertically, and are ideal for structured data with complex relationships.
+NoSQL databases use a flexible schema, favour eventual consistency, scale horizontally, and are ideal for large volumes of unstructured or rapidly changing data.
+
+## Choosing Between Them
+- Choose SQL when data integrity and complex queries matter most
+- Choose NoSQL when write throughput and horizontal scale matter most`,
+  },
+  {
+    icon: GitBranch,
+    title: "Hierarchy / taxonomy",
+    hint: "Nested categories → tree or mind map",
+    topic: "Types of Machine Learning",
+    text: `## Machine Learning
+Machine learning divides into three broad approaches.
+
+### Supervised Learning
+Learns a mapping from labelled examples. Includes classification and regression.
+
+### Unsupervised Learning
+Finds structure in unlabelled data. Includes clustering and dimensionality reduction.
+
+### Reinforcement Learning
+Learns a policy by interacting with an environment and receiving rewards. Includes value-based and policy-gradient methods.`,
   },
 ];
 
