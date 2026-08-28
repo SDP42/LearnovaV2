@@ -1,12 +1,12 @@
 /**
  * Auth shim.
  *
- * In normal operation this just re-exports @clerk/clerk-react. When the app is
+ * In normal operation this re-exports @clerk/react (v6). When the app is
  * started with `VITE_DEMO=1` it swaps in no-op stubs so the UI can be run and
  * viewed without a Clerk account (the FastAPI backend already has an anonymous
  * single-user mode). Demo mode is never bundled unless the env flag is set.
  */
-import * as Clerk from "@clerk/clerk-react";
+import * as Clerk from "@clerk/react";
 
 export const DEMO = import.meta.env.VITE_DEMO === "1";
 
@@ -21,8 +21,14 @@ export const useUser = DEMO
   ? () => ({ isLoaded: true, isSignedIn: true, user: { firstName: "Demo", fullName: "Demo User" } })
   : Clerk.useUser;
 
-export const SignedIn = DEMO ? passthrough : Clerk.SignedIn;
-export const SignedOut = DEMO ? empty : Clerk.SignedOut;
+// @clerk/react v6 replaced <SignedIn>/<SignedOut> with <Show when="…">.
+// Keep the old names so the rest of the app is unchanged.
+export const SignedIn = DEMO
+  ? passthrough
+  : ({ children }) => <Clerk.Show when="signed-in">{children}</Clerk.Show>;
+export const SignedOut = DEMO
+  ? empty
+  : ({ children }) => <Clerk.Show when="signed-out">{children}</Clerk.Show>;
 
 export const UserButton = DEMO
   ? () => (

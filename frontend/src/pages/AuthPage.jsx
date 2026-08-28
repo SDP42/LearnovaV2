@@ -1,95 +1,52 @@
+import { Link } from "react-router-dom";
+import { Sparkles } from "lucide-react";
 import { SignIn, SignUp } from "@/auth";
-import Footer from "../components/Footer.jsx";
-import Navbar from "../components/Navbar.jsx";
+import { ThemeToggle } from "@/components/theme.jsx";
 
-// Clerk's card is restyled to match the brutalist shell: square corners,
-// black borders, amber primary button. Clerk renders in its own tree and
-// takes plain values, not CSS custom properties — these must stay literals and
-// be kept in step with the --accent tokens in styles.css.
-const clerkAppearance = {
-  variables: {
-    colorPrimary: "#000000",
-    colorText: "#000000",
-    colorBackground: "#ffffff",
-    borderRadius: "0px",
-    fontFamily: "Archivo, system-ui, sans-serif",
-  },
-  elements: {
-    rootBox: { width: "100%" },
-    cardBox: { boxShadow: "none", borderRadius: 0 },
-    card: { boxShadow: "none", borderRadius: 0, border: "none" },
-    headerTitle: {
-      fontFamily: "Oswald, sans-serif",
-      textTransform: "uppercase",
-      letterSpacing: "0.06em",
-    },
-    formButtonPrimary: {
-      background: "#ffbd00",
-      color: "#000",
-      border: "3px solid #000",
-      borderRadius: 0,
-      fontFamily: "Oswald, sans-serif",
-      textTransform: "uppercase",
-      letterSpacing: "0.12em",
-      fontWeight: 600,
-      boxShadow: "none",
-      "&:hover": { background: "#cc9700" },
-    },
-    socialButtonsBlockButton: { borderRadius: 0, border: "2px solid #000" },
-    formFieldInput: { borderRadius: 0, border: "2px solid #000" },
-    footerActionLink: { color: "#000", fontWeight: 700 },
-  },
-};
-
+/**
+ * Sign-in / sign-up on the new design shell. Clerk's own card styling is set
+ * globally via ClerkThemed's `appearance`, so the component just drops in.
+ */
 export default function AuthPage({ mode = "sign-in" }) {
   const isSignIn = mode === "sign-in";
+  const Clerk = isSignIn ? SignIn : SignUp;
 
   return (
-    <>
-      <Navbar variant="solid" />
+    <div
+      data-learnova-app
+      className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 text-foreground"
+    >
+      <div className="pointer-events-none absolute inset-0 lv-grid-bg" />
+      <div className="lv-glow left-1/2 top-0 h-[380px] w-[620px] -translate-x-1/2" />
 
-      <section className="auth-wrap dotgrid" style={{ paddingTop: 110 }}>
-        <div className="watermark auth-watermark">LEARNOVA</div>
+      <header className="absolute inset-x-0 top-0 flex items-center justify-between px-5 py-4">
+        <Link to="/" className="flex items-center gap-2">
+          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Sparkles className="size-4" />
+          </span>
+          <span className="text-base font-semibold tracking-tight">Learnova</span>
+        </Link>
+        <ThemeToggle />
+      </header>
 
-        <div className="auth-head">
-          <div className="hero-badge">
-            <span className="dot" />
-            <span className="eyebrow">SECURE {isSignIn ? "LOGIN" : "SIGN UP"}</span>
-          </div>
-
-          <h1 className="display auth-title">
-            {isSignIn ? "SIGN" : "CREATE"}
-            <br />
-            <span className="outline-word">{isSignIn ? "IN." : "ACCOUNT."}</span>
+      <div className="relative flex w-full max-w-sm flex-col items-center gap-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isSignIn ? "Welcome back" : "Create your account"}
           </h1>
-
-          <p className="auth-sub">Access your <b>Learnova</b> studio and deck library.
-            <br />Build smarter. Present better.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Continue to your Learnova studio and deck library.
           </p>
         </div>
 
-        <div className="auth-card">
-          {isSignIn ? (
-            <SignIn
-              routing="path"
-              path="/sign-in"
-              signUpUrl="/sign-up"
-              forceRedirectUrl="/studio"
-              appearance={clerkAppearance}
-            />
-          ) : (
-            <SignUp
-              routing="path"
-              path="/sign-up"
-              signInUrl="/sign-in"
-              forceRedirectUrl="/studio"
-              appearance={clerkAppearance}
-            />
-          )}
-        </div>
-      </section>
-
-      <Footer />
-    </>
+        <Clerk
+          routing="path"
+          path={isSignIn ? "/sign-in" : "/sign-up"}
+          {...(isSignIn ? { signUpUrl: "/sign-up" } : { signInUrl: "/sign-in" })}
+          fallbackRedirectUrl="/app"
+          forceRedirectUrl="/app"
+        />
+      </div>
+    </div>
   );
 }
