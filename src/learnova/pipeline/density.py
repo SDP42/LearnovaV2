@@ -31,6 +31,11 @@ from learnova.textutils import clean_bullet, dedupe_bullets
 # Off by default so behaviour and the test suite are unchanged.
 _USE_CLASS = os.getenv("LEARNOVA_USE_CLASS", "").lower() in {"1", "true", "yes", "on"}
 
+# When set, a bullet is never shortened at all — the full sentence the source
+# had is kept, and layout fitting is left to the renderer's auto-scaling. Useful
+# for study handouts and worked examples where the reasoning IS the content.
+_VERBOSE_BULLETS = os.getenv("LEARNOVA_VERBOSE_BULLETS", "").lower() in {"1", "true", "yes", "on"}
+
 
 def _segment(items: List[str], size: int, layout: str = "MINIMAL_TEXT") -> List[List[str]]:
     """Split a bullet/step list into slide-sized groups.
@@ -89,16 +94,33 @@ PROFILES: Dict[str, DensityProfile] = {
     "medium": DensityProfile(
         id="medium",
         label="Medium — balanced (default)",
-        description="Five bullets per slide with one supporting example. "
-                    "Works for teaching and for self-study.",
+        description="Five points per slide, each a full teaching sentence, "
+                    "with one supporting example. Teaching and self-study.",
         max_bullets=5,
-        max_words_per_bullet=20,
-        max_chars_per_bullet=140,
+        # A complete teaching point keeps its reasoning ("... because ...",
+        # "... so that ..."). 20 words clipped that mid-clause; 30 does not.
+        max_words_per_bullet=30,
+        max_chars_per_bullet=210,
         max_table_rows=6,
         max_flow_steps=4,
         max_grid_cards=4,
         include_enhancement=True,
         enhancement_items=1,
+    ),
+    "teaching": DensityProfile(
+        id="teaching",
+        label="Teaching — explain every step",
+        description="Every point kept as a full sentence with its reasoning. "
+                    "One idea revealed per click. Best for typed lesson notes "
+                    "and worked examples.",
+        max_bullets=6,
+        max_words_per_bullet=40,
+        max_chars_per_bullet=280,
+        max_table_rows=8,
+        max_flow_steps=6,
+        max_grid_cards=4,
+        include_enhancement=True,
+        enhancement_items=2,
     ),
     "heavy": DensityProfile(
         id="heavy",
@@ -129,32 +151,83 @@ def get_profile(density: str) -> DensityProfile:
 
 
 # ── Bullet shaping ────────────────────────────────────────────────────────────
-def trim_bullet(text: str, profile: DensityProfile) -> str:
+def split_bullet(text: str, profile: DensityProfile,
+                 preserve: bool = False) -> List[str]:
     """
-    Shorten one bullet to the profile budget.
+    Shape one bullet to the profile budget **without ever discarding text**.
 
-    Cuts at a clause boundary where possible so the result still reads as a
-    sentence, rather than stopping mid-phrase with an ellipsis.
+    A bullet within budget comes back as a single-item list. A longer one is
+    split at clause boundaries into a head plus continuation fragments (each
+    prefixed ``↳ `` so it reads as a sub-point) — so the tail of an explanation
+    moves to its own line instead of being clipped off and lost.
+
+    ``preserve`` (or ``LEARNOVA_VERBOSE_BULLETS``) returns the whole cleaned
+    sentence untouched.
     """
     clean = clean_bullet(text)
     if not clean:
-        return ""
+        return []
+    if preserve or _VERBOSE_BULLETS:
+        return [clean]
 
-    words = clean.split()
-    if len(words) > profile.max_words_per_bullet:
-        candidate = " ".join(words[: profile.max_words_per_bullet])
-        # Prefer the last clause break inside the budget.
-        breaks = list(_CLAUSE_BREAK.finditer(candidate))
-        if breaks and breaks[-1].start() > len(candidate) * 0.5:
-            candidate = candidate[: breaks[-1].start()]
-        clean = candidate.rstrip(" ,;:—–")
+    within_words = len(clean.split()) <= profile.max_words_per_bullet
+    within_chars = len(clean) <= profile.max_chars_per_bullet
+    if within_words and within_chars:
+        return [clean]
 
-    if len(clean) > profile.max_chars_per_bullet:
-        cut = clean[: profile.max_chars_per_bullet]
-        space = cut.rfind(" ")
-        clean = (cut[:space] if space > profile.max_chars_per_bullet * 0.6 else cut).rstrip()
+    def _fits(s: str) -> bool:
+        return (len(s.split()) <= profile.max_words_per_bullet
+                and len(s) <= profile.max_chars_per_bullet)
 
-    return clean
+    # Break the sentence into clauses and regroup them into budget-sized pieces.
+    parts = [p.strip(" ,;:—–") for p in _CLAUSE_BREAK.split(clean) if p.strip(" ,;:—–")]
+
+    if len(parts) > 1:
+        chunks: List[str] = []
+        buf = ""
+        for part in parts:
+            candidate = f"{buf}, {part}" if buf else part
+            if _fits(candidate):
+                buf = candidate
+            else:
+                if buf:
+                    chunks.append(buf)
+                buf = part
+        if buf:
+            chunks.append(buf)
+        parts = chunks or [clean]
+
+    # Any piece still over budget (a long clause, or the no-clause case) is cut
+    # by words/chars and its remainder kept as the next fragment — nothing is
+    # dropped, it just moves to its own line.
+    pieces: List[str] = []
+    queue = list(parts)
+    while queue:
+        seg = queue.pop(0).strip()
+        if not seg:
+            continue
+        if _fits(seg) or len(pieces) > 8:
+            pieces.append(seg)
+            continue
+        words = seg.split()
+        head = " ".join(words[: profile.max_words_per_bullet])
+        if len(head) > profile.max_chars_per_bullet:
+            cut = head[: profile.max_chars_per_bullet].rsplit(" ", 1)[0]
+            head = cut or head[: profile.max_chars_per_bullet]
+        rest = seg[len(head):].strip(" ,;:—–")
+        pieces.append(head)
+        if rest:
+            queue.insert(0, rest)
+
+    if not pieces:
+        return [clean[: profile.max_chars_per_bullet]]
+    return [pieces[0]] + [p if p.startswith("↳") else f"↳ {p}" for p in pieces[1:]]
+
+
+def trim_bullet(text: str, profile: DensityProfile) -> str:
+    """Back-compat single-string shaper: the head piece of :func:`split_bullet`."""
+    pieces = split_bullet(text, profile)
+    return pieces[0] if pieces else ""
 
 
 def _chunk(items: List[Any], size: int) -> List[List[Any]]:
@@ -178,6 +251,29 @@ def _chunk(items: List[Any], size: int) -> List[List[Any]]:
         out.append(items[start: start + take])
         start += take
     return out
+
+
+def _should_preserve(improved: dict) -> bool:
+    """
+    True when this slide's wording must not be shortened — mirrors the Deck
+    Director's PRESERVE directive (``rendering/deck_director.choose_summary_directive``)
+    but computed here, before the director runs, so the density stage can honour
+    it. Fires when a large share of the slide's sentences are precision-critical
+    (definitions, laws, quotations, formulae).
+    """
+    try:
+        from learnova.ai.text_policy import classify_sentences
+
+        parts = [str(improved.get("title", ""))]
+        parts += [str(b) for b in (improved.get("bullets") or [])]
+        parts.append(str(improved.get("takeaway", "")))
+        sents = classify_sentences(" ".join(p for p in parts if p))
+        if not sents:
+            return False
+        verbatim = sum(1 for s in sents if s.treatment == "VERBATIM")
+        return verbatim / len(sents) >= 0.4
+    except Exception:
+        return False
 
 
 def _restates(bullet: str, title: str) -> bool:
@@ -245,6 +341,10 @@ def paginate_slide(entry: dict, profile: DensityProfile,
     title = improved.get("title", "Slide")
     takeaway = improved.get("takeaway", "")
 
+    # PRESERVE directive: slides that are mostly definitions / laws / quotations
+    # keep their exact wording — split_bullet returns them untouched.
+    preserve = _should_preserve(improved)
+
     # Metrics and quizzes lose their meaning when split.
     if layout in _ATOMIC_LAYOUTS:
         if improved.get("bullets"):
@@ -260,7 +360,8 @@ def paginate_slide(entry: dict, profile: DensityProfile,
         # A table slide can also carry lead-in bullets. They are paginated
         # alongside the rows rather than capped — capping silently deleted
         # content, which the whole continuity contract forbids.
-        lead = [trim_bullet(b, profile) for b in (improved.get("bullets") or [])]
+        lead = [p for b in (improved.get("bullets") or [])
+                for p in split_bullet(b, profile, preserve)]
         lead = [b for b in lead if b]
         lead_pages = _chunk(lead, profile.max_bullets) if lead else []
 
@@ -294,7 +395,8 @@ def paginate_slide(entry: dict, profile: DensityProfile,
 
     # ── Flowcharts: split into stages, never mid-step ────────────────────────
     if layout in {"FLOWCHART", "PROCESS_DIAGRAM"} and improved.get("bullets"):
-        steps = [trim_bullet(b, profile) for b in improved["bullets"] if str(b).strip()]
+        steps = [p for b in improved["bullets"] if str(b).strip()
+                 for p in split_bullet(b, profile, preserve)]
         pages = _segment(steps, profile.max_flow_steps, "FLOWCHART")
         return [
             {
@@ -321,10 +423,10 @@ def paginate_slide(entry: dict, profile: DensityProfile,
     # restatements of the heading.
     source = dedupe_bullets(improved.get("bullets") or [])
     source = [b for b in source if not _restates(b, title)]
-    bullets = [b for b in (trim_bullet(b, profile) for b in source) if b]
+    bullets = [p for b in source for p in split_bullet(b, profile, preserve) if p]
 
     for extra in enhancement_bullets(enhanced, profile):
-        bullets.append(trim_bullet(extra, profile))
+        bullets.extend(split_bullet(extra, profile, preserve))
 
     if not bullets:
         return [{**entry, "improved": improved}]
@@ -384,6 +486,7 @@ __all__ = [
     "DEFAULT_DENSITY",
     "get_profile",
     "trim_bullet",
+    "split_bullet",
     "paginate_slide",
     "apply_density",
     "enhancement_bullets",

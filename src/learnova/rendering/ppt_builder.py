@@ -5,6 +5,7 @@ and embeds PowerPoint OpenXML slide transition animations.
 """
 
 import io
+import os
 import re
 from pptx import Presentation
 from pptx.util import Emu, Inches, Pt
@@ -25,6 +26,43 @@ def SubElement(parent, tagname, **kwargs):
     element.attrib.update(kwargs)
     parent.append(element)
     return element
+
+
+_IMAGE_KEEP_ALL = os.getenv("LEARNOVA_IMAGE_KEEP_ALL", "").lower() in {"1", "true", "yes", "on"}
+
+
+def _image_decision(orig: dict):
+    """
+    Decide whether a figure attached to a slide should appear in the PPTX, using
+    the SAME policy as the web deck (``ai.image_policy``) so the two outputs never
+    disagree. Returns ``(show: bool, caption: str)``. Only a confident DROP
+    (logo / divider / bullet icon) is hidden.
+    """
+    img = (orig or {}).get("image") if isinstance(orig, dict) else None
+    if not img or not img.get("bytes"):
+        return False, ""
+    try:
+        from learnova.ai.image_policy import (
+            ImageMeta, decide_image_action, meta_from_bytes,
+        )
+
+        ext = str(img.get("ext", "png")).lower().lstrip(".")
+        slide_text = " ".join(str(x) for x in (orig.get("text"),))
+        try:
+            meta = meta_from_bytes(
+                img["bytes"], ext=ext,
+                ocr_text=str(img.get("description", "")), slide_text=slide_text,
+            )
+        except Exception:
+            meta = ImageMeta(ext=ext, ocr_text=str(img.get("description", "")),
+                             slide_text=slide_text)
+        action = decide_image_action(meta)
+        if action.action == "DROP" and not _IMAGE_KEEP_ALL:
+            return False, ""
+        return True, (action.caption or str(img.get("description", ""))[:200])
+    except Exception:
+        # Policy must never cost us a figure — when in doubt, show it.
+        return True, str(img.get("description", ""))[:200]
 
 def _add_slide_transition(slide):
     """Inject OpenXML transition tag for smooth slide entrance."""
@@ -558,7 +596,8 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
         # ── 6. DEFAULT / MINIMAL TEXT + IMAGE COLUMN LAYOUT ───────────────────
         else:
-            has_img = bool(orig.get("image") and orig["image"].get("bytes"))
+            _show_img, _img_caption = _image_decision(orig)
+            has_img = _show_img
             text_area, image_area = L.split_text_image(band, has_img)
 
             bullets = [str(b).replace("▪", "").strip()
@@ -602,10 +641,12 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         # immediately after so it stays with the content it belongs to.
         image = orig.get("image") if isinstance(orig, dict) else None
         if layout_type != "MINIMAL_TEXT" and image and image.get("bytes"):
-            _add_figure_slide(
-                prs, theme, title_text, image["bytes"],
-                caption=(image.get("description") or "")[:300],
-            )
+            _fig_show, _fig_caption = _image_decision(orig)
+            if _fig_show:
+                _add_figure_slide(
+                    prs, theme, title_text, image["bytes"],
+                    caption=(_fig_caption or image.get("description") or "")[:300],
+                )
 
     # ── Closing slide ─────────────────────────────────────────────────────────
     end_slide = prs.slides.add_slide(prs.slide_layouts[6])

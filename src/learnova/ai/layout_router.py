@@ -63,7 +63,13 @@ CRITICAL INSTRUCTIONS FOR CONTENT IMPROVEMENT:
    A later stage decides how many fit on a slide and moves the rest onto a
    continuation slide, so anything you drop here is lost from the deck entirely.
    You may only remove: exact repetition, filler words, and the slide's own title.
-2. CONCISE REPHRASING: Tighten each point into a punchy bullet (aim 12-20 words).
+2. WRITE FULL TEACHING SENTENCES, NOT HEADLINES. Each bullet is one complete
+   thought a teacher would say out loud — typically 15 to 30 words — and it KEEPS
+   ITS REASONING: the "because ...", "so that ...", "which means ..." clause that
+   explains WHY, and connectives like "first / then / next / finally" that show
+   order. Do not strip a sentence down to a noun phrase. For a worked example or
+   a derivation, keep every intermediate step as its own bullet in order — never
+   jump from step 1 to the final answer.
    Preserve concrete numbers, currency amounts, formulas and proper nouns VERBATIM.
    Keep any "Label: detail" prefix intact — it becomes the card heading.
 3. HIGH-YIELD TAKEAWAY: Formulate a single, high-yield summary sentence ("takeaway")
@@ -351,6 +357,7 @@ def _call_llm(
     system_prompt: str,
     max_tokens: int = 300,
     timeout: float = 8.0,
+    reasoning_effort: str = "medium",
 ) -> Optional[str]:
     """
     Single classification call through the router. Returns the raw response
@@ -373,6 +380,9 @@ def _call_llm(
             temperature=0.2,
             max_tokens=max_tokens,
             timeout=timeout,
+            # Full teaching-sentence bullets need the model to actually reason
+            # about what to keep; "low" produced clipped noun phrases.
+            reasoning_effort=reasoning_effort,
         )
         return raw
     except Exception as e:
@@ -545,7 +555,9 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
         raw1: Optional[str] = None
 
         try:
-            raw1 = _call_llm(user_prompt, SYSTEM_PROMPT, max_tokens=300)
+            # Room for a full set of teaching-sentence bullets plus the visual
+            # payload; 300 tokens truncated the JSON on content-rich slides.
+            raw1 = _call_llm(user_prompt, SYSTEM_PROMPT, max_tokens=750)
         except ValueError as ve:
             if "rate_limit" in str(ve):
                 raise  # propagate to outer except → heuristic fallback

@@ -58,10 +58,15 @@ class GroqProvider(LLMProvider):
         # gpt-oss / other reasoning models on Groq spend the token budget on
         # chain-of-thought unless told otherwise, leaving `content` empty.
         if "gpt-oss" in model or "reason" in model.lower():
-            extra["reasoning_effort"] = "low"
+            # Callers that need better structured output (the layout stage writing
+            # full teaching sentences) can ask for more reasoning; default stays
+            # low so bulk classification stays fast.
+            extra["reasoning_effort"] = kwargs.get("reasoning_effort", "low")
             extra["reasoning_format"] = "hidden"
             if max_tokens:
-                max_tokens = max(max_tokens, 512)
+                # The visible answer needs headroom once thinking is hidden;
+                # 512 clipped multi-bullet JSON mid-array.
+                max_tokens = max(max_tokens, 900)
 
         completion = self.client.chat.completions.create(
             model=model,

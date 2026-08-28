@@ -5,6 +5,7 @@ Supports live interactive quizzes, flowcharts, tables, metric cards, and smooth 
 """
 
 import html
+import os
 import re
 import json
 from learnova.rendering.theme_engine import (
@@ -45,10 +46,21 @@ def _font_query(theme) -> str:
     return "&family=".join(f.replace(" ", "+") + ":wght@400;600;800" for f in families)
 
 
+# Only a figure the policy is *confident* is pure chrome (logo, divider, bullet
+# icon) is hidden. Everything else is shown — a figure the source author put in
+# the document is content until proven otherwise. SUMMARISE_TO_STRUCTURE used to
+# hide the bitmap on the promise of a native redraw that was never built, so the
+# figure just vanished; now we keep it. Set LEARNOVA_IMAGE_KEEP_ALL=1 to show
+# even the DROP cases.
+_IMAGE_KEEP_ALL = os.getenv("LEARNOVA_IMAGE_KEEP_ALL", "").lower() in {"1", "true", "yes", "on"}
+
+
 def _image_html(orig: dict, theme) -> str:
     """
-    Render an extracted figure as an inline data-URI <img>, unless the image
-    policy says to drop it or replace it with structure. Never raises.
+    Render an extracted figure as an inline data-URI <img>. The image policy can
+    only *hide* a figure it is confident is decoration (DROP); a redraw-as-
+    structure verdict still shows the bitmap, because losing it silently is worse
+    than showing a slightly redundant picture. Never raises.
     """
     try:
         import base64
@@ -70,7 +82,11 @@ def _image_html(orig: dict, theme) -> str:
             meta = ImageMeta(ext=ext, ocr_text=str(img.get("description", "")), slide_text=slide_text)
         action = decide_image_action(meta)
 
-        if action.action in {"DROP", "SUMMARISE_TO_STRUCTURE"}:
+        # DROP = logo / divider / bullet icon. Hidden unless KEEP_ALL. Every
+        # other verdict (KEEP_AS_IS, ENHANCE, SUMMARISE_TO_STRUCTURE, REGENERATE,
+        # CAPTION_ONLY) renders the bitmap — we cannot generate a replacement, so
+        # the real figure is the best available option.
+        if action.action == "DROP" and not _IMAGE_KEEP_ALL:
             return ""
         b64 = base64.b64encode(raw).decode("ascii")
         cap = html.escape(action.caption or str(img.get("description", ""))[:120])
