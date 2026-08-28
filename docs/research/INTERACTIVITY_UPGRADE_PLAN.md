@@ -257,7 +257,7 @@ Each task names the exact files to touch.
   version; show what changed.
   *Files:* `storage/deck_library.py`, `frontend/src/pages/Projects.jsx`
 
-- [ ] **6.6 — In-browser figure re-crop / annotate** before it goes on the slide.
+- [x] **6.6 — In-browser figure re-crop / annotate** before it goes on the slide.
   *Files:* new `components/app/ImageEditor.jsx`, `DiagramView.jsx` pattern
 
 - [x] **6.7 — Theme picker** _(swatches on Create; live sample-slide preview deferred)_ — live palette + font preview against a real slide,
