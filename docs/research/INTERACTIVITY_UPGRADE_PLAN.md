@@ -68,7 +68,7 @@ Each task names the exact files to touch.
 
 ### PHASE 1 — Stop losing content (highest priority: correctness)
 
-- [ ] **1.1 — Kill silent image loss.**
+- [x] **1.1 — Kill silent image loss.**
   In `web_deck_builder._image_html`, when the policy says `SUMMARISE_TO_STRUCTURE`
   but no native rebuild exists, **fall back to `KEEP_AS_IS`** (show the bitmap +
   caption) instead of returning `""`. Only truly `DROP` (logos/dividers) should
@@ -76,26 +76,26 @@ Each task names the exact files to touch.
   to render.
   *Files:* `rendering/web_deck_builder.py`, `ai/image_policy.py`
 
-- [ ] **1.2 — Make PPTX and web deck agree on images.**
+- [x] **1.2 — Make PPTX and web deck agree on images.**
   Route `ppt_builder`'s image decision through the same `decide_image_action`.
   Keep `KEEP_AS_IS` / `ENHANCE`, caption `CAPTION_ONLY`, skip `DROP`. Same input →
   same figures in both outputs.
   *Files:* `rendering/ppt_builder.py`
 
-- [ ] **1.3 — Stop truncating explanations.**
+- [x] **1.3 — Stop truncating explanations.**
   `trim_bullet`: when a bullet exceeds the word budget, **split it onto a
   sub-bullet / continuation** instead of clipping. Nothing gets an ellipsis and
   vanishes. Raise `max_words_per_bullet` for `medium` to ~28 and add a
   `LEARNOVA_VERBOSE_BULLETS=1`.
   *Files:* `pipeline/density.py`
 
-- [ ] **1.4 — Enforce the summary directive.**
+- [x] **1.4 — Enforce the summary directive.**
   In the density stage, read `deck_plan`'s `summary_directive` per slide:
   `PRESERVE` → skip `trim_bullet` entirely; `BALANCED` → current behaviour;
   `COMPRESS` → current + tighter. Right now the directive is computed and ignored.
   *Files:* `pipeline/density.py`, `pipeline/orchestrator.py` (pass `deck_plan` into `apply_density`)
 
-- [ ] **1.5 — Loosen the layout prompt.**
+- [x] **1.5 — Loosen the layout prompt.**
   Change "aim 12-20 words" → "one complete teaching sentence per point, ~15-30
   words, keep the reasoning ('because…', 'so that…')". Bump quiz/layout calls off
   `reasoning_effort=low` for the layout task specifically.
