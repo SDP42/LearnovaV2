@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BrainCircuit, RotateCcw, Trophy } from "lucide-react";
+import { BrainCircuit, Lightbulb, RotateCcw, Target, Trophy } from "lucide-react";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
 import QuizCard from "@/components/app/QuizCard";
@@ -137,18 +137,60 @@ export default function Quizzes() {
             </CardContent>
           </Card>
         ) : (
-          <QuizCard
-            key={at}
-            quiz={current}
-            position={at + 1}
-            total={total}
-            onNext={(wasCorrect) => {
-              if (wasCorrect) setScore((s) => s + 1);
-              if (at + 1 >= total) setDone(true);
-              else setAt((i) => i + 1);
-            }}
-          />
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="tabular-nums">
+                {at + 1} / {total}
+              </span>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${(at / total) * 100}%` }}
+                />
+              </div>
+              <span className="inline-flex items-center gap-1 tabular-nums">
+                <Target className="size-3" /> {score}
+              </span>
+            </div>
+            <QuizCard
+              key={at}
+              quiz={current}
+              position={at + 1}
+              total={total}
+              onNext={(wasCorrect) => {
+                if (wasCorrect) setScore((s) => s + 1);
+                if (at + 1 >= total) setDone(true);
+                else setAt((i) => i + 1);
+              }}
+            />
+          </div>
         )}
+
+        <Card className="lv-card">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Lightbulb className="size-4 text-primary" />
+            <CardTitle className="text-base">Why checkpoint quizzes</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              Retrieving a fact from memory strengthens it far more than re-reading
+              it — the <span className="font-medium text-foreground">testing effect</span>.
+              Learnova drops a short question every few slides so a lecture becomes
+              an active loop instead of a passive scroll.
+            </p>
+            <p>
+              Questions are generated from the slide content just before them, with
+              plausible distractors and a one-line explanation revealed after you
+              answer. Change how often they appear with{" "}
+              <span className="font-medium text-foreground">Quiz every N</span> in{" "}
+              <Link to="/app/settings" className="underline">Settings</Link>.
+            </p>
+            <p className="text-xs">
+              Quiz generation needs an LLM key (Groq or NVIDIA). The extractive
+              fallback builds slides but not questions.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );

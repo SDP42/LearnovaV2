@@ -146,6 +146,71 @@ export default function Settings() {
         </Card>
 
         <Card>
+          <CardHeader><CardTitle className="text-base">Keyboard shortcuts</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3 text-sm">
+            {[
+              ["Presenter", [["→ / Space", "Next build / slide"], ["←", "Previous"], ["F", "Fullscreen"], ["B or .", "Blackout"], ["P", "Pause timer"], ["R", "Reset timer"]]],
+              ["Diagram editor", [["Scroll", "Zoom at cursor"], ["Drag", "Pan"], ["Toolbar", "Fit / reset"], ["Toolbar", "Download SVG / PNG"]]],
+              ["App", [["Cmd/Ctrl + B", "Collapse sidebar"]]],
+            ].map(([group, rows]) => (
+              <div key={group}>
+                <p className="mb-2 font-medium">{group}</p>
+                <dl className="flex flex-col gap-1.5">
+                  {rows.map(([k, v]) => (
+                    <div key={k + v} className="flex items-center justify-between gap-2">
+                      <dt className="text-muted-foreground">{v}</dt>
+                      <dd>
+                        <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[11px] font-medium">
+                          {k}
+                        </kbd>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Data & storage</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              Each deck is stored on the server running Learnova under{" "}
+              <code className="rounded bg-muted px-1">.data/users/&lt;your-id&gt;/</code>{" "}
+              — the markdown source, the PowerPoint, the web deck, and a slides
+              JSON payload. Deleting a project removes that folder.
+            </p>
+            <p>
+              LLM requests go only to the provider whose key is configured above.
+              No analytics or telemetry leave the machine. Generation defaults on
+              this page are stored in your browser's local storage, not on the
+              server.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">About Learnova</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              An AI presentation engine that reasons about the structure of your
+              content — choosing per slide whether to keep text verbatim, tighten
+              it, or turn it into a flowchart, timeline, chart, or diagram — then
+              builds an animated PPTX and an interactive web deck from one model.
+            </p>
+            <p>
+              The engagement score (PSF) and the pagination algorithm (CLASS) are
+              grounded in Cognitive Load Theory and Mayer's multimedia principles.
+            </p>
+            <div className="flex gap-4 pt-1">
+              <a href="/app/docs" className="underline hover:text-foreground">Documentation</a>
+              <a href="/app/library" className="underline hover:text-foreground">Templates</a>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle className="text-base">Account</CardTitle></CardHeader>
           <CardContent className="overflow-hidden">
             {typeof UserProfile === "function" ? (

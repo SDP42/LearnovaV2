@@ -5,8 +5,11 @@ import {
   Download,
   Eye,
   FileDown,
+  Globe,
+  MonitorPlay,
   PartyPopper,
   Pencil,
+  Presentation,
   Share2,
 } from "lucide-react";
 import * as api from "@/api";
@@ -114,6 +117,48 @@ export default function Export() {
           <Button variant="ghost" size="sm" onClick={() => navigate("/app/create")}>
             <Pencil /> Edit again
           </Button>
+        </div>
+
+        <div className="w-full text-left">
+          <p className="mb-3 text-sm font-medium">What's in each format</p>
+          <div className="flex flex-col gap-3">
+            {[
+              [FileDown, "PowerPoint (.pptx)", "Editable slides built with native shapes and text — open in PowerPoint, Keynote or Google Slides. Entrance animations mirror the reveal steps when PPTX animation is enabled."],
+              [Globe, "Web deck (.html)", "One standalone file — Reveal.js, images and checkpoint quizzes all inlined. Double-click to open in any browser; no server, no install."],
+              [MonitorPlay, "Presenter console", "Not a download — a live dual-screen view with speaker notes, a timer, a next-slide preview and a synced audience window."],
+            ].map(([Icon, h, b]) => (
+              <Card key={h} className="lv-card">
+                <CardContent className="flex items-start gap-3 p-4">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Icon className="size-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">{h}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{b}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        <div className="w-full text-left">
+          <p className="mb-3 text-sm font-medium">Next steps</p>
+          <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <Presentation className="mt-0.5 size-4 shrink-0 text-primary" />
+              Rehearse with the presenter console before you're in the room.
+            </li>
+            <li className="flex items-start gap-2">
+              <Eye className="mt-0.5 size-4 shrink-0 text-primary" />
+              Review the engagement score in{" "}
+              <Link to="/app/analytics" className="underline">Analytics</Link> — split any slide below 70.
+            </li>
+            <li className="flex items-start gap-2">
+              <Pencil className="mt-0.5 size-4 shrink-0 text-primary" />
+              Tweak the source and regenerate; both exports stay in step.
+            </li>
+          </ul>
         </div>
       </div>
     </AppLayout>

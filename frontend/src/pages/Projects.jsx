@@ -55,6 +55,30 @@ export default function Projects() {
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
+        {decks && decks.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              ["Decks", decks.length],
+              ["Slides", decks.reduce((n, d) => n + (d.slide_count ?? d.slides ?? 0), 0)],
+              ["Quiz questions", decks.reduce((n, d) => n + (d.quiz_count ?? d.quizzes ?? 0), 0)],
+              [
+                "Avg score",
+                Math.round(
+                  decks.reduce((n, d) => n + (d.overall_score ?? d.engagement ?? 0), 0) /
+                    decks.length
+                ) || "—",
+              ],
+            ].map(([label, value]) => (
+              <Card key={label} className="lv-wash">
+                <CardContent className="p-4">
+                  <p className="text-xl font-semibold tabular-nums">{value}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : null}
+
         <Card className="overflow-hidden">
           <CardContent className="p-0">
             {decks === null ? (
@@ -62,11 +86,23 @@ export default function Projects() {
                 {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
               </div>
             ) : decks.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 p-12 text-center">
-                <p className="text-sm text-muted-foreground">No projects yet.</p>
-                <Button asChild size="sm">
-                  <Link to="/app/create">Create your first</Link>
-                </Button>
+              <div className="mx-auto flex max-w-sm flex-col items-center gap-3 p-12 text-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Sparkles className="size-6" />
+                </div>
+                <p className="text-sm font-medium">No projects yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Every deck you generate is saved here — with its slide count,
+                  engagement score, and one-click open, present, and export.
+                </p>
+                <div className="flex gap-2">
+                  <Button asChild size="sm">
+                    <Link to="/app/create">Create your first</Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/app/library">Browse templates</Link>
+                  </Button>
+                </div>
               </div>
             ) : (
               <table className="w-full text-sm">
