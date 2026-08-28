@@ -281,6 +281,122 @@
       ),
       var(--color-card);
   }
+
+  /* ── Extended motion / surface kit ─────────────────────────────────────── */
+
+  /* Slow drifting aurora mesh — a hero / section backdrop. */
+  .lv-aurora {
+    position: absolute;
+    inset: -20%;
+    pointer-events: none;
+    background:
+      radial-gradient(40% 40% at 20% 30%, color-mix(in oklch, var(--color-primary) 40%, transparent), transparent 70%),
+      radial-gradient(35% 35% at 80% 20%, color-mix(in oklch, oklch(0.68 0.17 200) 38%, transparent), transparent 70%),
+      radial-gradient(45% 45% at 60% 80%, color-mix(in oklch, oklch(0.7 0.18 320) 34%, transparent), transparent 70%);
+    filter: blur(70px);
+    opacity: 0.55;
+    animation: lv-drift 22s ease-in-out infinite alternate;
+  }
+  :root:not(.dark) .lv-aurora { opacity: 0.3; }
+  @keyframes lv-drift {
+    0%   { transform: translate3d(0,0,0) scale(1) rotate(0deg); }
+    100% { transform: translate3d(2%, -3%, 0) scale(1.12) rotate(8deg); }
+  }
+  @media (prefers-reduced-motion: reduce) { .lv-aurora { animation: none; } }
+
+  /* Fine dotted field, radial-masked. */
+  .lv-dots {
+    background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 40%, #000 30%, transparent 100%);
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 40%, #000 30%, transparent 100%);
+  }
+
+  /* Shimmer sweep for skeletons / loading rows / "pending" chips. */
+  .lv-shimmer {
+    background: linear-gradient(
+      100deg,
+      transparent 20%,
+      color-mix(in oklch, var(--color-primary) 14%, transparent) 45%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    animation: lv-shimmer 1.6s linear infinite;
+  }
+  @keyframes lv-shimmer { to { background-position: -200% 0; } }
+
+  /* Gentle breathing glow for a live / recording indicator. */
+  .lv-pulse { animation: lv-pulse 2s ease-in-out infinite; }
+  @keyframes lv-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 45%, transparent); }
+    50%      { box-shadow: 0 0 0 8px color-mix(in oklch, var(--color-primary) 0%, transparent); }
+  }
+  @media (prefers-reduced-motion: reduce) { .lv-pulse { animation: none; } }
+
+  /* Card that tilts toward the cursor (set --mx / --my in %, JS-free fallback ok). */
+  .lv-tilt {
+    transform: perspective(900px)
+      rotateX(calc((var(--my, 50) - 50) * -0.04deg))
+      rotateY(calc((var(--mx, 50) - 50) * 0.05deg));
+    transition: transform 0.25s ease;
+    transform-style: preserve-3d;
+  }
+
+  /* Staggered entrance — pair with inline animation-delay. */
+  .lv-in {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    animation: lv-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  @keyframes lv-in { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .lv-in { animation: none; opacity: 1; transform: none; } }
+
+  /* Number ticker helper — animate a CSS var and read it with counter(). */
+  .lv-count {
+    transition: --lv-n 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    counter-reset: n var(--lv-n, 0);
+  }
+  .lv-count::after { content: counter(n); }
+  @property --lv-n { syntax: "<integer>"; inherits: false; initial-value: 0; }
+
+  /* Marquee row (logos, tags). Wrap two copies of the content. */
+  .lv-marquee {
+    display: flex;
+    gap: 2.5rem;
+    width: max-content;
+    animation: lv-marquee 26s linear infinite;
+  }
+  @keyframes lv-marquee { to { transform: translateX(-50%); } }
+  .lv-marquee-mask {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) { .lv-marquee { animation: none; } }
+
+  /* Underline that draws in on hover (nav links). */
+  .lv-link {
+    position: relative;
+  }
+  .lv-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -3px;
+    height: 1.5px;
+    width: 100%;
+    background: var(--color-primary);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s ease;
+  }
+  .lv-link:hover::after { transform: scaleX(1); }
+
+  /* Frosted panel used for dialogs / floating toolbars. */
+  .lv-frost {
+    background: color-mix(in oklch, var(--color-popover) 78%, transparent);
+    backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid color-mix(in oklch, var(--color-primary) 12%, var(--color-border));
+  }
 }
 
 /* Scoped reset for the app shell (replaces the global preflight we dropped). */

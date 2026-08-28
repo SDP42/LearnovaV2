@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useUser } from "@/auth";
 import {
+  BarChart3,
   FileStack,
+  FolderOpen,
   Images,
+  Library,
   Lightbulb,
   ListChecks,
   Presentation,
@@ -52,20 +55,52 @@ export default function Dashboard() {
   return (
     <AppLayout title="Dashboard">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">
-              Welcome back{user?.firstName ? `, ${user.firstName}` : ""} 👋
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Turn a syllabus or document into an engaging, structured deck.
-            </p>
+        <div className="relative overflow-hidden rounded-2xl border p-6 sm:p-8">
+          <div className="lv-aurora" />
+          <div className="relative flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                Welcome back{user?.firstName ? `, ${user.firstName}` : ""}
+              </h2>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                Turn a syllabus, a chapter or a set of notes into a deck that
+                explains itself — one idea at a time.
+              </p>
+            </div>
+            <Button asChild size="lg" className="lv-cta rounded-lg">
+              <Link to="/app/create">
+                <Sparkles /> New presentation
+              </Link>
+            </Button>
           </div>
-          <Button asChild>
-            <Link to="/app/create">
-              <Sparkles /> New presentation
+        </div>
+
+        {/* quick actions */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Create", "From a doc or notes", Sparkles, "/app/create"],
+            ["Lessons", "Ready-made examples", Library, "/app/library"],
+            ["Projects", "Everything you've made", FolderOpen, "/app/projects"],
+            ["Analytics", "Engagement over time", BarChart3, "/app/analytics"],
+          ].map(([label, hint, Icon, to], i) => (
+            <Link
+              key={label}
+              to={to}
+              className="lv-card lv-in group flex items-center gap-3 rounded-xl p-4"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                <Icon className="size-4" />
+              </span>
+              <span>
+                <span className="block text-sm font-medium">{label}</span>
+                <span className="block text-xs text-muted-foreground">{hint}</span>
+              </span>
             </Link>
-          </Button>
+          ))}
         </div>
 
         {error ? (

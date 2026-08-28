@@ -136,11 +136,11 @@ export default function Present() {
   );
 
   const jump = useCallback(
-    (h) => {
+    (h, f) => {
       const R = reveal();
       if (!R) return;
       try {
-        R.slide(h);
+        R.slide(h, undefined, f);
       } catch {
         /* ignore */
       }
@@ -293,10 +293,12 @@ export default function Present() {
                 {steps > 1 ? (
                   <div className="mt-1 flex justify-center gap-1">
                     {Array.from({ length: steps }).map((_, i) => (
-                      <span
+                      <button
                         key={i}
+                        onClick={() => jump(pos.h, i)}
+                        title={`Reveal step ${i + 1}`}
                         className={cn(
-                          "h-1.5 w-4 rounded-full transition-colors",
+                          "h-1.5 w-4 rounded-full transition-colors hover:opacity-80",
                           i <= pos.f ? "bg-primary" : "bg-white/15"
                         )}
                       />
@@ -373,8 +375,22 @@ export default function Present() {
         </aside>
       </div>
 
+      {/* ── deck scrubber ──────────────────────────────────────────────── */}
+      <div className="flex shrink-0 items-center gap-3 border-t border-white/10 bg-neutral-950 px-3 pt-2 text-[11px] text-neutral-500">
+        <span className="tabular-nums">{pos.h + 1}</span>
+        <input
+          type="range"
+          min={0}
+          max={total - 1}
+          value={Math.min(pos.h, total - 1)}
+          onChange={(e) => jump(Number(e.target.value))}
+          className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-primary"
+        />
+        <span className="tabular-nums">{total}</span>
+      </div>
+
       {/* ── filmstrip (jump to slide) ───────────────────────────────────── */}
-      <div ref={filmRef} className="flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 bg-neutral-950 p-2">
+      <div ref={filmRef} className="flex shrink-0 gap-2 overflow-x-auto bg-neutral-950 p-2">
         <button
           data-h="0"
           onClick={() => jump(0)}

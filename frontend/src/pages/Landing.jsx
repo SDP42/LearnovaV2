@@ -48,19 +48,19 @@ const ISNT = [
 
 const RESEARCH = [
   {
-    tag: "Metric",
-    title: "Pedagogical Slide Fitness (PSF)",
-    body: "A slide's score is the product of three grounded terms — information efficiency, intrinsic cognitive load, and multimedia coherence — rather than an arbitrary weighted sum. Multiplicative combination means a slide that fails badly on any one dimension cannot be rescued by the other two, which matches how a confusing slide actually lands in a room.",
+    tag: "Scoring",
+    title: "Every slide gets an engagement score",
+    body: "Three things, multiplied: how much meaningful content per unit of space, how much the slide asks working memory to hold at once, and whether the visual and the text say the same thing. Multiplied, not averaged — so one bad dimension can't hide behind two good ones.",
   },
   {
-    tag: "Algorithm",
-    title: "CLASS — cognitive-load-aware segmentation",
-    body: "Deciding where one slide should end and the next begin is treated as a Knuth–Plass-style dynamic program: it searches all pagination boundaries for the one that minimises total cognitive-load 'badness' across the deck, instead of greedily cutting at a fixed bullet count.",
+    tag: "Pagination",
+    title: "It decides where slides break",
+    body: "Rather than cutting at a fixed bullet count, it searches the possible break points for the split that keeps every slide's cognitive load reasonable across the whole deck.",
   },
   {
-    tag: "Selector",
-    title: "Semantic transition & reveal planning",
-    body: "Transitions and build steps are chosen from the relationship between adjacent content — a contrast slide gets a different move than a continuation — so animation carries meaning instead of decoration. The model that judges a finished deck is the same one that plans it.",
+    tag: "Transitions",
+    title: "Animation that means something",
+    body: "A slide that continues the last one gets no visual break; a contrast gets a different move; a new section gets a hard cut. The build steps come from the same read of the content.",
   },
 ];
 
@@ -167,14 +167,13 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="research" className="relative mx-auto max-w-5xl px-4 py-24">
+      <section id="research" className="relative mx-auto max-w-5xl overflow-hidden px-4 py-24">
         <div className="lv-glow left-1/2 top-8 h-[200px] w-[400px] -translate-x-1/2 opacity-25" />
         <div className="relative mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-semibold tracking-tight">Built on published research</h2>
+          <h2 className="text-3xl font-semibold tracking-tight">The parts that make it teach</h2>
           <p className="mx-auto mt-3 text-muted-foreground">
-            The engine is grounded in Cognitive Load Theory and Mayer's multimedia
-            principles. Three pieces do the work — and the metric that judges a
-            deck is the same model that builds it.
+            Grounded in Cognitive Load Theory and Mayer's multimedia principles.
+            The score that judges a finished deck is the same model that plans it.
           </p>
         </div>
         <div className="relative mt-12 grid gap-4 md:grid-cols-3">
@@ -217,19 +216,28 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-4 py-24 text-center">
-        <h2 className="text-3xl font-semibold tracking-tight">
-          Give it your densest material
-        </h2>
-        <p className="mx-auto mt-3 max-w-lg text-muted-foreground">
-          The messier the source, the more the structural reasoning shows. Paste a
-          syllabus and watch it become a deck that teaches.
-        </p>
-        <Button asChild size="lg" className="lv-cta mt-6 rounded-lg">
-          <Link to="/app/create">
-            Create your first presentation <ArrowRight />
-          </Link>
-        </Button>
+      <section className="relative mx-auto max-w-3xl overflow-hidden px-4 py-24 text-center">
+        <div className="lv-dots absolute inset-0" />
+        <div className="lv-glow left-1/2 top-1/2 h-[240px] w-[440px] -translate-x-1/2 -translate-y-1/2 opacity-30" />
+        <div className="relative">
+          <h2 className="text-3xl font-semibold tracking-tight">
+            Try it with something real
+          </h2>
+          <p className="mx-auto mt-3 max-w-lg text-muted-foreground">
+            Paste a week of lecture notes, or start from a ready-made lesson. The
+            denser the source, the more the difference shows.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button asChild size="lg" className="lv-cta rounded-lg">
+              <Link to="/app/create">
+                Create a presentation <ArrowRight />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link to="/app/library">Browse lessons</Link>
+            </Button>
+          </div>
+        </div>
       </section>
 
       <footer className="border-t">
