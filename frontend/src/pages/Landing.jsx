@@ -4,7 +4,6 @@ import LandingNav from "@/components/landing/LandingNav";
 import Hero from "@/components/landing/Hero";
 import FeatureBento from "@/components/landing/FeatureBento";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 
 const STEPS = [
   ["Ingest", "Upload a PPTX or PDF, or paste a syllabus. Everything converges on one editable markdown representation."],
@@ -20,33 +19,35 @@ export default function Landing() {
       <Hero />
       <FeatureBento />
 
-      <section id="how" className="border-t bg-muted/30">
+      <section id="how" className="border-t bg-muted/20">
         <div className="mx-auto max-w-6xl px-4 py-20">
           <h2 className="text-center text-3xl font-semibold tracking-tight">How it works</h2>
+          <div className="lv-rule mx-auto mt-4 w-24" />
           <div className="mt-12 grid gap-4 md:grid-cols-4">
             {STEPS.map(([title, body], i) => (
-              <Card key={title}>
-                <CardContent className="flex flex-col gap-2 p-5">
-                  <span className="text-xs font-medium text-primary">Step {i + 1}</span>
-                  <h3 className="font-medium">{title}</h3>
-                  <p className="text-sm text-muted-foreground">{body}</p>
-                </CardContent>
-              </Card>
+              <div key={title} className="lv-card flex flex-col gap-2 rounded-xl p-5">
+                <span className="inline-flex w-fit items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  Step {i + 1}
+                </span>
+                <h3 className="font-medium">{title}</h3>
+                <p className="text-sm text-muted-foreground">{body}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="research" className="mx-auto max-w-3xl px-4 py-20 text-center">
-        <h2 className="text-3xl font-semibold tracking-tight">Built on published research</h2>
-        <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+      <section id="research" className="relative mx-auto max-w-3xl px-4 py-24 text-center">
+        <div className="lv-glow left-1/2 top-8 h-[200px] w-[400px] -translate-x-1/2 opacity-25" />
+        <h2 className="relative text-3xl font-semibold tracking-tight">Built on published research</h2>
+        <p className="relative mx-auto mt-3 max-w-xl text-muted-foreground">
           Learnova's engine is grounded in Cognitive Load Theory and Mayer's
           multimedia principles: a calibrated slide-fitness metric (PSF), an
           optimal cognitive-load-aware segmentation algorithm, and a semantic
           transition selector — the metric that judges a deck is the same model
           that builds it.
         </p>
-        <Button asChild variant="outline" className="mt-6">
+        <Button asChild variant="outline" className="relative mt-6">
           <Link to="/app/create">
             Try it now <ArrowRight />
           </Link>

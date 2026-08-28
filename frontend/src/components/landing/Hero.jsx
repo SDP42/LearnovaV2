@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import DeckMock from "@/components/landing/DeckMock";
 
 const WORDS = ["Turn", "any", "syllabus", "into", "a", "presentation", "that", "teaches."];
 
@@ -17,21 +18,21 @@ export default function Hero() {
   }
 
   return (
-    <section
-      ref={ref}
-      onMouseMove={onMove}
-      className="relative overflow-hidden border-b"
-    >
+    <section ref={ref} onMouseMove={onMove} className="relative overflow-hidden border-b">
       <div className="pointer-events-none absolute inset-0 lv-grid-bg" />
       <div className="pointer-events-none absolute inset-0 lv-spotlight" />
+      <div className="lv-glow left-1/2 top-[-10%] h-[420px] w-[720px] -translate-x-1/2" />
 
-      <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center sm:py-32">
+      <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-4 pt-24 pb-8 text-center sm:pt-32">
         <span className="lv-rise inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-primary" />
+          <span className="relative flex size-1.5">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-primary" />
+          </span>
           AI presentation engine · cognitive-load aware
         </span>
 
-        <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+        <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight sm:text-[3.25rem]">
           {WORDS.map((w, i) => (
             <span
               key={i}
@@ -47,16 +48,16 @@ export default function Hero() {
           className="lv-rise max-w-xl text-balance text-muted-foreground"
           style={{ animationDelay: "0.6s" }}
         >
-          Learnova converts text-heavy PPTX, PDFs, and typed syllabi into
-          structured, visually engaging decks — flowcharts, timelines, charts,
-          progressive reveals, and inline checkpoint quizzes.
+          Learnova reads your content and decides — per slide — whether to keep it
+          as text, tighten it, or turn it into a flowchart, timeline, chart, or
+          diagram. Then it builds an animated deck with a presenter view.
         </p>
 
         <div
           className="lv-rise flex flex-wrap items-center justify-center gap-3"
           style={{ animationDelay: "0.72s" }}
         >
-          <Button asChild size="lg">
+          <Button asChild size="lg" className="lv-cta rounded-lg">
             <Link to="/app/create">
               Create presentation <ArrowRight />
             </Link>
@@ -69,12 +70,12 @@ export default function Hero() {
         </div>
 
         <div
-          className="lv-rise mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-muted-foreground"
+          className="lv-rise mt-2 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-muted-foreground"
           style={{ animationDelay: "0.84s" }}
         >
           {[
             ["1000+", "addressable visuals"],
-            ["0", "API keys required"],
+            ["16", "diagram families"],
             ["PSF", "engagement metric"],
           ].map(([v, l]) => (
             <span key={l} className="flex items-baseline gap-1.5">
@@ -82,6 +83,13 @@ export default function Hero() {
             </span>
           ))}
         </div>
+      </div>
+
+      <div
+        className="lv-rise relative mx-auto -mb-24 max-w-4xl px-4 sm:-mb-32"
+        style={{ animationDelay: "0.95s" }}
+      >
+        <DeckMock />
       </div>
     </section>
   );

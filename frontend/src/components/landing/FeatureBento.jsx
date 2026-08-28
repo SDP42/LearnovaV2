@@ -7,26 +7,26 @@ import {
   Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
 
 function Feature({ icon: Icon, title, body, className }) {
   return (
-    <Card className={cn("flex flex-col gap-3 p-5", className)}>
-      <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+    <div className={cn("lv-card group flex flex-col gap-3 rounded-xl p-5", className)}>
+      <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
         <Icon className="size-5" />
       </span>
       <div>
         <h3 className="font-medium">{title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{body}</p>
       </div>
-    </Card>
+    </div>
   );
 }
 
 export default function FeatureBento() {
   return (
-    <section id="features" className="mx-auto max-w-6xl px-4 py-20">
-      <div className="mx-auto max-w-2xl text-center">
+    <section id="features" className="relative mx-auto max-w-6xl px-4 pb-20 pt-40 sm:pt-48">
+      <div className="lv-glow left-1/2 top-24 h-[300px] w-[600px] -translate-x-1/2 opacity-30" />
+      <div className="relative mx-auto max-w-2xl text-center">
         <h2 className="text-3xl font-semibold tracking-tight">
           Not a template filler. A teaching engine.
         </h2>
@@ -37,7 +37,7 @@ export default function FeatureBento() {
         </p>
       </div>
 
-      <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="relative mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Feature
           icon={LayoutTemplate}
           title="1000+ addressable visuals"

@@ -52,15 +52,15 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
             <li
               key={phase.label}
               className={cn(
-                "flex items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors",
-                state === "active" && "bg-primary/5"
+                "flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors",
+                state === "active" && "bg-primary/10 ring-1 ring-inset ring-primary/25"
               )}
             >
               <span
                 className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs",
+                  "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs transition-colors",
                   state === "done" && "border-primary bg-primary text-primary-foreground",
-                  state === "active" && "border-primary text-primary",
+                  state === "active" && "border-primary text-primary shadow-[0_0_0_4px_color-mix(in_oklch,var(--color-primary)_18%,transparent)]",
                   state === "todo" && "border-border text-muted-foreground"
                 )}
               >

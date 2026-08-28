@@ -192,6 +192,95 @@
     background-clip: text;
     color: transparent;
   }
+
+  /* ── Dark-UI polish primitives ──────────────────────────────────────────── */
+
+  /* A soft glowing orb — sits behind hero / section headers. */
+  .lv-glow {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    opacity: 0.5;
+    background: radial-gradient(
+      circle at center,
+      color-mix(in oklch, var(--color-primary) 65%, transparent),
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+  :root:not(.dark) .lv-glow {
+    opacity: 0.28;
+  }
+
+  /* Glass card: subtle translucency + a border that lights up on hover. */
+  .lv-card {
+    background: color-mix(in oklch, var(--color-card) 82%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--color-border);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .lv-card:hover {
+    border-color: color-mix(in oklch, var(--color-primary) 45%, var(--color-border));
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 25%, transparent),
+      0 12px 40px -12px color-mix(in oklch, var(--color-primary) 35%, transparent);
+  }
+
+  /* Animated conic gradient border for the primary call-to-action. */
+  .lv-cta {
+    position: relative;
+    isolation: isolate;
+  }
+  .lv-cta::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--lv-angle, 0deg),
+      color-mix(in oklch, var(--color-primary) 90%, transparent),
+      color-mix(in oklch, oklch(0.72 0.16 200) 90%, transparent),
+      color-mix(in oklch, var(--color-primary) 90%, transparent)
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: lv-spin 4s linear infinite;
+    z-index: -1;
+  }
+  @keyframes lv-spin {
+    to { --lv-angle: 360deg; }
+  }
+  @property --lv-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lv-cta::before { animation: none; }
+  }
+
+  /* Gradient hairline used under section headings / above footers. */
+  .lv-rule {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in oklch, var(--color-primary) 40%, var(--color-border)),
+      transparent
+    );
+  }
+
+  /* KPI / feature card with a faint top-lit gradient wash. */
+  .lv-wash {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--color-primary) 6%, transparent),
+        transparent 40%
+      ),
+      var(--color-card);
+  }
 }
 
 /* Scoped reset for the app shell (replaces the global preflight we dropped). */
@@ -234,5 +323,32 @@
   [data-learnova-app] textarea {
     font: inherit;
     color: inherit;
+  }
+  /* Colours ease when the theme flips, so the toggle is a fade not a flash. */
+  [data-learnova-app],
+  [data-learnova-app] * {
+    transition: background-color 0.18s ease, border-color 0.18s ease,
+      color 0.18s ease;
+  }
+  [data-learnova-app] *:where(.recharts-surface, .recharts-surface *) {
+    transition: none;
+  }
+  [data-learnova-app] ::selection {
+    background: color-mix(in oklch, var(--color-primary) 40%, transparent);
+  }
+  /* Thin, theme-aware scrollbars inside the shell. */
+  [data-learnova-app] *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  [data-learnova-app] *::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--color-muted-foreground) 30%, transparent);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  [data-learnova-app] *::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--color-muted-foreground) 50%, transparent);
+    background-clip: content-box;
   }
 }

@@ -9,10 +9,14 @@ import { cn } from "@/lib/utils";
 export default function StatCard({ label, value, delta, icon: Icon, hint }) {
   const up = typeof delta === "number" && delta >= 0;
   return (
-    <Card>
+    <Card className="lv-wash overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        {Icon ? <Icon className="size-4 text-muted-foreground" /> : null}
+        {Icon ? (
+          <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Icon className="size-4" />
+          </span>
+        ) : null}
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-semibold tracking-tight tabular-nums">{value}</div>
