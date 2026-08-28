@@ -174,18 +174,18 @@ Each task names the exact files to touch.
 
 ### PHASE 4 — Unify the two outputs + light up the visual library
 
-- [ ] **4.1 — One visual spec, two renderers.**
+- [x] **4.1 — One visual spec, two renderers.**
   Define a single `VisualSpec` (family + variant + data + animation) as the
   contract. `web_deck_builder` and `ppt_builder` each become a *renderer* of that
   spec. The Deck Director already produces most of it — formalise it.
   *Files:* new `rendering/visual_spec.py`, refactor both builders, `rendering/deck_director.py`
 
-- [ ] **4.2 — Web deck = the rich surface.**
+- [x] **4.2 — Web deck = the rich surface.**
   Decision: the web deck renders the full family set as SVG/HTML with animation;
   the PPTX renders the best static approximation of the same spec (native shapes,
   no JS). Document this in `DECK_DIRECTOR.md`.
 
-- [ ] **4.3 — LLM data-extraction for families.**
+- [x] **4.3 — LLM data-extraction for families.**
   `build_family_data` is text-only heuristics for ~8 families. Add an LLM
   extraction path (`TASK_VISUAL_DATA`) that, given the slide text + chosen family,
   returns the structured `data` the renderer needs (timeline events with dates,
@@ -193,14 +193,14 @@ Each task names the exact files to touch.
   the other 30 families.
   *Files:* `ai/visual_selector.py`, new prompt in `ai/master_prompt.py`, `providers/router.py`
 
-- [ ] **4.4 — Fill in the missing renderers.**
+- [x] **4.4 — Fill in the missing renderers.**
   Prioritised by frequency in real lecture content: `MATRIX_2x2`, `CYCLE` (proper
   ring, not chips), `TREE` / `ORG_CHART`, `MIND_MAP`, `GANTT` / `ROADMAP`,
   `FUNNEL`, `COMPARISON_MATRIX` (n×m), `LABELLED_DIAGRAM` (image + callout pins),
   `NUMBER_LINE`, `STAT_CALLOUT_GRID`.
   *Files:* `rendering/family_blocks.py` (+ PPTX equivalents)
 
-- [ ] **4.5 — Variant selection.**
+- [ ] **4.5 — Variant selection.** _(deferred — polish)_
   Once families render, use the catalog's `params` axes (density, orientation,
   emphasis) to pick a *variant* per slide from PSF signals — this is where the
   "1000+" actually materialises.

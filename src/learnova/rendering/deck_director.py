@@ -293,6 +293,25 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         ) or text
         vd = select_visual(vms_source, title)
 
+        # The visual_data stage may have already extracted (via LLM) the exact
+        # payload this family's renderer needs — a chart's series, a 2x2 matrix,
+        # a comparison table. When present and it agrees with the VMS pick (or
+        # the VMS only found text), adopt that family + data outright.
+        vdata = imp.get("visual_data") if isinstance(imp.get("visual_data"), dict) else None
+        if vdata and vdata.get("data"):
+            if vd.family in {"TEXT", "MINIMAL_TEXT", ""} or vd.family == vdata.get("family"):
+                from learnova.ai.visual_selector import VisualDecision
+
+                vd = VisualDecision(
+                    treatment=vd.treatment, family=vdata["family"],
+                    variant=vdata.get("variant", vd.variant),
+                    confidence=max(vd.confidence, float(vdata.get("confidence", 0.7))),
+                    rationale="structured data extracted for the chosen family",
+                    scores=vd.scores, bullets=vd.bullets, verbatim=vd.verbatim,
+                    reveal_groups=vd.reveal_groups, animation=vd.animation,
+                    data=vdata["data"],
+                )
+
         # A layout the pipeline actually populated with data (an LLM table,
         # a real metric, a mermaid flowchart) is authoritative. A bare
         # keyword-heuristic guess (METRIC with no metric_value, etc.) is not —

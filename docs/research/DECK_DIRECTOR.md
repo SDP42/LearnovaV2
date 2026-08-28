@@ -119,3 +119,27 @@ the PSF `Flow` term — same signal, two uses.
 - Next: `ppt_builder` reads the plan → per-shape entrance animations + notes pane;
   new SVG family renderers; feed `animation.steps` count into CLASS as the
   realised slide segmentation.
+
+---
+
+## Phase 4 update (2026-08-28) — one plan, two renderers
+
+**Decision.** The **web deck is the rich surface**: it renders the full family
+set as animated SVG/HTML with progressive reveal. The **PPTX renders the best
+static approximation** of the same `SlidePlan` using native PowerPoint shapes —
+no JS, but the same family, the same data, plus click-build entrance animations.
+Both consume the one `DeckPlan`; neither invents its own visual logic.
+
+**`visual_data` pipeline stage** (`pipeline/visual_data_stage.py`). The VMS picks
+the family; `build_family_data` extracts the payload from text with regex for
+~18 families. For the data-hungry ones it misses (charts, 2x2 matrix, comparison
+table, mind map, dated timeline), the new stage makes **one LLM call per slide**
+(`TASK_VISUAL_DATA`, `ai/visual_data.py`) returning exactly the JSON the renderer
+wants, and attaches it as `improved["visual_data"]`. The director adopts it when
+it agrees with (or out-resolves) the VMS pick. Bounded to 10 calls, rate-limit
+aware, `LEARNOVA_VISUAL_DATA_LLM=0` to disable.
+
+**New renderers.** `rendering/family_blocks.py`: `_bar_chart`, `_line_chart`,
+`_pie_chart`, `_matrix_2x2`, `_compare_table`, `_mind_map`. `rendering/ppt_builder.py`:
+`_pptx_family()` draws process / worked-example / pros-cons / pyramid / cards /
+bar chart / timeline / mind map as native shapes.

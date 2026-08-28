@@ -25,6 +25,7 @@ TASK_IMPROVE = "improve"        # pedagogical rewriting, quality-sensitive
 TASK_QUIZ = "quiz"              # distractor quality matters
 TASK_ENHANCE = "enhance"        # examples/analogies/mnemonics
 TASK_DIAGRAM = "diagram"        # mermaid generation
+TASK_VISUAL_DATA = "visual_data"  # extract structured data for a chosen visual family
 
 # Preferred provider order per task. First available wins; the rest are fallback.
 TASK_PREFERENCE: Dict[str, Sequence[str]] = {
@@ -39,6 +40,9 @@ TASK_PREFERENCE: Dict[str, Sequence[str]] = {
     # the failover for when Groq hits its TPM ceiling.
     TASK_ENHANCE: ("groq", "nvidia"),
     TASK_DIAGRAM: ("groq", "nvidia"),
+    # Structured extraction — a compact JSON classification job, latency-sensitive
+    # (one call per visual slide). Fast model first.
+    TASK_VISUAL_DATA: ("groq", "nvidia"),
 }
 
 import os as _os
@@ -58,6 +62,7 @@ TASK_MODEL: Dict[str, Dict[str, str]] = {
         TASK_QUIZ: _GROQ_MODEL,
         TASK_ENHANCE: _GROQ_MODEL,
         TASK_DIAGRAM: _GROQ_MODEL,
+        TASK_VISUAL_DATA: _GROQ_MODEL,
     },
     # Quality-sensitive tasks run on Nemotron 3 Ultra (550B MoE, 55B active).
     # High-volume tasks stay on a small instruct model: Ultra answers a layout
@@ -70,6 +75,7 @@ TASK_MODEL: Dict[str, Dict[str, str]] = {
         TASK_QUIZ: _NVIDIA_MODEL,
         TASK_ENHANCE: _NVIDIA_MODEL,
         TASK_DIAGRAM: _NVIDIA_MODEL,
+        TASK_VISUAL_DATA: _NVIDIA_MODEL,
     },
 }
 

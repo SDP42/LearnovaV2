@@ -16,6 +16,7 @@ between them:
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import time
 from dataclasses import dataclass, field, replace
@@ -40,6 +41,7 @@ STAGES: List[str] = [
     "index",
     "layout",
     "visual_plan",
+    "visual_data",
     "expand",
     "enhance",
     "density",
@@ -357,6 +359,24 @@ def generate(
     runner.run(
         "visual_plan", _visual_plan,
         skip=not config.enable_visual_planner, skip_reason="disabled",
+    )
+
+    # 6a. Visual data — for slides whose chosen visual needs structured data
+    #     (a chart, a 2x2 matrix, a comparison table, a mind map, a dated
+    #     timeline) that the regex extractor could not pull, ask the LLM for it
+    #     once. Attaches ``improved["visual_data"]`` for the deck director.
+    #     Bounded, rate-limit-aware, and a no-op without a provider.
+    _visual_data_on = os.getenv("LEARNOVA_VISUAL_DATA_LLM", "1").lower() in {"1", "true", "yes", "on"}
+
+    def _visual_data():
+        from learnova.pipeline.visual_data_stage import fill_visual_data
+
+        return f"{fill_visual_data(result.improved)} slide(s) enriched"
+
+    runner.run(
+        "visual_data", _visual_data,
+        skip=not _visual_data_on,
+        skip_reason="LEARNOVA_VISUAL_DATA_LLM=0",
     )
 
     # 6b. Expansion pass — turn terse bullets into full teaching sentences that

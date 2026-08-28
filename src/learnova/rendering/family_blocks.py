@@ -232,6 +232,211 @@ def _venn(data: Dict[str, Any], theme) -> Optional[str]:
     )
 
 
+def _num(v) -> Optional[float]:
+    try:
+        return float(re.sub(r"[^\d.\-]", "", str(v)))
+    except (ValueError, TypeError):
+        return None
+
+
+def _series(data: Dict[str, Any]) -> list:
+    """Normalise chart data to [(label, value), ...]."""
+    pts = data.get("points") or data.get("series") or data.get("items") or []
+    out = []
+    for p in pts:
+        if isinstance(p, dict):
+            lbl = str(p.get("label") or p.get("name") or p.get("x") or "")
+            val = _num(p.get("value") if p.get("value") is not None else p.get("y"))
+        elif isinstance(p, (list, tuple)) and len(p) >= 2:
+            lbl, val = str(p[0]), _num(p[1])
+        else:
+            lbl, val = str(p), None
+        if lbl and val is not None:
+            out.append((lbl, val))
+    return out[:8]
+
+
+def _bar_chart(data: Dict[str, Any], theme) -> Optional[str]:
+    pts = _series(data)
+    if len(pts) < 2:
+        return None
+    mx = max(v for _, v in pts) or 1
+    rows = ""
+    for i, (lbl, val) in enumerate(pts):
+        w = max(2.0, val / mx * 100)
+        rows += (
+            f'<div data-el="el.{i}" data-build="{i}" style="display:flex;align-items:center;'
+            f'gap:10px;margin:6px 0;font-size:0.85rem;">'
+            f'<span style="flex:0 0 32%;text-align:right;color:{theme.text_hex};">{_esc(lbl)}</span>'
+            f'<span style="flex:1;background:{theme.card_bg_hex};border-radius:4px;">'
+            f'<span style="display:block;height:20px;width:{w:.0f}%;background:{theme.primary_hex};'
+            f'border-radius:4px;"></span></span>'
+            f'<span style="flex:0 0 auto;color:{theme.subtext_hex};font-variant-numeric:tabular-nums;">'
+            f'{_esc(str(val).rstrip("0").rstrip(".") if "." in str(val) else str(val))}</span></div>'
+        )
+    return f'<div style="margin-top:20px;max-width:720px;">{rows}</div>'
+
+
+def _line_chart(data: Dict[str, Any], theme) -> Optional[str]:
+    pts = _series(data)
+    if len(pts) < 3:
+        return None
+    vals = [v for _, v in pts]
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or 1
+    W, H, PAD = 320, 160, 24
+    xs = [PAD + (W - 2 * PAD) * i / (len(pts) - 1) for i in range(len(pts))]
+    ys = [H - PAD - (H - 2 * PAD) * (v - lo) / span for v in vals]
+    path = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in zip(xs, ys))
+    dots = "".join(
+        f'<circle data-el="el.{i}" data-build="{i}" cx="{x:.1f}" cy="{y:.1f}" r="3" '
+        f'fill="{theme.accent_hex}"/>' for i, (x, y) in enumerate(zip(xs, ys))
+    )
+    labels = "".join(
+        f'<text x="{x:.1f}" y="{H - 6}" font-size="8" fill="{theme.subtext_hex}" '
+        f'text-anchor="middle">{_esc(pts[i][0][:8])}</text>' for i, x in enumerate(xs)
+    )
+    return (
+        f'<div style="margin-top:20px;display:flex;justify-content:center;">'
+        f'<svg viewBox="0 0 {W} {H}" style="width:100%;max-width:560px;">'
+        f'<line x1="{PAD}" y1="{H-PAD}" x2="{W-6}" y2="{H-PAD}" stroke="{theme.primary_hex}55"/>'
+        f'<line x1="{PAD}" y1="6" x2="{PAD}" y2="{H-PAD}" stroke="{theme.primary_hex}55"/>'
+        f'<path d="{path}" fill="none" stroke="{theme.primary_hex}" stroke-width="2"/>'
+        f'{dots}{labels}</svg></div>'
+    )
+
+
+def _pie_chart(data: Dict[str, Any], theme) -> Optional[str]:
+    pts = _series(data)
+    if len(pts) < 2:
+        return None
+    total = sum(v for _, v in pts) or 1
+    palette = [theme.primary_hex, theme.accent_hex, "#3aa07b", "#c9772f", "#6b6bd6", "#b8506b", "#4a90c4"]
+    cx = cy = 60
+    r = 52
+    ang = -90.0
+    wedges = ""
+    legend = ""
+    for i, (lbl, val) in enumerate(pts):
+        frac = val / total
+        a2 = ang + frac * 360
+        large = 1 if frac > 0.5 else 0
+        x1 = cx + r * _cos(ang)
+        y1 = cy + r * _sin(ang)
+        x2 = cx + r * _cos(a2)
+        y2 = cy + r * _sin(a2)
+        col = palette[i % len(palette)]
+        wedges += (
+            f'<path data-el="el.{i}" data-build="{i}" d="M{cx} {cy} L{x1:.1f} {y1:.1f} '
+            f'A{r} {r} 0 {large} 1 {x2:.1f} {y2:.1f} Z" fill="{col}"/>'
+        )
+        legend += (
+            f'<div data-el="el.{i}" data-build="{i}" style="display:flex;align-items:center;'
+            f'gap:6px;font-size:0.82rem;margin:3px 0;">'
+            f'<span style="width:11px;height:11px;background:{col};border-radius:2px;"></span>'
+            f'{_esc(lbl)} — {frac * 100:.0f}%</div>'
+        )
+        ang = a2
+    return (
+        f'<div style="margin-top:20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;">'
+        f'<svg viewBox="0 0 120 120" style="width:180px;flex-shrink:0;">{wedges}</svg>'
+        f'<div>{legend}</div></div>'
+    )
+
+
+def _matrix_2x2(data: Dict[str, Any], theme) -> Optional[str]:
+    quads = data.get("quadrants") or data.get("cells") or []
+    if len(quads) < 3:
+        return None
+    x_axis = data.get("x_axis") or ["Low", "High"]
+    y_axis = data.get("y_axis") or ["Low", "High"]
+    labels = []
+    for q in quads[:4]:
+        if isinstance(q, dict):
+            labels.append((str(q.get("title", "")), [str(i) for i in (q.get("items") or [])][:3]))
+        else:
+            labels.append((str(q), []))
+    while len(labels) < 4:
+        labels.append(("", []))
+    cell = lambda t, items, i: (
+        f'<div data-el="el.{i}" data-build="{i}" style="border:1px solid {theme.primary_hex}33;'
+        f'background:{theme.card_bg_hex};border-radius:8px;padding:12px;min-height:96px;">'
+        f'<div style="font-weight:700;color:{theme.primary_hex};font-size:0.85rem;">{_esc(t)}</div>'
+        + "".join(f'<div style="font-size:0.78rem;color:{theme.text_hex};margin-top:4px;">• {_esc(x)}</div>' for x in items)
+        + "</div>"
+    )
+    return (
+        f'<div style="margin-top:18px;display:grid;grid-template-columns:auto 1fr 1fr;'
+        f'grid-template-rows:auto 1fr 1fr;gap:8px;max-width:640px;align-items:center;">'
+        f'<div></div>'
+        f'<div style="text-align:center;font-size:0.75rem;color:{theme.subtext_hex};">{_esc(str(x_axis[0]))}</div>'
+        f'<div style="text-align:center;font-size:0.75rem;color:{theme.subtext_hex};">{_esc(str(x_axis[-1]))}</div>'
+        f'<div style="writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;'
+        f'font-size:0.75rem;color:{theme.subtext_hex};">{_esc(str(y_axis[-1]))}</div>'
+        f'{cell(labels[0][0], labels[0][1], 0)}{cell(labels[1][0], labels[1][1], 1)}'
+        f'<div style="writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;'
+        f'font-size:0.75rem;color:{theme.subtext_hex};">{_esc(str(y_axis[0]))}</div>'
+        f'{cell(labels[2][0], labels[2][1], 2)}{cell(labels[3][0], labels[3][1], 3)}</div>'
+    )
+
+
+def _compare_table(data: Dict[str, Any], theme) -> Optional[str]:
+    headers = data.get("headers") or []
+    rows = data.get("rows") or []
+    if len(headers) < 2 or len(rows) < 2:
+        return None
+    on = _on(theme)
+    th = "".join(
+        f'<th style="background:{theme.primary_hex};color:{on};padding:8px 12px;'
+        f'text-align:left;font-size:0.82rem;">{_esc(str(h))}</th>' for h in headers
+    )
+    body = ""
+    for i, r in enumerate(rows[:8]):
+        cells = "".join(
+            f'<td style="padding:8px 12px;border-bottom:1px solid {theme.primary_hex}22;'
+            f'font-size:0.82rem;color:{theme.text_hex};">{_esc(str(c))}</td>'
+            for c in (list(r) + [""] * len(headers))[:len(headers)]
+        )
+        body += f'<tr data-el="el.{i}" data-build="{i}">{cells}</tr>'
+    return (
+        f'<div style="margin-top:18px;overflow-x:auto;max-width:820px;">'
+        f'<table style="width:100%;border-collapse:collapse;background:{theme.card_bg_hex};'
+        f'border-radius:8px;overflow:hidden;">'
+        f'<thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>'
+    )
+
+
+def _mind_map(data: Dict[str, Any], theme) -> Optional[str]:
+    center = str(data.get("center") or data.get("central") or "")
+    branches = [str(b) for b in (data.get("branches") or data.get("items") or []) if str(b).strip()][:8]
+    if not center or len(branches) < 2:
+        return None
+    on = _on(theme)
+    chips = "".join(
+        f'<div data-el="el.{i}" data-build="{i}" style="background:{theme.card_bg_hex};'
+        f'border:1px solid {theme.primary_hex}44;border-radius:16px;padding:8px 14px;'
+        f'font-size:0.85rem;color:{theme.text_hex};">{_esc(b)}</div>'
+        for i, b in enumerate(branches)
+    )
+    return (
+        f'<div style="margin-top:22px;display:flex;flex-direction:column;align-items:center;gap:16px;">'
+        f'<div style="background:{theme.primary_hex};color:{on};font-weight:800;'
+        f'border-radius:50%;padding:18px 22px;text-align:center;max-width:220px;">{_esc(center)}</div>'
+        f'<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:720px;">'
+        f'{chips}</div></div>'
+    )
+
+
+def _cos(deg):
+    import math
+    return math.cos(math.radians(deg))
+
+
+def _sin(deg):
+    import math
+    return math.sin(math.radians(deg))
+
+
 def _on(theme) -> str:
     try:
         from learnova.rendering.theme_engine import readable_text_hex
@@ -495,6 +700,13 @@ def _chem(data: Dict[str, Any], theme) -> Optional[str]:
 _BUILDERS = {
     "LIST_STRUCTURED": _cards,
     "COMPARE_VISUAL": _pros_cons,
+    "COMPARE_TABLE": _compare_table,
+    "MATRIX_GRID": _matrix_2x2,
+    "MIND_MAP": _mind_map,
+    "CHART_CATEGORICAL": _bar_chart,
+    "CHART_RANKING": _bar_chart,
+    "CHART_TREND": _line_chart,
+    "CHART_PART_TO_WHOLE": _pie_chart,
     "WORKED_EXAMPLE": _worked_example,
     "TIMELINE": _timeline,
     "HIERARCHY_NEST": _pyramid,

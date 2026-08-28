@@ -436,6 +436,38 @@ def build_family_data(bullets: List[str], family: str, f: "Features") -> Dict[st
         if pros and cons:
             return {"pros": pros[:5], "cons": cons[:5]}
 
+    if family in {"CHART_CATEGORICAL", "CHART_RANKING", "CHART_PART_TO_WHOLE", "CHART_TREND"}:
+        # "Label ... 36%" / "Label: 36" / "Label - 1,200"
+        pts = []
+        for s in b:
+            m = re.match(r"^\s*([A-Za-z][\w /&.\-']{1,40}?)\s*[:\-–]?\s*"
+                         r"(?:is|was|=|at)?\s*\$?([\d][\d,]*\.?\d*)\s*%?", s)
+            if m:
+                try:
+                    pts.append({"label": m.group(1).strip(), "value": float(m.group(2).replace(",", ""))})
+                except ValueError:
+                    pass
+        if len(pts) >= 2:
+            if family == "CHART_RANKING":
+                pts.sort(key=lambda p: -p["value"])
+            return {"points": pts[:8]}
+
+    if family == "COMPARE_TABLE":
+        # rows like "Aspect: A-detail vs B-detail" or the LLM table_data if present
+        rows = []
+        for s in b:
+            m = re.match(r"^\s*([\w /&.\-']{2,30}?)\s*[:\-–]\s*(.+?)\s+(?:vs\.?|versus|/)\s+(.+)$", s, re.I)
+            if m:
+                rows.append([m.group(1).strip(), m.group(2).strip(), m.group(3).strip()])
+        if len(rows) >= 2:
+            return {"headers": ["Aspect", "Option A", "Option B"], "rows": rows[:8]}
+
+    if family == "MIND_MAP":
+        branches = [re.sub(r"^[-•*]\s*", "", s).strip() for s in b if s.strip()][:8]
+        center = (f.title if getattr(f, "title", "") else (branches[0] if branches else "")).strip()
+        if center and len(branches) >= 3:
+            return {"center": center, "branches": branches}
+
     if family == "HIERARCHY_NEST":  # pyramid
         levels = [re.sub(r"^\s*(level|tier|layer)\s*\d*[:.\-]?\s*", "", s, flags=re.I) for s in b]
         levels = [s for s in levels if s][:5]

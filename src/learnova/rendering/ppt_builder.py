@@ -64,6 +64,162 @@ def _image_decision(orig: dict):
         # Policy must never cost us a figure — when in doubt, show it.
         return True, str(img.get("description", ""))[:200]
 
+def _pptx_family(slide, sp, theme, band) -> bool:
+    """
+    Draw the Deck Director's chosen visual family as native PowerPoint shapes so
+    the PPTX matches the web deck instead of always falling back to bullets.
+    Returns True if it drew something. Best-effort — any failure returns False
+    and the caller renders the plain bullet list.
+    """
+    try:
+        family = getattr(sp, "family", "") or ""
+        data = getattr(sp, "data", {}) or {}
+        if not data:
+            return False
+        L_ = band.left + 0.4
+        W_ = band.width - 0.8
+        top = band.top + 0.15
+        h = band.height - 0.3
+
+        def _box(x, y, w, hh, text, *, fill=None, bold=False, size=13, color=None, align=None):
+            shp = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(hh))
+            if fill is not None:
+                shp.fill.solid(); shp.fill.fore_color.rgb = fill
+                shp.line.color.rgb = theme.primary_rgb
+            tf = shp.text_frame; tf.word_wrap = True
+            tf.text = str(text)
+            p = tf.paragraphs[0]
+            p.font.size = Pt(size); p.font.bold = bold
+            p.font.color.rgb = color or theme.text_rgb
+            if align is not None:
+                p.alignment = align
+            return shp
+
+        # ── process / cycle — numbered stacked steps ─────────────────────────
+        if family in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "WORKED_EXAMPLE"}:
+            steps = data.get("steps") or data.get("stages") or [
+                r.get("step") for r in (data.get("rows") or []) if r.get("step")
+            ]
+            steps = [s for s in steps if str(s).strip()][:8]
+            if len(steps) < 2:
+                return False
+            reasons = {i: r.get("reason", "") for i, r in enumerate(data.get("rows") or [])}
+            row_h = min(0.9, h / len(steps))
+            for i, s in enumerate(steps):
+                y = top + i * row_h
+                _box(L_, y, 0.5, row_h - 0.08, str(i + 1), fill=theme.primary_rgb,
+                     bold=True, size=14, color=theme.accent_rgb, align=PP_ALIGN.CENTER)
+                label = str(s)
+                if reasons.get(i):
+                    label += f"   —  {reasons[i]}"
+                _box(L_ + 0.65, y, W_ - 0.65, row_h - 0.08, label, fill=theme.bg_rgb, size=12)
+            return True
+
+        # ── pros / cons — two columns ───────────────────────────────────────
+        if family == "COMPARE_VISUAL":
+            pros = [str(x) for x in (data.get("pros") or [])][:5]
+            cons = [str(x) for x in (data.get("cons") or [])][:5]
+            if not (pros and cons):
+                return False
+            cw = W_ / 2 - 0.15
+            _box(L_, top, cw, 0.4, "Advantages", bold=True, size=13, color=theme.primary_rgb)
+            _box(L_ + cw + 0.3, top, cw, 0.4, "Trade-offs", bold=True, size=13, color=theme.primary_rgb)
+            _box(L_, top + 0.45, cw, h - 0.5, "\n".join(f"•  {p}" for p in pros),
+                 fill=theme.bg_rgb, size=11)
+            _box(L_ + cw + 0.3, top + 0.45, cw, h - 0.5, "\n".join(f"•  {c}" for c in cons),
+                 fill=theme.bg_rgb, size=11)
+            return True
+
+        # ── pyramid — stacked bands, widest at the base ─────────────────────
+        if family == "HIERARCHY_NEST":
+            levels = [str(x) for x in (data.get("levels") or [])][:5]
+            if len(levels) < 3:
+                return False
+            row_h = min(0.8, h / len(levels))
+            for i, lv in enumerate(levels):
+                frac = 0.45 + (i / max(1, len(levels) - 1)) * 0.5
+                w = W_ * frac
+                _box(L_ + (W_ - w) / 2, top + i * row_h, w, row_h - 0.1, lv,
+                     fill=theme.primary_rgb, color=theme.accent_rgb, bold=True,
+                     size=12, align=PP_ALIGN.CENTER)
+            return True
+
+        # ── card grid ──────────────────────────────────────────────────────
+        if family == "LIST_STRUCTURED":
+            cards = data.get("cards") or []
+            cards = [c for c in cards if str(c.get("body", c)).strip()][:4]
+            if len(cards) < 3:
+                return False
+            cw = W_ / len(cards) - 0.2
+            for i, c in enumerate(cards):
+                x = L_ + i * (cw + 0.25)
+                head = str(c.get("heading", "")) if isinstance(c, dict) else ""
+                body = str(c.get("body", c)) if isinstance(c, dict) else str(c)
+                txt = (head + "\n" + body) if head else body
+                _box(x, top, cw, h * 0.8, txt, fill=theme.bg_rgb, size=11)
+            return True
+
+        # ── bar chart — horizontal bars ────────────────────────────────────
+        if family in {"CHART_CATEGORICAL", "CHART_RANKING", "CHART_PART_TO_WHOLE"}:
+            pts = []
+            for p in (data.get("points") or []):
+                try:
+                    pts.append((str(p.get("label", "")), float(p.get("value", 0))))
+                except (ValueError, TypeError):
+                    pass
+            pts = pts[:8]
+            if len(pts) < 2:
+                return False
+            mx = max(v for _, v in pts) or 1
+            row_h = min(0.55, h / len(pts))
+            for i, (lbl, val) in enumerate(pts):
+                y = top + i * row_h
+                _box(L_, y, W_ * 0.28, row_h - 0.06, lbl, size=11, align=PP_ALIGN.RIGHT)
+                bw = max(0.15, (W_ * 0.6) * val / mx)
+                bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE,
+                                             Inches(L_ + W_ * 0.3), Inches(y + 0.04),
+                                             Inches(bw), Inches(row_h - 0.14))
+                bar.fill.solid(); bar.fill.fore_color.rgb = theme.primary_rgb
+                bar.line.fill.background()
+                _box(L_ + W_ * 0.3 + bw + 0.05, y, W_ * 0.1, row_h - 0.06,
+                     ("%g" % val), size=10, color=theme.text_rgb)
+            return True
+
+        # ── timeline — dated rows ──────────────────────────────────────────
+        if family == "TIMELINE":
+            events = [e for e in (data.get("events") or []) if e.get("title")][:6]
+            if len(events) < 3:
+                return False
+            row_h = min(0.7, h / len(events))
+            for i, e in enumerate(events):
+                y = top + i * row_h
+                _box(L_, y, 1.2, row_h - 0.08, str(e.get("date", "")), bold=True,
+                     size=12, color=theme.primary_rgb)
+                _box(L_ + 1.35, y, W_ - 1.35, row_h - 0.08, str(e.get("title", "")),
+                     fill=theme.bg_rgb, size=11)
+            return True
+
+        # ── mind map — centre + chips ──────────────────────────────────────
+        if family == "MIND_MAP":
+            center = str(data.get("center", ""))
+            branches = [str(b) for b in (data.get("branches") or [])][:8]
+            if not center or len(branches) < 3:
+                return False
+            _box(L_ + W_ / 2 - 1.4, top, 2.8, 0.7, center, fill=theme.primary_rgb,
+                 color=theme.accent_rgb, bold=True, size=14, align=PP_ALIGN.CENTER)
+            per_row = 3
+            cw = W_ / per_row - 0.2
+            for i, br in enumerate(branches):
+                r, c = divmod(i, per_row)
+                _box(L_ + c * (cw + 0.25), top + 0.9 + r * 0.75, cw, 0.6, br,
+                     fill=theme.bg_rgb, size=11, align=PP_ALIGN.CENTER)
+            return True
+
+        return False
+    except Exception:
+        return False
+
+
 def _add_slide_transition(slide):
     """Inject OpenXML transition tag for smooth slide entrance."""
     try:
@@ -593,6 +749,11 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                 sp2.text = body
                 sp2.font.size = Pt(card_pt)
                 sp2.font.color.rgb = theme.text_rgb
+
+        # ── 5b. EXPANDED VISUAL FAMILY (from the Deck Director) ───────────────
+        elif _sp and getattr(_sp, "family", None) and getattr(_sp, "data", None) and \
+                _pptx_family(slide, _sp, theme, band):
+            pass  # drew a native structured visual; bullets are represented in it
 
         # ── 6. DEFAULT / MINIMAL TEXT + IMAGE COLUMN LAYOUT ───────────────────
         else:
