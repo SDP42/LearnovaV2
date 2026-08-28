@@ -49,6 +49,9 @@ export default function Create() {
   const [quizStyle, setQuizStyle] = useState("inline"); // "inline" | "slide"
   const [quizAfter, setQuizAfter] = useState(""); // e.g. "3, 7, 11"
   const [ocr, setOcr] = useState(true);
+  const [wantPptx, setWantPptx] = useState(true);
+  const [wantHtml, setWantHtml] = useState(true);
+  const [enrich, setEnrich] = useState(true);
 
   const [phase, setPhase] = useState("input"); // input | review | generating | done
   const [error, setError] = useState("");
@@ -132,6 +135,10 @@ export default function Create() {
         quiz_style: quizStyle,
         quiz_positions: positions.length ? positions : null,
         enable_vision_ocr: ocr,
+        enable_quizzes: Number(quizFreq) > 0 || positions.length > 0,
+        enable_enhancement: enrich,
+        build_pptx: wantPptx,
+        build_html: wantHtml,
         text_density: density,
         markdown,
       });
@@ -311,6 +318,26 @@ export default function Create() {
                   <span className="text-xs text-muted-foreground">
                     a full checkpoint slide goes in after each
                   </span>
+                </div>
+
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Outputs
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <Switch checked={wantHtml} onCheckedChange={setWantHtml} />
+                      Interactive web deck
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <Switch checked={wantPptx} onCheckedChange={setWantPptx} />
+                      Animated PowerPoint
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <Switch checked={enrich} onCheckedChange={setEnrich} />
+                      Examples & analogies
+                    </label>
+                  </div>
                 </div>
 
                 <Button onClick={onGenerate} disabled={busy} className="self-start">

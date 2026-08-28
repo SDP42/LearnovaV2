@@ -38,32 +38,54 @@ export default function Presentations() {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {decks.map((d) => {
+            {decks.map((d, idx) => {
               const id = deckId(d);
+              const score = d.overall_score ?? null;
               return (
-                <Card key={id} className="lv-card group flex flex-col overflow-hidden">
+                <Card
+                  key={id}
+                  className="lv-card lv-in group flex flex-col overflow-hidden"
+                  style={{ animationDelay: `${idx * 40}ms` }}
+                >
                   <Link
                     to={`/app/preview/${id}`}
-                    className="flex aspect-video items-center justify-center border-b bg-muted/30 p-4"
+                    className="relative flex aspect-video items-center justify-center overflow-hidden border-b bg-gradient-to-br from-primary/10 via-muted/30 to-transparent p-4"
                   >
-                    <div className="w-full max-w-[200px] rounded-md border bg-card p-3">
-                      <div className="mb-2 h-1.5 w-2/3 rounded bg-primary/60" />
-                      <div className="space-y-1">
+                    <div className="lv-dots absolute inset-0 opacity-60" />
+                    <div className="relative w-full max-w-[210px] rounded-md border bg-card p-3 shadow-sm transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-lg">
+                      <div className="mb-2 h-2 w-2/3 rounded bg-primary/70" />
+                      <div className="flex gap-1.5">
+                        {[0, 1, 2].map((k) => (
+                          <div key={k} className="h-8 flex-1 rounded bg-primary/15" />
+                        ))}
+                      </div>
+                      <div className="mt-2 space-y-1">
                         <div className="h-1 w-full rounded bg-muted-foreground/25" />
-                        <div className="h-1 w-5/6 rounded bg-muted-foreground/25" />
-                        <div className="h-1 w-3/4 rounded bg-muted-foreground/25" />
+                        <div className="h-1 w-4/5 rounded bg-muted-foreground/25" />
                       </div>
                     </div>
+                    <span className="absolute right-2 top-2 rounded-md bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground backdrop-blur">
+                      {d.slide_count ?? d.slides ?? 0} slides
+                    </span>
                   </Link>
                   <CardContent className="flex flex-1 flex-col gap-2 p-4">
                     <p className="truncate text-sm font-medium">{deckTitle(d)}</p>
-                    <p className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{d.slide_count ?? d.slides ?? 0} slides</span>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
-                        <ListChecks className="size-3" /> {d.quiz_count ?? d.quizzes ?? 0}
+                        <ListChecks className="size-3" /> {d.quiz_count ?? d.quizzes ?? 0} quizzes
                       </span>
-                      {d.overall_score != null ? <span>{d.overall_score}/100</span> : null}
-                    </p>
+                      {score != null ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="h-1 w-10 overflow-hidden rounded-full bg-muted">
+                            <span
+                              className="block h-full rounded-full bg-primary"
+                              style={{ width: `${Math.min(100, score)}%` }}
+                            />
+                          </span>
+                          {score}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="mt-auto flex gap-2 pt-1">
                       <Button asChild size="sm" variant="outline" className="flex-1">
                         <Link to={`/app/preview/${id}`}>Open</Link>
