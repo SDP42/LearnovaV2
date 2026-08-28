@@ -1,4 +1,4 @@
-import { SignIn, SignUp } from "@clerk/clerk-react";
+import { SignIn, SignUp } from "@/auth";
 import Footer from "../components/Footer.jsx";
 import Navbar from "../components/Navbar.jsx";
 

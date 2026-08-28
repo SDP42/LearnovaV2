@@ -319,6 +319,13 @@ def enrich_deck(improved: List[dict]) -> int:
         current = entry.get("improved") or {}
         layout = str(current.get("layout_type", "MINIMAL_TEXT")).upper()
 
+        # The extractive summariser (no-LLM path) already produced clean,
+        # scored bullets and a conservative layout — do not re-derive from the
+        # raw section text (that reintroduces the title-in-first-bullet bug and
+        # over-eager FLOWCHART routing).
+        if current.get("visual_source") == "extractive":
+            continue
+
         # The router's fallbacks emit recognisable placeholders: a flowchart
         # with no node data, or a metric literally labelled "Key Stat". Those
         # are worth re-deriving; a genuine LLM result is not.

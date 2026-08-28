@@ -45,15 +45,98 @@ def _font_query(theme) -> str:
     return "&family=".join(f.replace(" ", "+") + ":wght@400;600;800" for f in families)
 
 
+def _image_html(orig: dict, theme) -> str:
+    """
+    Render an extracted figure as an inline data-URI <img>, unless the image
+    policy says to drop it or replace it with structure. Never raises.
+    """
+    try:
+        import base64
+
+        img = orig.get("image") if isinstance(orig, dict) else None
+        if not img or not img.get("bytes"):
+            return ""
+        raw = img["bytes"]
+        ext = str(img.get("ext", "png")).lower().lstrip(".")
+        mime = {"jpg": "jpeg", "jpeg": "jpeg", "webp": "webp", "gif": "gif"}.get(ext, "png")
+
+        from learnova.ai.image_policy import ImageMeta, decide_image_action, meta_from_bytes
+
+        slide_text = " ".join(str(x) for x in (orig.get("text"),))
+        try:
+            meta = meta_from_bytes(raw, ext=ext, ocr_text=str(img.get("description", "")),
+                                   slide_text=slide_text)
+        except Exception:
+            meta = ImageMeta(ext=ext, ocr_text=str(img.get("description", "")), slide_text=slide_text)
+        action = decide_image_action(meta)
+
+        if action.action in {"DROP", "SUMMARISE_TO_STRUCTURE"}:
+            return ""
+        b64 = base64.b64encode(raw).decode("ascii")
+        cap = html.escape(action.caption or str(img.get("description", ""))[:120])
+        cap_html = (f'<figcaption style="font-size:0.72rem;color:{theme.subtext_hex};'
+                    f'margin-top:6px;text-align:center;">{cap}</figcaption>') if cap else ""
+        badge = ' · low-res, flagged for cleanup' if action.action == "ENHANCE" else ""
+        return (
+            f'<figure style="margin:18px auto 0;max-width:70%;text-align:center;">'
+            f'<img src="data:image/{mime};base64,{b64}" '
+            f'style="max-width:100%;max-height:340px;border-radius:8px;'
+            f'border:1px solid {theme.primary_hex}33;" alt="figure{badge}"/>'
+            f'{cap_html}</figure>'
+        )
+    except Exception:
+        return ""
+
+
+def _family_block(family, data, theme):
+    """Cached wrapper around family_blocks.render_family_block."""
+    try:
+        from learnova.rendering.family_blocks import render_family_block
+
+        return render_family_block(family, data, theme)
+    except Exception:
+        return None
+
+
+def _fragment_index_for(idx0: int, animation: dict | None) -> dict:
+    """Map a bullet index -> reveal step number, from a deck-director animation."""
+    if not animation:
+        return {}
+    out: dict = {}
+    for step_no, step in enumerate(animation.get("steps") or []):
+        for el in step.get("adds") or []:
+            m = str(el)
+            if m.startswith("el."):
+                try:
+                    out[int(m[3:])] = step_no
+                except ValueError:
+                    pass
+    return out
+
+
 def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interactive Deck",
-                   theme_id: str = "auto", theme_spec: dict | None = None) -> str:
+                   theme_id: str = "auto", theme_spec: dict | None = None,
+                   deck_plan=None) -> str:
     """
     Constructs standalone HTML presentation with Reveal.js and Mermaid.js.
+
+    When ``deck_plan`` (a ``rendering.deck_director.DeckPlan``) is supplied, each
+    slide also gets: its director-chosen ``data-transition``, per-bullet
+    progressive-reveal ``fragment`` markup, and a populated speaker-notes pane
+    (Reveal's presenter view, opened with the ``s`` key).
     """
     theme = resolve_theme(topic_title, theme_id, theme_spec)
     # Text drawn on top of the primary fill. Hardcoding white broke every
     # light-primary palette; luminance picks the readable one.
     on_primary = readable_text_hex(theme.primary_hex)
+
+    if deck_plan is None:
+        try:
+            from learnova.rendering.deck_director import plan_deck
+
+            deck_plan = plan_deck(slides_data)
+        except Exception:  # director must never break the render
+            deck_plan = None
 
     slides_html_list = []
 
@@ -82,10 +165,47 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         title_text = html.escape(imp.get("title", orig.get("title", f"Slide {idx}")))
         takeaway_text = html.escape(imp.get("takeaway", "").strip())
 
+        sp = deck_plan.by_index(idx - 1) if deck_plan is not None else None
+        image_block = _image_html(orig, theme)
+        slide_transition = sp.transition if sp else "slide"
+        frag_map = _fragment_index_for(idx - 1, sp.animation if sp else None)
+        notes_html = (
+            f'<aside class="notes">{html.escape(sp.speaker_notes)}</aside>' if sp and sp.speaker_notes else ""
+        )
+
+        def _bullets_html(items, li_style=""):
+            # Emit the reveal-step as data-build only. Bullets stay fully visible
+            # in normal view (Canva/PowerPoint behaviour); the deck's script
+            # promotes [data-build] to real Reveal fragments *only* in present
+            # mode, so the Preview embed and a plain double-click never show a
+            # slide of hidden text.
+            out = []
+            for bi, b in enumerate(items):
+                db = f' data-build="{frag_map[bi]}"' if bi in frag_map else ""
+                out.append(f"<li{db} style='{li_style}'>{html.escape(str(b))}</li>")
+            return "".join(out)
+
         slide_body = ""
 
+        # ── 0. EXPANDED FAMILY — the Deck Director confidently chose one and
+        #      carried its data. This wins over a stale heuristic layout_type
+        #      (e.g. the router guessed METRIC for "y = 2x + 1", the VMS knows
+        #      it is a FUNCTION_PLOT).
+        _fam_block = None
+        if (
+            sp
+            and getattr(sp, "family", None)
+            and getattr(sp, "data", None)
+            and getattr(sp, "confidence", 0) >= 0.62
+            and layout_type not in {"QUIZ"}
+        ):
+            _fam_block = _family_block(sp.family, sp.data, theme)
+
+        if _fam_block:
+            slide_body = _fam_block
+
         # ── 1. TABLE LAYOUT ──────────────────────────────────────────────────
-        if layout_type == "TABLE" and "table_headers" in imp:
+        elif layout_type == "TABLE" and "table_headers" in imp:
             headers = imp.get("table_headers", [])
             rows = imp.get("table_rows", [])
             th_cells = "".join(f"<th style='background-color:{theme.primary_hex}; color:{on_primary}; padding:12px;'>{html.escape(str(h))}</th>" for h in headers)
@@ -150,7 +270,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             mermaid_code = imp.get("mermaid_code", "graph TD\n  A[Start] --> B[End]")
             escaped_mermaid = html.escape(mermaid_code)
             bullets = imp.get("bullets", [])
-            b_items = "".join(f"<li style='margin-bottom:8px;'>{html.escape(b)}</li>" for b in bullets)
+            b_items = _bullets_html(bullets, "margin-bottom:8px;")
 
             slide_body = f"""
             <div style="display:flex; gap:20px; text-align:left; margin-top:20px;">
@@ -166,10 +286,16 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             </div>
             """
 
-        # ── 5. DEFAULT MINIMAL TEXT LAYOUT ───────────────────────────────────
+        # ── 5. EXPANDED VISUAL FAMILIES (from the Deck Director) ─────────────
+        elif sp and getattr(sp, "family", None) and getattr(sp, "data", None) and _family_block(
+            sp.family, sp.data, theme
+        ):
+            slide_body = _family_block(sp.family, sp.data, theme)
+
+        # ── 6. DEFAULT MINIMAL TEXT LAYOUT ───────────────────────────────────
         else:
             bullets = imp.get("bullets", [])
-            b_items = "".join(f"<li style='margin-bottom:12px;'>{html.escape(b)}</li>" for b in bullets)
+            b_items = _bullets_html(bullets, "margin-bottom:12px;")
             slide_body = f"""
             <div style="text-align:left; margin-top:20px; font-size:1.1rem; line-height:1.6;">
                 <ul>{b_items}</ul>
@@ -185,13 +311,15 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
         # Slide wrapper
         slides_html_list.append(f"""
-        <section data-transition="slide" style="text-align:left;">
+        <section data-transition="{slide_transition}" style="text-align:left;">
             <div style="border-bottom:3px solid {theme.primary_hex}; padding-bottom:10px;">
                 <h2 style="color:{theme.primary_hex}; font-family:'{theme.heading_font}', sans-serif; font-size:2.2rem; margin:0; text-transform:uppercase;">{title_text}</h2>
             </div>
             {slide_body}
+            {image_block}
             {_inline_quiz_html(imp.get("inline_quiz"), theme)}
             {takeaway_html}
+            {notes_html}
         </section>
         """)
 
@@ -230,15 +358,58 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
     <!-- Reveal.js (pinned stable 4.6.1, classic UMD build) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.js" crossorigin="anonymous"></script>
+    <!-- Presenter view (speaker notes + next-slide preview + timer): press 's' -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/notes/notes.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.js" crossorigin="anonymous"></script>
     <!-- Mermaid.js (cdnjs UMD standalone build – works in local file:// and data URIs) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js" crossorigin="anonymous"></script>
     <script>
+        // Present mode = ?build / #build in the URL, or a parent frame that set
+        // window.__learnovaBuild before load. Normal / preview view keeps every
+        // bullet visible; only present mode turns [data-build] into fragments.
+        var LV_BUILD = (function () {{
+            try {{
+                if (window.__learnovaBuild) return true;
+                var s = (location.search + location.hash);
+                return /[?#&]build\\b/.test(s);
+            }} catch (e) {{ return false; }}
+        }})();
+
+        function lvApplyBuilds() {{
+            var els = document.querySelectorAll('[data-build]');
+            els.forEach(function (el) {{
+                if (LV_BUILD) {{
+                    el.classList.add('fragment');
+                    var i = parseInt(el.getAttribute('data-build'), 10);
+                    if (!isNaN(i)) el.setAttribute('data-fragment-index', i);
+                }} else {{
+                    el.classList.remove('fragment');
+                    el.removeAttribute('data-fragment-index');
+                }}
+            }});
+        }}
+        // Callable from a parent frame (the presenter console) to switch on builds.
+        window.__enableBuilds = function () {{
+            LV_BUILD = true;
+            lvApplyBuilds();
+            if (window.Reveal && Reveal.sync) Reveal.sync();
+        }};
+
+        lvApplyBuilds();
+
         Reveal.initialize({{
             controls: true,
             progress: true,
             center: true,
             hash: true,
-            transition: 'slide', // slide/fade/convex/concave/zoom
+            slideNumber: 'c/t',
+            transition: 'slide',        // per-slide data-transition overrides this
+            transitionSpeed: 'fast',
+            fragments: LV_BUILD,
+            plugins: [
+                (typeof RevealNotes !== 'undefined' ? RevealNotes : null),
+                (typeof RevealHighlight !== 'undefined' ? RevealHighlight : null),
+            ].filter(Boolean),
         }});
 
         mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});

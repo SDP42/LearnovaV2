@@ -126,6 +126,10 @@ class GenerateRequest(BaseModel):
     text_density: str = "medium"
     enable_enhancement: bool = True
     markdown: Optional[str] = None
+    # Advisory visual-family bias from the studio's "Visual style" picker
+    # (e.g. "PROCESS_LINEAR", "TIMELINE"). Consumed by a future biasing pass in
+    # the visual planner; accepted now so the UI contract is stable.
+    visual_hint: Optional[str] = None
 
 
 def _config_from(request: GenerateRequest, textbook_mode: bool = False) -> PipelineConfig:
@@ -309,10 +313,24 @@ def start_generate(
 
 
 def _slides_payload(final_deck: List[dict]) -> List[dict]:
+    # The Deck Director assigns the whole-deck presentation decisions
+    # (visual family/variant, inter-slide transition, animation timeline,
+    # summarisation directive, speaker notes). Failure here must not break the
+    # deck response, so it is best-effort.
+    plan_by_index: dict = {}
+    try:
+        from learnova.rendering.deck_director import plan_deck
+
+        for sp in plan_deck(final_deck).slides:
+            plan_by_index[sp.index] = sp
+    except Exception:  # pragma: no cover - director is advisory here
+        plan_by_index = {}
+
     slides = []
     for index, entry in enumerate(final_deck):
         improved = entry.get("improved", {})
         original = entry.get("original", {})
+        sp = plan_by_index.get(index)
         slides.append(
             {
                 "index": index,
@@ -333,6 +351,17 @@ def _slides_payload(final_deck: List[dict]) -> List[dict]:
                 "continued": bool(improved.get("continued")),
                 "has_image": bool(original.get("image")),
                 "source_text": original.get("text", ""),
+                # Deck Director decisions (may be absent if the director failed)
+                "family": getattr(sp, "family", None),
+                "variant": getattr(sp, "variant", None),
+                "treatment": getattr(sp, "treatment", None),
+                "transition": getattr(sp, "transition", None),
+                "transition_reason": getattr(sp, "transition_reason", None),
+                "summary_directive": getattr(sp, "summary_directive", None),
+                "reveal_steps": len(getattr(sp, "animation", {}).get("steps", [])) if sp else 0,
+                "speaker_notes": getattr(sp, "speaker_notes", ""),
+                "est_seconds": getattr(sp, "est_seconds", None),
+                "is_section_start": getattr(sp, "is_section_start", False),
             }
         )
     return slides

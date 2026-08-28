@@ -18,12 +18,37 @@ conclusion lands once rather than repeating on every page.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from learnova.logging_config import logger
 from learnova.textutils import clean_bullet, dedupe_bullets
+
+# Opt-in: paginate text-ish slides with the research CLASS dynamic program
+# (scoring/psf.py) — a load-optimal split — instead of the even _chunk split.
+# Off by default so behaviour and the test suite are unchanged.
+_USE_CLASS = os.getenv("LEARNOVA_USE_CLASS", "").lower() in {"1", "true", "yes", "on"}
+
+
+def _segment(items: List[str], size: int, layout: str = "MINIMAL_TEXT") -> List[List[str]]:
+    """Split a bullet/step list into slide-sized groups.
+
+    Uses CLASS when ``LEARNOVA_USE_CLASS`` is set and the items are strings;
+    otherwise the even ``_chunk`` rebalance. Both preserve every item and
+    respect ``size`` as a hard cap.
+    """
+    if _USE_CLASS and items and all(isinstance(x, str) for x in items):
+        try:
+            from learnova.scoring.psf import segment_blocks
+
+            groups = segment_blocks(items, max_per_slide=max(1, size), layout_type=layout)
+            if groups and sum(len(g) for g in groups) == len(items):
+                return groups
+        except Exception:  # never let scoring math break pagination
+            logger.debug("CLASS segmentation failed; falling back to _chunk", exc_info=True)
+    return _chunk(items, size)
 
 # ── Profiles ──────────────────────────────────────────────────────────────────
 
@@ -270,7 +295,7 @@ def paginate_slide(entry: dict, profile: DensityProfile,
     # ── Flowcharts: split into stages, never mid-step ────────────────────────
     if layout in {"FLOWCHART", "PROCESS_DIAGRAM"} and improved.get("bullets"):
         steps = [trim_bullet(b, profile) for b in improved["bullets"] if str(b).strip()]
-        pages = _chunk(steps, profile.max_flow_steps)
+        pages = _segment(steps, profile.max_flow_steps, "FLOWCHART")
         return [
             {
                 **entry,
@@ -304,7 +329,7 @@ def paginate_slide(entry: dict, profile: DensityProfile,
     if not bullets:
         return [{**entry, "improved": improved}]
 
-    pages = _chunk(bullets, limit)
+    pages = _segment(bullets, limit, layout)
     return [
         {
             **entry,

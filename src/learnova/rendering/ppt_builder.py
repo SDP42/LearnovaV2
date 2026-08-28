@@ -265,8 +265,18 @@ def _add_inline_quiz(slide, quiz: dict, theme: ColorPalette, has_takeaway: bool)
 
 
 def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentation",
-               theme_id: str = "auto", theme_spec: dict | None = None) -> bytes:
+               theme_id: str = "auto", theme_spec: dict | None = None,
+               deck_plan=None) -> bytes:
     theme = resolve_theme(topic_title, theme_id, theme_spec)
+
+    # Deck Director → per-slide speaker notes (the PPTX notes pane). Best-effort.
+    if deck_plan is None:
+        try:
+            from learnova.rendering.deck_director import plan_deck
+
+            deck_plan = plan_deck(slides_data)
+        except Exception:
+            deck_plan = None
 
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(13.33), Inches(7.5)
@@ -314,6 +324,14 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         title_text = imp.get("title", orig.get("title", "Presentation Slide"))
         takeaway_text = imp.get("takeaway", "").strip()
         inline_quiz = imp.get("inline_quiz") or None
+
+        # Speaker notes pane (key point, per-click cues, "read exactly", timing)
+        _sp = deck_plan.by_index(idx) if deck_plan is not None else None
+        if _sp and getattr(_sp, "speaker_notes", ""):
+            try:
+                slide.notes_slide.notes_text_frame.text = _sp.speaker_notes
+            except Exception:
+                pass
 
         # Geometry is derived per slide: the body shrinks when a takeaway bar
         # or a checkpoint band is also being drawn, so nothing overlaps.
@@ -607,6 +625,35 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
     tfe.paragraphs[0].alignment = PP_ALIGN.CENTER
 
     _apply_theme_fonts(prs, theme)
+
+    # ── Optional per-shape entrance animations (LEARNOVA_PPTX_ANIM=1) ─────────
+    try:
+        from learnova.rendering.pptx_animation import (
+            animations_enabled,
+            apply_click_builds,
+            strip_all_timing,
+        )
+
+        if animations_enabled():
+            content_slides = list(prs.slides)[1:-1]  # skip title + thank-you
+            for idx, slide in enumerate(content_slides):
+                sp = deck_plan.by_index(idx) if deck_plan is not None else None
+                n_groups = len((getattr(sp, "animation", {}) or {}).get("steps", []) or []) if sp else 0
+                shape_ids = [s.shape_id for s in slide.shapes][2:8]
+                if n_groups >= 2:
+                    shape_ids = shape_ids[: max(2, n_groups)]
+                apply_click_builds(slide, shape_ids)
+
+            # Validate: the file must still round-trip through python-pptx.
+            check = io.BytesIO()
+            prs.save(check)
+            check.seek(0)
+            try:
+                Presentation(check)
+            except Exception:
+                strip_all_timing(prs)
+    except Exception:
+        pass
 
     output = io.BytesIO()
     prs.save(output)

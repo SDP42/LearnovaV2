@@ -1,0 +1,238 @@
+/* Tailwind v4 WITHOUT global preflight — the legacy brutalist styles.css still
+   powers the marketing Landing page and a global reset would break it. The app
+   shell gets its own scoped reset below ([data-learnova-app]). */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Learnova design system — "Modern AI EdTech".
+   Clean, academic, professional, minimal, slightly futuristic.
+   Neutral slate base + an indigo primary. One design language everywhere in
+   the app shell; the legacy brutalist styles.css still powers the marketing
+   Landing page until that is migrated to the Aceternity hero.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.65rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.21 0.03 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.03 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.03 264);
+
+  --primary: oklch(0.55 0.21 273);          /* indigo 600-ish */
+  --primary-foreground: oklch(0.98 0.01 273);
+  --secondary: oklch(0.968 0.007 264);
+  --secondary-foreground: oklch(0.28 0.03 264);
+  --muted: oklch(0.968 0.007 264);
+  --muted-foreground: oklch(0.55 0.02 264);
+  --accent: oklch(0.95 0.03 273);
+  --accent-foreground: oklch(0.3 0.08 273);
+  --destructive: oklch(0.58 0.24 27);
+  --destructive-foreground: oklch(0.98 0.01 27);
+
+  --border: oklch(0.92 0.006 264);
+  --input: oklch(0.92 0.006 264);
+  --ring: oklch(0.55 0.21 273);
+
+  --chart-1: oklch(0.55 0.21 273);
+  --chart-2: oklch(0.62 0.17 198);
+  --chart-3: oklch(0.7 0.15 162);
+  --chart-4: oklch(0.75 0.16 85);
+  --chart-5: oklch(0.65 0.2 15);
+
+  --sidebar: oklch(0.985 0.002 264);
+  --sidebar-foreground: oklch(0.21 0.03 264);
+  --sidebar-primary: oklch(0.55 0.21 273);
+  --sidebar-primary-foreground: oklch(0.98 0.01 273);
+  --sidebar-accent: oklch(0.95 0.02 273);
+  --sidebar-accent-foreground: oklch(0.3 0.08 273);
+  --sidebar-border: oklch(0.92 0.006 264);
+  --sidebar-ring: oklch(0.55 0.21 273);
+}
+
+.dark {
+  /* "bright and dark" — a deep blue-slate ground with a vivid violet accent
+     and high-contrast text, so the UI feels alive rather than grey. */
+  --background: oklch(0.17 0.028 275);
+  --foreground: oklch(0.97 0.005 270);
+  --card: oklch(0.215 0.03 275);
+  --card-foreground: oklch(0.97 0.005 270);
+  --popover: oklch(0.215 0.03 275);
+  --popover-foreground: oklch(0.97 0.005 270);
+
+  --primary: oklch(0.72 0.19 285);
+  --primary-foreground: oklch(0.15 0.04 285);
+  --secondary: oklch(0.27 0.03 275);
+  --secondary-foreground: oklch(0.97 0.005 270);
+  --muted: oklch(0.26 0.025 275);
+  --muted-foreground: oklch(0.72 0.02 272);
+  --accent: oklch(0.36 0.07 285);
+  --accent-foreground: oklch(0.95 0.03 285);
+  --destructive: oklch(0.66 0.21 22);
+  --destructive-foreground: oklch(0.99 0.01 22);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.72 0.19 285);
+
+  --chart-1: oklch(0.72 0.19 285);
+  --chart-2: oklch(0.75 0.15 200);
+  --chart-3: oklch(0.78 0.16 155);
+  --chart-4: oklch(0.82 0.16 90);
+  --chart-5: oklch(0.72 0.2 20);
+
+  --sidebar: oklch(0.195 0.03 275);
+  --sidebar-foreground: oklch(0.97 0.005 270);
+  --sidebar-primary: oklch(0.72 0.19 285);
+  --sidebar-primary-foreground: oklch(0.15 0.04 285);
+  --sidebar-accent: oklch(0.34 0.07 285);
+  --sidebar-accent-foreground: oklch(0.95 0.03 285);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.72 0.19 285);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
+
+/* Scope a light reset to the app shell only, so the legacy Landing CSS
+   (styles.css) is untouched. Anything under [data-learnova-app] is the new
+   design language. */
+[data-learnova-app] {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Landing hero effects (Aceternity-style, dependency-free) ─────────────── */
+@layer components {
+  .lv-grid-bg {
+    background-image:
+      linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+    background-size: 48px 48px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 40%, transparent 100%);
+  }
+  .lv-spotlight {
+    background: radial-gradient(
+      600px circle at var(--x, 50%) var(--y, 0%),
+      color-mix(in oklch, var(--color-primary) 22%, transparent),
+      transparent 60%
+    );
+    transition: background 0.2s ease;
+  }
+  .lv-rise {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: lv-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  @keyframes lv-rise {
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lv-rise { animation: none; opacity: 1; transform: none; }
+  }
+  .lv-gradient-text {
+    background: linear-gradient(
+      92deg,
+      var(--color-primary),
+      color-mix(in oklch, var(--color-primary) 55%, oklch(0.62 0.17 198))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Scoped reset for the app shell (replaces the global preflight we dropped). */
+@layer base {
+  [data-learnova-app] *,
+  [data-learnova-app] *::before,
+  [data-learnova-app] *::after {
+    box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: var(--color-border);
+  }
+  [data-learnova-app] {
+    font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.5;
+  }
+  [data-learnova-app] h1,
+  [data-learnova-app] h2,
+  [data-learnova-app] h3,
+  [data-learnova-app] h4,
+  [data-learnova-app] p,
+  [data-learnova-app] figure {
+    margin: 0;
+  }
+  [data-learnova-app] ul,
+  [data-learnova-app] ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  [data-learnova-app] button {
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  [data-learnova-app] svg {
+    display: block;
+  }
+  [data-learnova-app] input,
+  [data-learnova-app] textarea {
+    font: inherit;
+    color: inherit;
+  }
+}

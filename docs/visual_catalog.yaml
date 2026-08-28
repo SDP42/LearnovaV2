@@ -1,0 +1,360 @@
+# Learnova visual catalog — the addressable visual library.
+#
+# id = FAMILY.variant. Params (docs/research/VISUAL_LIBRARY_MASTER_PROMPT.md B.3)
+# multiply the ~180 variants below past 1000 materially-different visuals.
+#
+# Each variant:
+#   use_when   - the content shape that calls for this visual
+#   avoid_when - when to pick something else (or plain text)
+#   needs      - structured data fields the renderer requires
+#   reveal_unit- the atom one progressive-reveal step adds (Part C.2)
+#   params     - parametric axes this variant accepts
+#
+# Consumed by ai/visual_selector.py (load_catalog) and documented for the
+# master prompt in ai/master_prompt.py.
+
+version: 1
+
+params_vocab:
+  orientation:    [horizontal, vertical, radial, isometric]
+  cardinality:    [tiny, small, medium, large, dense]
+  emphasis:       [neutral, highlight, ranked, threshold, delta]
+  data_mode:      [schematic, data_driven, hybrid]
+  dimensionality: [1d, 2d, 2.5d, 3d]
+  motion:         [static, build, animate, scrub]
+  encoding:       [position, length, angle, area, color_seq, color_div, color_cat, size, texture]
+
+families:
+
+  TEXT:
+    domain: verbatim / prose / bullets
+    variants:
+      keep:     {use_when: "wording is legally or mathematically exact (definition, theorem, statute, quotation, code, formula-in-prose)", avoid_when: "prose can be paraphrased without loss", needs: [sentences], reveal_unit: sentence, params: [motion]}
+      minimal:  {use_when: "connected explanatory prose with no internal structure", avoid_when: "there is order, comparison, quantity, hierarchy or process", needs: [sentences], reveal_unit: sentence, params: [motion]}
+      bullets:  {use_when: "3-8 discrete facts with no relationship between them", avoid_when: "the items form a sequence, comparison or hierarchy", needs: [bullets], reveal_unit: bullet, params: [motion, emphasis]}
+
+  DEFINITION:
+    domain: term - meaning - example callouts
+    variants:
+      term:      {use_when: "one term is introduced and defined", avoid_when: "several terms (use glossary_strip); no explicit definition", needs: [term, definition, examples], reveal_unit: line, params: [motion]}
+      glossary_strip: {use_when: "3-6 short terms each with a one-line gloss", avoid_when: "one term needing depth", needs: [entries], reveal_unit: entry, params: [motion, orientation]}
+
+  QUOTE:
+    domain: statements, laws, principles
+    variants:
+      statement: {use_when: "a single memorable statement, law or principle IS the slide", avoid_when: "the statement needs unpacking into parts", needs: [text, attribution], reveal_unit: whole, params: [motion]}
+
+  KPI:
+    domain: headline numbers
+    variants:
+      single:    {use_when: "exactly one figure carries the message", avoid_when: "3+ metrics (use grid); the number needs a trend", needs: [value, label, description], reveal_unit: whole, params: [motion, emphasis]}
+      grid:      {use_when: "2-4 headline metrics of equal weight", avoid_when: "one dominant metric; metrics need comparison over time", needs: [metrics], reveal_unit: metric, params: [motion, emphasis]}
+      delta:     {use_when: "a metric shown against a baseline or target", avoid_when: "no baseline exists", needs: [value, baseline, label], reveal_unit: whole, params: [motion]}
+
+  LIST_STRUCTURED:
+    domain: checklist / ranked / cards / do-dont
+    variants:
+      checklist: {use_when: "items to be verified or completed, order loose", avoid_when: "strict sequence (use PROCESS_LINEAR)", needs: [items], reveal_unit: item, params: [motion]}
+      ranked:    {use_when: "items in a meaningful order of importance or size, no numeric axis", avoid_when: "numeric values are known (use CHART_RANKING)", needs: [items_ordered], reveal_unit: item, params: [motion, emphasis]}
+      do_dont:   {use_when: "recommended vs discouraged practices", avoid_when: "comparing two neutral options (use COMPARE_VISUAL)", needs: [do, dont], reveal_unit: item, params: [motion]}
+      cards:     {use_when: "3-4 parallel pillars / categories / principles of equal weight", avoid_when: ">4 items; items form a process or hierarchy", needs: [cards], reveal_unit: card, params: [motion, orientation]}
+      steps_list: {use_when: "an ordered procedure best read as a numbered list, no branching", avoid_when: "branches or parallel paths exist (use flowchart)", needs: [steps], reveal_unit: step, params: [motion]}
+
+  PROCESS_LINEAR:
+    domain: flowchart / pipeline / swimlane / funnel / chevron
+    variants:
+      flowchart: {use_when: "ordered procedure, 3-12 nodes, may branch/merge", avoid_when: "it loops with no end (PROCESS_CYCLIC); >15 nodes", needs: [nodes, edges], reveal_unit: node, params: [orientation, motion, emphasis]}
+      pipeline:  {use_when: "data or material transformed stage by stage, single path", avoid_when: "branches; stages are not transformations", needs: [stages], reveal_unit: stage, params: [orientation, motion]}
+      swimlane:  {use_when: "a process where who-does-what matters, 2+ actors", avoid_when: "actor is irrelevant", needs: [lanes, steps], reveal_unit: step, params: [orientation, motion]}
+      funnel:    {use_when: "a quantity shrinks monotonically through stages", avoid_when: "quantity grows or is unordered", needs: [stages_desc], reveal_unit: stage, params: [motion, emphasis]}
+      chevron:   {use_when: "3-6 sequential phases, no data, emphasis on direction", avoid_when: "branching or timing detail exists", needs: [phases], reveal_unit: phase, params: [orientation, motion]}
+
+  PROCESS_CYCLIC:
+    domain: cycle / feedback loop / iteration
+    variants:
+      cycle:         {use_when: "3-8 stages repeating forever, equal weight", avoid_when: "there is a true start/end; one stage dominates", needs: [stages], reveal_unit: stage, params: [orientation, motion]}
+      feedback_loop: {use_when: "output feeds back to modify input", avoid_when: "the return path is not a correction or measurement", needs: [nodes, forward_edges, feedback_edge], reveal_unit: edge, params: [motion]}
+      iteration_loop: {use_when: "repeat-until-converged (training, refinement)", avoid_when: "fixed number of non-repeating steps", needs: [body_steps, exit_condition], reveal_unit: step, params: [motion]}
+
+  DECISION:
+    domain: decision tree / if-then ladder / truth table
+    variants:
+      tree:          {use_when: "nested yes/no choices leading to outcomes", avoid_when: "choices are independent (MATRIX_GRID); >4 levels deep", needs: [root, nodes, branches, leaves], reveal_unit: branch, params: [orientation, motion]}
+      if_then_ladder: {use_when: "3-7 mutually exclusive condition to action rules", avoid_when: "conditions overlap or are continuous", needs: [rules, default], reveal_unit: rule, params: [motion]}
+      truth_table:   {use_when: "boolean function of 2-4 inputs", avoid_when: "continuous inputs; >4 inputs", needs: [inputs, rows], reveal_unit: row, params: [motion]}
+
+  STATE_MACHINE:
+    domain: state diagram / lifecycle / phases
+    variants:
+      state_diagram: {use_when: "discrete states with named transitions and events", avoid_when: "no transitions; linear steps (PROCESS_LINEAR)", needs: [states, transitions, initial], reveal_unit: transition, params: [orientation, motion]}
+      lifecycle:     {use_when: "an entity moving through named life phases, may loop", avoid_when: "one-shot process", needs: [phases, transitions], reveal_unit: phase, params: [orientation, motion]}
+
+  TIMELINE:
+    domain: dated timeline / gantt / roadmap / era band
+    variants:
+      dated:     {use_when: "3-12 events with real dates", avoid_when: "ordinal-only (first, then); durations matter more than dates", needs: [events], reveal_unit: event, params: [orientation, motion, emphasis]}
+      gantt:     {use_when: "overlapping tasks with start/end and dependencies", avoid_when: "instantaneous events; no overlap", needs: [tasks], reveal_unit: task, params: [motion]}
+      roadmap:   {use_when: "a future plan grouped into horizons (now/next/later)", avoid_when: "precise dates are known and matter", needs: [horizons, items], reveal_unit: item, params: [orientation, motion]}
+      era_band:  {use_when: "long history split into named periods", avoid_when: "<3 periods; exact events matter more", needs: [periods, markers], reveal_unit: period, params: [orientation, motion]}
+
+  HIERARCHY_TREE:
+    domain: org chart / taxonomy / bracket / dendrogram
+    variants:
+      org_chart: {use_when: "reporting or containment tree", avoid_when: "peer relationships or networks (CHART_FLOW.network)", needs: [root, edges, labels], reveal_unit: node, params: [orientation, motion]}
+      taxonomy:  {use_when: "is-a classification, 2-4 levels", avoid_when: "overlapping categories; fuzzy membership", needs: [levels, nodes, parent_links], reveal_unit: node, params: [orientation, motion]}
+      bracket:   {use_when: "single-elimination tournament / knockout", avoid_when: "non-elimination structure", needs: [rounds, matchups], reveal_unit: matchup, params: [orientation, motion]}
+      dendrogram: {use_when: "hierarchical clustering result with merge heights", avoid_when: "no distance/merge information", needs: [leaves, merges], reveal_unit: merge, params: [orientation, motion]}
+
+  HIERARCHY_NEST:
+    domain: pyramid / layered model / treemap / sunburst
+    variants:
+      pyramid:      {use_when: "3-6 levels building on a base", avoid_when: "levels are independent or same size", needs: [levels], reveal_unit: level, params: [orientation, motion]}
+      layered_model: {use_when: "a stack of abstraction layers (OSI, TCP/IP)", avoid_when: "not a stack; lateral flow dominates", needs: [layers], reveal_unit: layer, params: [motion]}
+      treemap:      {use_when: "part-to-whole with nested categories, area = value", avoid_when: "<5 items; values unknown", needs: [tree], reveal_unit: leaf, params: [motion, encoding]}
+      sunburst:     {use_when: "nested part-to-whole where radial depth reads better", avoid_when: "one level; many tiny leaves", needs: [tree], reveal_unit: ring_segment, params: [motion, encoding]}
+
+  MIND_MAP:
+    domain: radial map / concept map / spider
+    variants:
+      radial:      {use_when: "one central concept fanning into 3-7 loose branches", avoid_when: "branches are ordered or hierarchical", needs: [central, branches], reveal_unit: branch, params: [motion]}
+      concept_map: {use_when: "concepts joined by labelled relationships (X causes Y)", avoid_when: "relationships are unlabelled or all the same", needs: [nodes, labelled_edges], reveal_unit: edge, params: [motion]}
+      spider:      {use_when: "one topic with sub-points at two depths, compact", avoid_when: ">3 depths; needs edge labels", needs: [central, branches], reveal_unit: branch, params: [motion]}
+
+  COMPARE_TABLE:
+    domain: comparison table / feature matrix / rubric
+    variants:
+      comparison:    {use_when: "2-5 things x 3-8 shared aspects", avoid_when: "one thing only (PROS_CONS); aspects differ per thing", needs: [headers, rows, highlight_cells], reveal_unit: row, params: [motion, emphasis]}
+      feature_matrix: {use_when: "many options x many binary features (check/cross)", avoid_when: "features are graded not binary", needs: [options, features, cells], reveal_unit: feature_row, params: [motion]}
+      rubric:        {use_when: "criteria x performance levels with descriptors", avoid_when: "no leveled descriptors", needs: [criteria, levels, cells], reveal_unit: criterion, params: [motion]}
+
+  COMPARE_VISUAL:
+    domain: before/after / split-screen / pros-cons
+    variants:
+      before_after: {use_when: "one subject, two states, the change is the point", avoid_when: ">2 states; states not comparable", needs: [before, after, changed], reveal_unit: side, params: [orientation, motion]}
+      split_screen: {use_when: "two competing approaches shown in parallel", avoid_when: "3+ approaches; they are not opposed", needs: [left, right], reveal_unit: point, params: [motion]}
+      pros_cons:    {use_when: "advantages vs disadvantages of ONE thing", avoid_when: "comparing two things", needs: [pros, cons], reveal_unit: item, params: [motion]}
+
+  MATRIX_GRID:
+    domain: 2x2 quadrant / eisenhower / confusion matrix / heatmap grid
+    variants:
+      quadrant_2x2:    {use_when: "items on two independent binary/continuous axes", avoid_when: "one axis; >12 items", needs: [x_axis, y_axis, items_or_quadrants], reveal_unit: quadrant, params: [motion, emphasis]}
+      eisenhower:      {use_when: "tasks by urgency x importance", avoid_when: "non-task content", needs: [items], reveal_unit: quadrant, params: [motion]}
+      confusion_matrix: {use_when: "classifier TP/FP/FN/TN or k x k results", avoid_when: "non-classification data", needs: [classes, counts], reveal_unit: cell, params: [motion, encoding]}
+      heatmap_grid:    {use_when: "a value across two categorical dimensions, colour = value", avoid_when: "dimensions are continuous", needs: [rows, cols, values], reveal_unit: cell, params: [motion, encoding]}
+
+  SET_DIAGRAM:
+    domain: Venn / Euler
+    variants:
+      venn2: {use_when: "two sets with shared and unique members", avoid_when: "sets do not overlap (use COMPARE_VISUAL); >3 sets", needs: [sets, only_a, only_b, shared], reveal_unit: region, params: [motion]}
+      venn3: {use_when: "three sets with all overlap regions meaningful", avoid_when: "some regions are empty (use euler); >3 sets", needs: [sets, regions], reveal_unit: region, params: [motion]}
+      euler: {use_when: "set containment or partial overlap where empty regions must not be drawn", avoid_when: "all regions are non-empty (use venn)", needs: [sets, relations], reveal_unit: set, params: [motion]}
+
+  CHART_CATEGORICAL:
+    domain: bar / grouped / stacked / pareto / lollipop / dot plot
+    variants:
+      bar:         {use_when: "compare a value across 3-15 nominal categories", avoid_when: "parts of a whole (pie); time series (line); >20 bars", needs: [categories, series, axes], reveal_unit: bar, params: [orientation, motion, emphasis, encoding]}
+      grouped_bar: {use_when: "2-4 sub-series per category", avoid_when: ">4 sub-series; categories >8", needs: [categories, series], reveal_unit: series, params: [orientation, motion]}
+      stacked_bar: {use_when: "category total AND composition both matter", avoid_when: "only composition (stacked_100); only total (bar)", needs: [categories, segments], reveal_unit: segment, params: [orientation, motion, encoding]}
+      pareto:      {use_when: "a few categories drive most of the total (80/20)", avoid_when: "no dominant categories", needs: [categories_sorted, cumulative], reveal_unit: bar, params: [motion, emphasis]}
+      lollipop:    {use_when: "bar chart with many categories, de-cluttered", avoid_when: "<6 categories; need to compare areas", needs: [categories, values], reveal_unit: stem, params: [orientation, motion]}
+      dot_plot:    {use_when: "compare values across many categories or one value vs a range", avoid_when: "few categories; part-to-whole", needs: [categories, values], reveal_unit: dot, params: [orientation, motion]}
+
+  CHART_TREND:
+    domain: line / area / step / slope
+    variants:
+      line:        {use_when: "continuous quantity over ordered/time x, 1-4 series", avoid_when: "nominal x (bar); >6 series", needs: [x, series], reveal_unit: series, params: [motion, emphasis]}
+      multi_line:  {use_when: "compare 2-6 series over the same time axis", avoid_when: ">6 series (spaghetti); one series", needs: [x, series], reveal_unit: series, params: [motion, emphasis]}
+      area:        {use_when: "magnitude of a single series over time, volume matters", avoid_when: "multiple crossing series", needs: [x, series_one], reveal_unit: region_sweep, params: [motion]}
+      stacked_area: {use_when: "composition of a total changing over time", avoid_when: "series cross a lot; exact values matter", needs: [x, series], reveal_unit: band, params: [motion]}
+      step:        {use_when: "a value that changes at discrete instants and holds", avoid_when: "smoothly varying quantity", needs: [x, series], reveal_unit: segment, params: [motion]}
+      slope:       {use_when: "change between exactly two time points, many items", avoid_when: ">2 time points; few items", needs: [items_t1_t2], reveal_unit: line, params: [motion, emphasis]}
+
+  CHART_PART_TO_WHOLE:
+    domain: pie / donut / stacked-100 / waffle
+    variants:
+      pie:         {use_when: "2-5 parts of one whole summing to ~100%", avoid_when: ">5 slices; values not a whole; comparing across pies", needs: [slices], reveal_unit: slice, params: [motion, emphasis]}
+      donut:       {use_when: "pie plus a central total/label", avoid_when: "same limits as pie", needs: [slices, center_label], reveal_unit: slice, params: [motion]}
+      stacked_100: {use_when: "compare composition across several groups", avoid_when: "one group only (pie); absolute totals matter", needs: [groups, segments], reveal_unit: segment, params: [orientation, motion]}
+      waffle:      {use_when: "make a proportion tangible (13 in 100)", avoid_when: "precise multi-part breakdown; >2 categories", needs: [total, highlighted, unit], reveal_unit: cell_block, params: [motion]}
+      icon_array:  {use_when: "risk / frequency communication to a lay audience", avoid_when: "continuous or precise data", needs: [total, highlighted, icon], reveal_unit: icon_block, params: [motion]}
+
+  CHART_DISTRIBUTION:
+    domain: histogram / box / violin / ecdf
+    variants:
+      histogram: {use_when: "shape of one numeric variable, n large", avoid_when: "n < 20; categorical data", needs: [values_or_bins], reveal_unit: bin, params: [motion]}
+      box_plot:  {use_when: "compare distributions across 2-8 groups", avoid_when: "need to see modality (violin); n tiny", needs: [groups_summary], reveal_unit: box, params: [orientation, motion]}
+      violin:    {use_when: "distribution shape and multimodality matter", avoid_when: "audience unfamiliar; small n", needs: [groups_values], reveal_unit: violin, params: [orientation, motion]}
+      density:   {use_when: "smooth estimate of one distribution, compare 2-3", avoid_when: "small n; discrete data", needs: [series_values], reveal_unit: curve, params: [motion]}
+      ecdf:      {use_when: "answering what fraction is below X", avoid_when: "audience wants the shape (histogram)", needs: [values], reveal_unit: curve, params: [motion]}
+
+  CHART_RELATIONSHIP:
+    domain: scatter / bubble / correlation heatmap
+    variants:
+      scatter:            {use_when: "relationship between two numeric variables", avoid_when: "one variable; categorical x", needs: [points, group], reveal_unit: point_cloud, params: [motion, emphasis]}
+      bubble:             {use_when: "a third numeric variable via marker size", avoid_when: "size differences <2x; clutter", needs: [points_xysize], reveal_unit: point, params: [motion, encoding]}
+      connected_scatter:  {use_when: "two variables that both change over an ordered index", avoid_when: "no ordering; many crossings", needs: [ordered_points], reveal_unit: segment, params: [motion]}
+      correlation_heatmap: {use_when: "pairwise correlations among 4-20 variables", avoid_when: "<4 variables; non-linear relations", needs: [variables, matrix], reveal_unit: cell, params: [motion, encoding]}
+
+  CHART_RANKING:
+    domain: ordered bar / bump / dumbbell / tornado
+    variants:
+      ordered_bar: {use_when: "rank items by a single value", avoid_when: "part-to-whole; time series", needs: [items_values_sorted], reveal_unit: bar, params: [orientation, motion, emphasis]}
+      bump:        {use_when: "how ranks change across time points", avoid_when: "absolute values matter; >10 items", needs: [items, ranks_over_time], reveal_unit: line, params: [motion, emphasis]}
+      dumbbell:    {use_when: "gap between two values per item (before/after, A/B)", avoid_when: ">2 values per item", needs: [items_v1_v2], reveal_unit: pair, params: [orientation, motion]}
+      tornado:     {use_when: "sensitivity: how each factor swings an outcome", avoid_when: "non-sensitivity data", needs: [factors_low_high], reveal_unit: bar, params: [motion, emphasis]}
+
+  CHART_FLOW:
+    domain: sankey / alluvial / chord / network / arc
+    variants:
+      sankey:   {use_when: "flow/conservation of a quantity through stages", avoid_when: "quantity not conserved; <3 nodes", needs: [nodes, links], reveal_unit: link, params: [motion]}
+      alluvial: {use_when: "how category membership changes across 2-4 dimensions", avoid_when: "one dimension; continuous data", needs: [dimensions, flows], reveal_unit: flow, params: [motion]}
+      chord:    {use_when: "pairwise flows among 5-15 entities, symmetric", avoid_when: ">15 entities; directed asymmetric flows", needs: [entities, matrix], reveal_unit: ribbon, params: [motion]}
+      network:  {use_when: "entities and their relationships, no hierarchy", avoid_when: "it is a tree; >50 nodes on a slide", needs: [nodes, edges], reveal_unit: node, params: [motion, emphasis]}
+      arc:      {use_when: "relationships among items in a fixed linear order", avoid_when: "no natural ordering", needs: [ordered_nodes, edges], reveal_unit: arc, params: [motion]}
+
+  CHART_SPATIAL:
+    domain: choropleth / dot map / flow map
+    variants:
+      choropleth: {use_when: "a value per region, geography matters", avoid_when: "regions vary wildly in size; non-spatial data", needs: [regions, scale], reveal_unit: region, params: [motion, encoding]}
+      dot_map:    {use_when: "individual events located in space", avoid_when: "aggregated rates (choropleth)", needs: [points], reveal_unit: point_cloud, params: [motion]}
+      flow_map:   {use_when: "movement between origins and destinations", avoid_when: "static quantities; many overlapping flows", needs: [origins, flows], reveal_unit: flow, params: [motion]}
+
+  CHART_SPECIAL:
+    domain: radar / parallel coordinates / gauge / bullet
+    variants:
+      radar:               {use_when: "one entity profiled on 3-8 comparable axes", avoid_when: "axes not comparable; >8 axes; >3 entities", needs: [axes, series], reveal_unit: axis, params: [motion, emphasis]}
+      parallel_coordinates: {use_when: "patterns across 4-10 numeric dimensions for many items", avoid_when: "few dimensions; small n", needs: [dimensions, items], reveal_unit: line, params: [motion]}
+      gauge:               {use_when: "one KPI against a target or range", avoid_when: "multiple metrics; no meaningful range", needs: [value, target, ranges], reveal_unit: needle_sweep, params: [motion]}
+      bullet:              {use_when: "KPI vs target with qualitative bands, compact", avoid_when: "no target; needs a dial metaphor", needs: [value, target, bands], reveal_unit: whole, params: [motion]}
+
+  FUNCTION_PLOT:
+    domain: y=f(x)
+    variants:
+      curve:     {use_when: "a single y=f(x) over a domain", avoid_when: "discrete data (scatter); no closed form", needs: [expr_or_samples, domain, key_points], reveal_unit: curve, params: [motion, data_mode]}
+      family:    {use_when: "how a parameter changes a curve's shape", avoid_when: "only one curve matters; >6 curves", needs: [base_expr, param, param_values], reveal_unit: curve_per_value, params: [motion]}
+      piecewise: {use_when: "a function defined by cases", avoid_when: "continuous single expression", needs: [pieces, breakpoints], reveal_unit: piece, params: [motion]}
+      parametric: {use_when: "x and y both depend on a parameter t", avoid_when: "y is a plain function of x", needs: [x_t, y_t, t_range], reveal_unit: trace, params: [motion]}
+      polar:     {use_when: "a relationship naturally expressed as r(theta)", avoid_when: "cartesian reads fine", needs: [r_theta, theta_range], reveal_unit: trace, params: [motion]}
+
+  CALCULUS_VIZ:
+    domain: limits / derivatives / integrals / ODE fields
+    variants:
+      secant_to_tangent: {use_when: "derivative as the limit of secant slope", avoid_when: "not teaching limits/derivative", needs: [curve, point, approaching_points], reveal_unit: secant_then_tangent, params: [motion]}
+      riemann:           {use_when: "integral as the limit of a rectangle sum", avoid_when: "not teaching integration", needs: [curve, interval, n_values], reveal_unit: rectangle_set, params: [motion]}
+      area_under:        {use_when: "definite integral as signed area", avoid_when: "area is not the concept", needs: [curve, a, b], reveal_unit: region_sweep, params: [motion]}
+      slope_field:       {use_when: "solutions of a first-order ODE", avoid_when: "no ODE context", needs: [dydx, grid, sample_solution], reveal_unit: field_then_solution, params: [motion]}
+      limit_zoom:        {use_when: "a limit or continuity behaviour near a point", avoid_when: "global behaviour matters", needs: [expr, point, zoom_levels], reveal_unit: zoom_step, params: [motion]}
+
+  LINEAR_ALGEBRA:
+    domain: vectors / transforms / projections
+    variants:
+      vector:        {use_when: "vector addition, components, or direction", avoid_when: "no vector context", needs: [vectors, basis], reveal_unit: vector, params: [motion, dimensionality]}
+      grid_transform: {use_when: "how a matrix warps space (basis change, rotation, shear)", avoid_when: "matrix used only for arithmetic", needs: [matrix, unit_grid], reveal_unit: transform_sweep, params: [motion]}
+      projection:    {use_when: "projecting a vector onto a line or subspace", avoid_when: "no projection concept", needs: [vector, target_subspace], reveal_unit: drop_perpendicular, params: [motion]}
+      span:          {use_when: "the space reachable from a set of vectors", avoid_when: ">3 dimensions", needs: [vectors], reveal_unit: vector_then_region, params: [motion]}
+
+  GEOMETRY:
+    domain: constructions / figures / transformations / solids
+    variants:
+      construction:   {use_when: "a figure built step by step (compass-straightedge)", avoid_when: "only the final figure matters", needs: [primitives, final_labels], reveal_unit: primitive, params: [motion]}
+      labelled_figure: {use_when: "a named polygon or solid with sides, angles, marks", avoid_when: "the figure must be built to be understood", needs: [shape, vertices, labels, marks], reveal_unit: label_group, params: [motion, dimensionality]}
+      transformation: {use_when: "translate/rotate/reflect/dilate a shape", avoid_when: "no transformation; >2 composed", needs: [pre_image, transform], reveal_unit: preimage_map_image, params: [motion]}
+      circle_theorem: {use_when: "an angle/tangent/chord circle theorem", avoid_when: "non-circle geometry", needs: [circle, points, marked_angles], reveal_unit: element, params: [motion]}
+      solid_net:      {use_when: "a 3D solid unfolded to its 2D net", avoid_when: "net is irrelevant", needs: [solid, faces, fold_edges], reveal_unit: fold, params: [motion]}
+
+  NUMBER_LINE:
+    domain: number lines / inequalities / fractions
+    variants:
+      line:        {use_when: "position or order of numbers", avoid_when: "2D relationships; clustered points", needs: [range, ticks, points], reveal_unit: point, params: [orientation, motion]}
+      inequality:  {use_when: "the solution set of an inequality in one variable", avoid_when: "equality; system in 2 vars", needs: [boundary, open_closed, direction], reveal_unit: boundary_then_ray, params: [motion]}
+      interval:    {use_when: "one or more intervals on the real line", avoid_when: "single points; 2D regions", needs: [intervals], reveal_unit: interval, params: [motion]}
+      fraction_bar: {use_when: "fractions / ratios / percentages of one bar", avoid_when: ">8 partitions; non part-whole", needs: [whole, partitions, shaded], reveal_unit: partition, params: [motion]}
+
+  PROOF_LADDER:
+    domain: proofs / derivations
+    variants:
+      statement_reason: {use_when: "two-column geometry or logic proof", avoid_when: "one-liner; purely computational", needs: [rows], reveal_unit: row, params: [motion]}
+      derivation_chain: {use_when: "algebra or physics: each line follows from the last", avoid_when: "steps are independent facts", needs: [lines], reveal_unit: line, params: [motion]}
+      proof_tree:      {use_when: "natural deduction or recursive structure", avoid_when: "linear derivation reads fine", needs: [premises, rules, conclusion], reveal_unit: inference, params: [motion]}
+
+  ML_VIZ:
+    domain: machine-learning concepts
+    variants:
+      regression_fit:   {use_when: "fitting a line/curve to points; residuals; best fit", avoid_when: "classification; no fitting concept", needs: [points, candidate_models, chosen, show_residuals, equation], reveal_unit: see_C5, params: [motion]}
+      decision_boundary: {use_when: "how a classifier partitions a 2-feature space", avoid_when: ">2 features; regression", needs: [points_class, boundary], reveal_unit: points_then_boundary_then_regions, params: [motion]}
+      gradient_descent: {use_when: "iterative minimisation of a loss", avoid_when: "closed-form solution; no optimisation", needs: [loss_surface_or_curve, start, path, lr], reveal_unit: step_along_path, params: [motion]}
+      loss_curve:       {use_when: "training vs validation loss over epochs", avoid_when: "single value; no training loop", needs: [epochs, train, val, marks], reveal_unit: series_then_epoch, params: [motion]}
+      tree_split:       {use_when: "how a decision tree partitions data at each node", avoid_when: "non-tree model", needs: [dataset, splits, regions], reveal_unit: split, params: [motion]}
+      kmeans:           {use_when: "iterative clustering", avoid_when: "supervised task; k unmotivated", needs: [points, k, init_centroids, iterations], reveal_unit: iteration, params: [motion]}
+      bias_variance:    {use_when: "under/overfitting tradeoff vs model complexity", avoid_when: "not discussing complexity", needs: [complexity_axis, train_err, test_err, sweet_spot], reveal_unit: curve_then_regions, params: [motion]}
+      confusion_matrix: {use_when: "classifier TP/FP/FN/TN", avoid_when: "non-classification", needs: [classes, counts], reveal_unit: cell, params: [motion, encoding]}
+
+  DATA_STRUCTURE:
+    domain: arrays / lists / trees / graphs / hash tables
+    variants:
+      array:      {use_when: "indexed contiguous cells; index vs value", avoid_when: "linked or hierarchical data", needs: [cells, indices, pointers], reveal_unit: cell_or_pointer, params: [orientation, motion]}
+      linked_list: {use_when: "nodes plus next pointers; insertion/deletion", avoid_when: "random access is the point", needs: [nodes, links, head], reveal_unit: node_or_pointer, params: [orientation, motion]}
+      stack_queue: {use_when: "LIFO or FIFO discipline", avoid_when: "random access; priority (heap)", needs: [items, mode, top_front_back], reveal_unit: push_pop_frame, params: [orientation, motion]}
+      binary_tree: {use_when: "BST, heap, or expression tree", avoid_when: "n-ary or graph", needs: [nodes, left_right, root, highlights], reveal_unit: node, params: [orientation, motion]}
+      heap:       {use_when: "priority queue as a complete binary tree / array", avoid_when: "ordering is total (BST)", needs: [array_or_tree, operations], reveal_unit: sift_step, params: [motion]}
+      hash_table: {use_when: "buckets, hash function, collisions", avoid_when: "ordered data; ranges", needs: [buckets, entries, collision_chain], reveal_unit: insert, params: [motion]}
+      graph:      {use_when: "vertices plus edges, weighted/directed optional", avoid_when: "tree (binary_tree); flow (sankey)", needs: [nodes, edges], reveal_unit: node_or_edge, params: [motion, emphasis]}
+
+  ALGORITHM_TRACE:
+    domain: step-by-step execution
+    variants:
+      sort_bars:     {use_when: "comparison/swap sorting step by step", avoid_when: "non-comparison sort; huge array", needs: [array, steps, sorted_prefix], reveal_unit: step, params: [motion]}
+      pointer_walk:  {use_when: "two-pointer / sliding-window / binary search", avoid_when: "recursion-heavy algorithm", needs: [array, pointers, steps], reveal_unit: step, params: [motion]}
+      recursion_tree: {use_when: "recursive call structure and return values", avoid_when: "iterative algorithm", needs: [calls, order], reveal_unit: call_then_return, params: [motion]}
+      dp_table:      {use_when: "filling a 1D/2D DP table cell by cell", avoid_when: "greedy / non-DP", needs: [dims, recurrence, fill_order, deps], reveal_unit: cell, params: [motion]}
+      call_stack:    {use_when: "stack frames pushed/popped during execution", avoid_when: "no nesting", needs: [frames, events], reveal_unit: frame, params: [motion]}
+
+  CIRCUIT:
+    domain: schematics / logic / block diagrams
+    variants:
+      schematic:    {use_when: "components plus wiring, analysis target", avoid_when: "block-level only; >15 components", needs: [components, wires, source], reveal_unit: component_then_wire, params: [motion]}
+      logic_gates:  {use_when: "boolean logic from gates", avoid_when: "transistor-level arithmetic", needs: [gates, inputs, output], reveal_unit: gate, params: [motion]}
+      block_diagram: {use_when: "a system as functional blocks plus signal flow", avoid_when: "component values are needed", needs: [blocks, signals], reveal_unit: block, params: [orientation, motion]}
+
+  PHYSICS_DIAGRAM:
+    domain: mechanics / optics / waves / fields
+    variants:
+      free_body: {use_when: "forces on one isolated object", avoid_when: "multi-body without isolating; kinematics only", needs: [object, forces, axes], reveal_unit: force_vector, params: [motion]}
+      ray_optics: {use_when: "lenses/mirrors, image formation", avoid_when: "wave optics; no optical elements", needs: [elements, object, principal_rays], reveal_unit: ray, params: [motion]}
+      wave:      {use_when: "wavelength/amplitude/phase/superposition", avoid_when: "not periodic; frequency-domain only", needs: [waves, sum], reveal_unit: wave_then_sum, params: [motion]}
+      field_lines: {use_when: "E/B/gravitational field around sources", avoid_when: "quantitative field values (heatmap)", needs: [sources, line_density], reveal_unit: source_then_lines, params: [motion]}
+      projectile: {use_when: "trajectory under gravity, range/height", avoid_when: "no motion; 1D motion", needs: [v0, angle, g], reveal_unit: trace, params: [motion]}
+      energy_bar: {use_when: "KE/PE/heat at stages of a process", avoid_when: "continuous function of time (line)", needs: [stages, bars], reveal_unit: stage, params: [motion]}
+
+  CHEM_DIAGRAM:
+    domain: molecules / mechanisms / energetics
+    variants:
+      molecule_2d:    {use_when: "skeletal structure, functional groups", avoid_when: "3D geometry is the point", needs: [atoms, bonds, charges], reveal_unit: bond_or_group, params: [motion]}
+      mechanism:      {use_when: "electron-pushing arrows between structures", avoid_when: "overall equation only", needs: [steps, arrows], reveal_unit: arrow, params: [motion]}
+      energy_profile: {use_when: "reaction coordinate vs energy, Ea, delta-H", avoid_when: "thermodynamics without kinetics context", needs: [coordinate, points, catalyst_path], reveal_unit: segment, params: [motion]}
+      titration_curve: {use_when: "pH vs volume, equivalence point, buffer region", avoid_when: "non acid-base; single measurement", needs: [points_or_model, equivalence_pt, pka_marks], reveal_unit: curve_then_marks, params: [motion]}
+      orbital:        {use_when: "atomic/molecular orbital shapes or filling", avoid_when: "connectivity is the point (molecule_2d)", needs: [orbitals, electrons], reveal_unit: orbital, params: [motion, dimensionality]}
+
+  BIO_DIAGRAM:
+    domain: anatomy / genetics / ecology / evolution
+    variants:
+      anatomy_labelled: {use_when: "parts of a structure named with leader lines", avoid_when: "process/flow (cycle); molecular scale", needs: [image_or_shape, labels], reveal_unit: label, params: [motion]}
+      cell:            {use_when: "organelles of a cell, labelled", avoid_when: "a biochemical pathway (use cycle/flow)", needs: [organelles, labels], reveal_unit: label, params: [motion]}
+      punnett:         {use_when: "Mendelian cross outcomes", avoid_when: "polygenic; linkage", needs: [parent_alleles, grid, ratios], reveal_unit: cell, params: [motion]}
+      food_web:        {use_when: "feeding relationships in an ecosystem", avoid_when: "linear chain (PROCESS_LINEAR); energy pyramid (HIERARCHY_NEST)", needs: [organisms, arrows], reveal_unit: organism_or_arrow, params: [motion]}
+      phylo_tree:      {use_when: "evolutionary relationships", avoid_when: "non-evolutionary classification (taxonomy)", needs: [taxa, clades, branch_order], reveal_unit: node, params: [orientation, motion]}
+
+  MEDIA:
+    domain: supplied figures
+    variants:
+      image_focus: {use_when: "a supplied figure IS the content; text only explains it", avoid_when: "the figure is decorative or redundant with the text", needs: [image_ref, caption, annotation_bullets], reveal_unit: annotation, params: [motion]}
+      gallery:    {use_when: "2-4 related figures compared or in sequence", avoid_when: "one figure; unrelated figures", needs: [images, captions], reveal_unit: image, params: [motion]}
+
+  ANNOTATION_LAYER:
+    domain: overlays on ANY visual above
+    variants:
+      callout_pin:    {use_when: "attach a note to a point on another visual", avoid_when: "the note applies to the whole visual (use caption)", needs: [anchor, text], reveal_unit: pin, params: [motion]}
+      spotlight:      {use_when: "dim everything except one region", avoid_when: "nothing to isolate", needs: [target, dim_opacity], reveal_unit: focus_step, params: [motion]}
+      magnifier_inset: {use_when: "a zoomed detail of a small region", avoid_when: "detail is legible at full size", needs: [source_region, inset_position, zoom], reveal_unit: inset, params: [motion]}
+      dimension_line: {use_when: "measured distances or angles on a figure", avoid_when: "measurements not relevant", needs: [measurements], reveal_unit: measurement, params: [motion]}
+      attention_arrow: {use_when: "direct the eye along a path", avoid_when: "the order is obvious", needs: [path, label], reveal_unit: arrow, params: [motion]}

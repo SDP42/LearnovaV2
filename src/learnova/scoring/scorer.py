@@ -81,9 +81,31 @@ def score_slide(improved: dict, has_image: bool = False) -> dict:
     total = min(100.0, sum(breakdown.values()))
     return {"score": round(total), "breakdown": breakdown}
 
-def score_all_slides(improved_results: list[dict]) -> dict:
+def score_all_slides(improved_results: list[dict], engine: str = "heuristic") -> dict:
+    """
+    Score every slide.
+
+    ``engine="heuristic"`` (default) keeps the original weighted-sum score so
+    nothing downstream changes. ``engine="psf"`` uses the research model in
+    ``scoring/psf.py`` (Pedagogical Slide Fitness) and additionally returns the
+    E/L/C breakdown and a deck-level flow term. Both can run side by side for
+    the calibration study in ``docs/research/PSF_DESIGN.md``.
+    """
     if not improved_results:
         return {"overall_score": 0, "slide_scores": []}
+
+    if engine == "psf":
+        from learnova.scoring.psf import psf_deck
+
+        deck = psf_deck(improved_results)
+        return {
+            "overall_score": deck["psf_deck_100"],
+            "slide_scores": [
+                {"score": s["psf_100"], "breakdown": {"E": s["E"], "L": s["L"], "C": s["C"]}}
+                for s in deck["slide_scores"]
+            ],
+            "psf": deck,
+        }
 
     slide_scores = []
     for item in improved_results:

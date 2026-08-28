@@ -1,11 +1,20 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, useAuth } from "@/auth";
 import * as api from "./api";
 import Cursor from "./components/Cursor.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
+import Analytics from "./pages/Analytics.jsx";
+import Audience from "./pages/Audience.jsx";
+import Create from "./pages/Create.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
 import DeckLibrary from "./pages/DeckLibrary.jsx";
+import Export from "./pages/Export.jsx";
 import Landing from "./pages/Landing.jsx";
+import Placeholder from "./pages/Placeholder.jsx";
+import Present from "./pages/Present.jsx";
+import Preview from "./pages/Preview.jsx";
+import Quizzes from "./pages/Quizzes.jsx";
 import Studio from "./pages/Studio.jsx";
 
 /**
@@ -66,6 +75,22 @@ export default function App() {
             </Protected>
           }
         />
+
+        {/* New app shell (shadcn design system) */}
+        <Route path="/app" element={<Protected><Dashboard /></Protected>} />
+        <Route path="/app/create" element={<Protected><Create /></Protected>} />
+        <Route path="/app/preview/:jobId" element={<Protected><Preview /></Protected>} />
+        <Route path="/app/present/:jobId" element={<Protected><Present /></Protected>} />
+        <Route path="/app/audience/:jobId" element={<Protected><Audience /></Protected>} />
+        <Route path="/app/export/:jobId" element={<Protected><Export /></Protected>} />
+        <Route path="/app/projects" element={<Protected><Placeholder title="Projects" /></Protected>} />
+        <Route path="/app/presentations" element={<Protected><Placeholder title="Presentations" /></Protected>} />
+        <Route path="/app/quizzes" element={<Protected><Quizzes /></Protected>} />
+        <Route path="/app/analytics" element={<Protected><Analytics /></Protected>} />
+        <Route path="/app/library" element={<Protected><Placeholder title="Library" /></Protected>} />
+        <Route path="/app/docs" element={<Protected><Placeholder title="Docs" /></Protected>} />
+        <Route path="/app/settings" element={<Protected><Placeholder title="Settings" /></Protected>} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthBridge>

@@ -147,3 +147,13 @@ export async function downloadArtifact(path, filename) {
 
 export const jobDownloadPath = (id, artifact) => `/api/jobs/${id}/download/${artifact}`;
 export const deckDownloadPath = (id, artifact) => `/api/decks/${id}/download/${artifact}`;
+
+/**
+ * Fetch an artifact (with the Authorization header) and return an object URL,
+ * for use as an <iframe src>. Caller must URL.revokeObjectURL() when done.
+ */
+export async function artifactObjectUrl(path) {
+  const response = await fetch(`${BASE}${path}`, { headers: await authHeaders() });
+  if (!response.ok) throw new Error(`Could not load preview (${response.status})`);
+  return URL.createObjectURL(await response.blob());
+}

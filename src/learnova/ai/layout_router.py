@@ -415,6 +415,96 @@ def _restore_dropped_points(bullets: list[str], source: str) -> list[str]:
     return restored
 
 
+# ── Master-prompt path (opt-in via LEARNOVA_MASTER_PROMPT=1) ──────────────────
+
+# Catalog family -> the legacy layout_type the current renderers understand.
+_FAMILY_TO_LEGACY = {
+    "PROCESS_LINEAR": "FLOWCHART", "PROCESS_CYCLIC": "FLOWCHART",
+    "DECISION": "FLOWCHART", "STATE_MACHINE": "FLOWCHART",
+    "COMPARE_TABLE": "TABLE", "MATRIX_GRID": "TABLE",
+    "KPI": "METRIC",
+    "LIST_STRUCTURED": "CARD_GRID", "MIND_MAP": "CARD_GRID",
+    "HIERARCHY_NEST": "CARD_GRID", "HIERARCHY_TREE": "CARD_GRID",
+}
+
+
+def _classify_with_master_prompt(text: str, current_title: str) -> Optional[dict]:
+    """Structure one chunk with the master prompt. Returns None to fall back."""
+    from learnova.ai.master_prompt import (
+        MASTER_RETRY_PROMPT,
+        MASTER_SYSTEM_PROMPT,
+        build_user_prompt,
+    )
+
+    ocr = ""
+    marker = "[Extracted OCR & Image Diagram Content:"
+    if marker in text:
+        ocr = text.split(marker, 1)[1].rsplit("]", 1)[0]
+
+    raw = _call_llm(build_user_prompt(text[:1600], current_title, ocr),
+                    MASTER_SYSTEM_PROMPT, max_tokens=900, timeout=14.0)
+    data = _extract_json(raw) if raw else None
+    if data is None:
+        raw = _call_llm(f"Text: {text[:600]}\n{current_title}", MASTER_RETRY_PROMPT, max_tokens=250)
+        data = _extract_json(raw) if raw else None
+    if data is None:
+        return None
+
+    family = str(data.get("family", "TEXT")).upper()
+    legacy = _FAMILY_TO_LEGACY.get(family, "MINIMAL_TEXT")
+    bullets = dedupe_bullets([str(b) for b in data.get("bullets", []) if str(b).strip()])
+    bullets = _restore_dropped_points(bullets, text)
+
+    result: dict = {
+        "layout_type": legacy,
+        "title": str(data.get("title", current_title or "Key Concept")).strip(),
+        "takeaway": str(data.get("takeaway", "")).strip(),
+        "bullets": bullets,
+        # carried through for the Deck Director + expanded renderers
+        "family": family,
+        "variant": str(data.get("variant", "")),
+        "params": data.get("params") or {},
+        "verbatim": [str(v) for v in (data.get("verbatim") or [])],
+        "animation": data.get("animation") or {},
+        "visual_data": data.get("data") or {},
+        "image_action": str(data.get("image_action", "NONE")),
+        "visual_source": "master_prompt",
+    }
+
+    d = result["visual_data"]
+    if legacy == "FLOWCHART":
+        nodes = d.get("flowchart", {}).get("nodes") or []
+        labels = [str(n.get("label", "")) for n in nodes if isinstance(n, dict)]
+        if not labels:
+            labels = [str(s) for s in (d.get("cycle", {}).get("stages") or [])]
+        if not labels:
+            labels = bullets[:6]
+        clean = [re.sub(r'[\[\]{}()"|]', "", lbl)[:36].strip() or "Step" for lbl in labels[:6]]
+        chain = " --> ".join(f"N{i}[{lbl}]" for i, lbl in enumerate(clean))
+        result["mermaid_code"] = f"graph TD\n  {chain}" if chain else "graph TD\n  A[Start] --> B[End]"
+    elif legacy == "TABLE":
+        tbl = d.get("table", {})
+        result["table_headers"] = [str(h) for h in tbl.get("headers", ["Aspect", "A", "B"])]
+        result["table_rows"] = [[str(c) for c in r] for r in tbl.get("rows", []) if isinstance(r, (list, tuple))]
+        if not result["table_rows"]:
+            result["layout_type"] = "MINIMAL_TEXT"
+    elif legacy == "METRIC":
+        met = d.get("metric", {})
+        from learnova.pipeline.visual_planner import extract_quantity
+
+        val = extract_quantity(str(met.get("value", ""))) or extract_quantity(text)
+        if val:
+            result["metric_value"] = val[:16]
+            result["metric_label"] = strip_inline_markdown(str(met.get("label", result["title"])))
+            result["metric_desc"] = truncate_words(str(met.get("description") or result["takeaway"]), 120)
+        else:
+            result["layout_type"] = "MINIMAL_TEXT"
+
+    logger.info("[layout_router] master prompt -> %s/%s (legacy %s)",
+                family, result["variant"], result["layout_type"])
+    return result
+
+
 # ── Main public function ──────────────────────────────────────────────────────
 
 def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
@@ -429,6 +519,17 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
     • Rate-limit circuit breaker skips all API calls once quota is exceeded
     """
     global _groq_rate_limited
+
+    # Opt-in: drive the structuring call with the full master prompt
+    # (ai/master_prompt.py) — 40-family taxonomy, per-sentence verbatim, and an
+    # animation timeline. Falls back to the classic 5-type path on any failure.
+    if os.getenv("LEARNOVA_MASTER_PROMPT", "").lower() in {"1", "true", "yes", "on"}:
+        try:
+            result = _classify_with_master_prompt(text, current_title)
+            if result:
+                return result
+        except Exception as exc:  # never let the new path break structuring
+            logger.warning("[layout_router] master prompt path failed: %s", exc)
 
     t_start = time.monotonic()
     stage = "layout_router"
