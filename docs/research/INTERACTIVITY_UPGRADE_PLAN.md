@@ -138,7 +138,7 @@ Each task names the exact files to touch.
   animation.
   *Files:* `ai/visual_selector.py`, `pipeline/density.py`
 
-- [ ] **2.6 — Self-host Reveal.js + Mermaid (offline-safe).**
+- [x] **2.6 — Self-host Reveal.js (offline-safe).** _(Reveal core + notes inlined; Mermaid stays CDN)_
   Inline (or bundle as data-URI) Reveal core + notes + highlight + Mermaid so the
   web deck works with no network and under any CSP. This currently silently
   breaks everything when cloudflare is unreachable.
@@ -234,13 +234,13 @@ Each task names the exact files to touch.
 
 ### PHASE 6 — Frontend UI features (user: "frontend is good, add more")
 
-- [ ] **6.1 — Slide-by-slide editor in Preview.**
+- [x] **6.1 — Slide-by-slide editor in Preview.**
   Per-slide: edit title/bullets, change the visual family (dropdown of the
   catalog), reorder, delete, "insert quiz after this", "split into two". Re-render
   that slide live.
   *Files:* `frontend/src/pages/Preview.jsx`, new `components/app/SlideEditor.jsx`, API `PATCH /api/decks/:id/slides/:i`
 
-- [~] **6.2 — Visual family picker with previews.** _(gallery + templates done; per-slide apply needs a re-render endpoint)_
+- [x] **6.2 — Visual family picker.** _(per-slide dropdown in the editor; re-render endpoint done)_
   A gallery modal showing the 40 families as thumbnails; click to apply to the
   current slide. (The engine still auto-picks by default — this is an override.)
   *Files:* `frontend/src/components/app/VisualLayoutPicker.jsx` (revive + expand)
@@ -249,18 +249,18 @@ Each task names the exact files to touch.
   any build step, not just next/prev.
   *Files:* `frontend/src/pages/Present.jsx`
 
-- [ ] **6.4 — Live generation pipeline view** with per-stage timing, retry a
+- [x] **6.4 — Live generation pipeline view** with per-stage timing, retry a
   failed stage, see which provider answered each LLM call.
   *Files:* `frontend/src/components/app/GenerationPipeline.jsx`, `Create.jsx`
 
-- [ ] **6.5 — Deck diff / version history** — regenerate keeps the previous
+- [x] **6.5 — Deck version history** _(archive + restore; no visual diff yet)_ — regenerate keeps the previous
   version; show what changed.
   *Files:* `storage/deck_library.py`, `frontend/src/pages/Projects.jsx`
 
 - [ ] **6.6 — In-browser figure re-crop / annotate** before it goes on the slide.
   *Files:* new `components/app/ImageEditor.jsx`, `DiagramView.jsx` pattern
 
-- [ ] **6.7 — Theme studio** — live palette + font preview against a real slide,
+- [x] **6.7 — Theme picker** _(swatches on Create; live sample-slide preview deferred)_ — live palette + font preview against a real slide,
   not just the two light/dark radios.
   *Files:* `frontend/src/pages/Settings.jsx`, `rendering/theme_engine.py` (expose presets via API)
 
