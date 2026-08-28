@@ -39,6 +39,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import ImageEditor from "@/components/app/ImageEditor";
+import { Image as ImageIcon } from "lucide-react";
 
 const FAMILIES = [
   ["", "Auto — let the engine choose"],
@@ -82,6 +84,8 @@ export default function Preview() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null); // editable slide list
   const [meta, setMeta] = useState({ version: 1, versions: [] });
+  const [imageSlides, setImageSlides] = useState([]);
+  const [figSrc, setFigSrc] = useState(null); // object URL while the figure editor is open
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -97,9 +101,27 @@ export default function Preview() {
       .then((r) => {
         setDraft(r.slides || []);
         setMeta({ version: r.version || 1, versions: r.versions || [] });
+        setImageSlides(r.image_slides || []);
       })
       .catch(() => setDraft([]));
   }, [jobId]);
+
+  async function openFigureEditor() {
+    try {
+      setFigSrc(await api.slideImageUrl(jobId, selected));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  async function saveFigure(blob) {
+    await api.saveSlideImage(jobId, selected, blob);
+    if (!imageSlides.includes(selected)) setImageSlides((s) => [...s, selected]);
+    // re-render the deck so the new figure shows
+    const r = await api.saveDeckSlides(jobId, draft, "figure edit");
+    setMeta((m) => ({ ...m, version: r.version }));
+    loadDeck();
+    loadHtml();
+  }
 
   const loadHtml = useCallback(() => {
     let url;
@@ -400,9 +422,14 @@ export default function Preview() {
                     placeholder="One-line key point (optional)"
                   />
                 </div>
+                {imageSlides.includes(selected) || cur?.has_image ? (
+                  <Button variant="outline" size="sm" onClick={openFigureEditor}>
+                    <ImageIcon /> Crop / highlight figure
+                  </Button>
+                ) : null}
                 <p className="text-xs text-muted-foreground">
                   Save re-runs the layout, animation and scoring for the whole deck.
-                  Figures from the original generation are not carried into an edit.
+                  Figures are kept and can be cropped or highlighted above.
                 </p>
               </>
             ) : !cur ? (
@@ -467,6 +494,17 @@ export default function Preview() {
           </div>
         </ScrollArea>
       </div>
+
+      {figSrc ? (
+        <ImageEditor
+          src={figSrc}
+          onSave={saveFigure}
+          onClose={() => {
+            URL.revokeObjectURL(figSrc);
+            setFigSrc(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

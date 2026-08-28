@@ -32,6 +32,9 @@ META_FILE = "meta.json"
 SLIDES_FILE = "deck.json"   # the slides payload, so a saved deck opens without a live job
 EDIT_FILE = "deck_edit.json"  # the editable improved-slide list (title/bullets/family), for re-renders
 VERSIONS_DIR = "versions"
+IMAGES_DIR = "images"         # per-slide figure bytes, so edits/crops survive a re-render
+
+_IMG_EXT = {"png": "png", "jpg": "jpg", "jpeg": "jpg", "webp": "webp", "gif": "gif"}
 
 
 @dataclass
@@ -180,6 +183,59 @@ def read_slides(user_id: str, deck_id: str) -> Optional[dict]:
         return None
 
 
+def _img_path(d, slide_index: int):
+    for ext in ("png", "jpg", "webp", "gif"):
+        p = d / IMAGES_DIR / f"slide{int(slide_index)}.{ext}"
+        if p.is_file():
+            return p
+    return None
+
+
+def save_images(user_id: str, deck_id: str, images: Dict[int, tuple]) -> int:
+    """images: {slide_index: (bytes, ext)}. Returns how many were written."""
+    d = _deck_dir(user_id, deck_id)
+    if not d.is_dir():
+        return 0
+    (d / IMAGES_DIR).mkdir(exist_ok=True)
+    n = 0
+    for idx, (data, ext) in (images or {}).items():
+        if not data:
+            continue
+        ext = _IMG_EXT.get(str(ext or "png").lower().lstrip("."), "png")
+        # Clear any prior extension for this slide, then write.
+        for old in ("png", "jpg", "webp", "gif"):
+            (d / IMAGES_DIR / f"slide{int(idx)}.{old}").unlink(missing_ok=True)
+        (d / IMAGES_DIR / f"slide{int(idx)}.{ext}").write_bytes(data)
+        n += 1
+    return n
+
+
+def read_image(user_id: str, deck_id: str, slide_index: int) -> Optional[tuple]:
+    """Returns (bytes, ext) for a slide's stored figure, or None."""
+    p = _img_path(_deck_dir(user_id, deck_id), slide_index)
+    if not p:
+        return None
+    return p.read_bytes(), p.suffix.lstrip(".")
+
+
+def save_one_image(user_id: str, deck_id: str, slide_index: int,
+                   data: bytes, ext: str = "png") -> bool:
+    return save_images(user_id, deck_id, {int(slide_index): (data, ext)}) == 1
+
+
+def read_all_images(user_id: str, deck_id: str) -> Dict[int, tuple]:
+    """{slide_index: (bytes, ext)} for every stored figure."""
+    d = _deck_dir(user_id, deck_id) / IMAGES_DIR
+    out: Dict[int, tuple] = {}
+    if not d.is_dir():
+        return out
+    for p in d.iterdir():
+        m = re.match(r"slide(\d+)\.(png|jpg|jpeg|webp|gif)$", p.name)
+        if m:
+            out[int(m.group(1))] = (p.read_bytes(), m.group(2))
+    return out
+
+
 def read_editable(user_id: str, deck_id: str) -> Optional[list]:
     """The editable improved-slide list, falling back to the display payload."""
     d = _deck_dir(user_id, deck_id)
@@ -320,5 +376,9 @@ __all__ = [
     "read_slides",
     "read_editable",
     "read_artifact",
+    "save_images",
+    "save_one_image",
+    "read_image",
+    "read_all_images",
     "delete_deck",
 ]

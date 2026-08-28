@@ -97,15 +97,17 @@ _EDITABLE_KEYS = (
 )
 
 
-def editable_to_final_deck(editable: List[dict]) -> List[dict]:
+def editable_to_final_deck(editable: List[dict],
+                           images: Dict[int, tuple] | None = None) -> List[dict]:
     """Rebuild a minimal ``final_deck`` (original/improved pairs) from edited slides.
 
-    Images are not recoverable from the editable payload — a re-render drops any
-    figure bytes the original generation embedded. Text, structure and family
-    all round-trip.
+    ``images`` maps a slide index to ``(bytes, ext)`` — the figure persisted with
+    the deck (and any crop/annotation the user applied). Text, structure, family
+    and figures all round-trip.
     """
+    images = images or {}
     deck = []
-    for s in editable or []:
+    for i, s in enumerate(editable or []):
         s = s or {}
         improved = {k: s.get(k) for k in _EDITABLE_KEYS if s.get(k) is not None}
         improved.setdefault("layout_type", "MINIMAL_TEXT")
@@ -133,8 +135,15 @@ def editable_to_final_deck(editable: List[dict]) -> List[dict]:
             if data:
                 vdata = {"family": fam, "variant": s.get("variant") or "default",
                          "confidence": 0.9, "data": data}
+        original = {"text": s.get("source_text", "") or "\n".join(improved.get("bullets") or [])}
+        img = images.get(i)
+        if img and img[0]:
+            original["image"] = {
+                "bytes": img[0], "ext": img[1] or "png",
+                "description": s.get("image_caption", "") or improved.get("title", ""),
+            }
         entry = {
-            "original": {"text": s.get("source_text", "") or "\n".join(improved.get("bullets") or [])},
+            "original": original,
             "improved": {**improved, **({"visual_data": vdata} if vdata else {})},
         }
         deck.append(entry)

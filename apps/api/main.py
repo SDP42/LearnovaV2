@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 
 load_dotenv(_ROOT / ".env")
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -346,7 +346,7 @@ def start_generate(
                 }
                 for s in payload
             ]
-        deck_library.save_deck(
+        record = deck_library.save_deck(
             user_id=finished.user_id or ANONYMOUS_USER,
             result=finished.result,
             theme_id=config.theme_id,
@@ -355,6 +355,19 @@ def start_generate(
             slides_payload=payload,
             editable_slides=editable,
         )
+        # Persist each slide's figure so it survives an edit / re-render.
+        try:
+            figures: dict = {}
+            for i, entry in enumerate(finished.result.final_deck):
+                img = (entry.get("original") or {}).get("image") or {}
+                if img.get("bytes"):
+                    figures[i] = (img["bytes"], img.get("ext", "png"))
+            if figures:
+                deck_library.save_images(
+                    record.user_id, record.id, figures
+                )
+        except Exception:
+            logger.warning("could not persist deck figures", exc_info=True)
 
     try:
         get_store().start_generation(
@@ -494,11 +507,13 @@ def get_editable_slides(deck_id: str, user_id: str = Depends(current_user)) -> d
     if record is None:
         raise HTTPException(status_code=404, detail="deck not found")
     slides = deck_library.read_editable(user_id, deck_id) or []
+    have_images = sorted(deck_library.read_all_images(user_id, deck_id).keys())
     return {
         "deck_id": deck_id,
         "title": record.get("title", ""),
         "version": record.get("version", 1),
         "versions": record.get("versions", []),
+        "image_slides": have_images,
         "slides": slides,
     }
 
@@ -526,6 +541,7 @@ def save_deck_slides(
             title=record.get("title", "Presentation"),
             theme_id=record.get("theme_id", "auto"),
             theme_spec=record.get("theme_spec"),
+            images=deck_library.read_all_images(user_id, deck_id),
         )
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=f"re-render failed: {exc}") from exc
@@ -563,3 +579,40 @@ def restore_deck_version(
     if meta is None:
         raise HTTPException(status_code=404, detail="version not found")
     return {"deck_id": deck_id, "version": meta.get("version")}
+
+
+# ── Slide figures (view + re-crop / annotate) ────────────────────────────────
+_IMG_MIME = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+             "webp": "image/webp", "gif": "image/gif"}
+
+
+@app.get("/api/decks/{deck_id}/images/{slide}")
+def get_slide_image(
+    deck_id: str, slide: int, user_id: str = Depends(current_user)
+) -> Response:
+    if deck_library.get_deck(user_id, deck_id) is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    got = deck_library.read_image(user_id, deck_id, slide)
+    if not got:
+        raise HTTPException(status_code=404, detail="no figure on this slide")
+    data, ext = got
+    return Response(content=data, media_type=_IMG_MIME.get(ext, "image/png"),
+                    headers={"Cache-Control": "no-store"})
+
+
+@app.put("/api/decks/{deck_id}/images/{slide}")
+async def put_slide_image(
+    deck_id: str, slide: int, request: Request,
+    user_id: str = Depends(current_user),
+) -> dict:
+    if deck_library.get_deck(user_id, deck_id) is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    ctype = request.headers.get("content-type", "")
+    ext = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp",
+           "image/gif": "gif"}.get(ctype.split(";")[0].strip(), "png")
+    body = await request.body()
+    if not body or len(body) > 8_000_000:
+        raise HTTPException(status_code=400, detail="empty or oversized image")
+    if not deck_library.save_one_image(user_id, deck_id, slide, body, ext):
+        raise HTTPException(status_code=500, detail="could not save image")
+    return {"deck_id": deck_id, "slide": slide, "bytes": len(body)}

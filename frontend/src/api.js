@@ -153,6 +153,23 @@ export async function restoreDeckVersion(deckId, v) {
   );
 }
 
+export async function slideImageUrl(deckId, slide) {
+  const r = await fetch(`${BASE}/api/decks/${deckId}/images/${slide}`, {
+    headers: await authHeaders(),
+  });
+  if (!r.ok) throw new Error(`No figure (${r.status})`);
+  return URL.createObjectURL(await r.blob());
+}
+
+export async function saveSlideImage(deckId, slide, blob) {
+  const r = await fetch(`${BASE}/api/decks/${deckId}/images/${slide}`, {
+    method: "PUT",
+    headers: await authHeaders({ "Content-Type": blob.type || "image/png" }),
+    body: blob,
+  });
+  return json(r);
+}
+
 /**
  * Downloads must carry the Authorization header, so a plain <a href> will not
  * work — fetch the bytes, then hand the browser a temporary object URL.

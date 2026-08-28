@@ -15,13 +15,14 @@ from learnova.logging_config import logger
 
 def rebuild(editable_slides: List[dict], *, title: str = "Presentation",
             theme_id: str = "auto", theme_spec: Dict[str, Any] | None = None,
+            images: Dict[int, tuple] | None = None,
             build_pptx: bool = True, build_html: bool = True) -> Dict[str, Any]:
     """Returns {html_bytes, pptx_bytes, slides_payload, scores, quizzes}."""
     from learnova.rendering.deck_payload import editable_to_final_deck, slides_payload
     from learnova.rendering.subprocess_builder import build_html_safe, build_pptx_safe
     from learnova.scoring.scorer import score_all_slides
 
-    final_deck = editable_to_final_deck(editable_slides)
+    final_deck = editable_to_final_deck(editable_slides, images)
 
     try:
         scores = score_all_slides(final_deck)
