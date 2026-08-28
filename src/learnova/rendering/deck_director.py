@@ -269,7 +269,14 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         #    slides is still detected and its data extracted from the whole.
         existing_layout = str(imp.get("layout_type", "MINIMAL_TEXT")).upper()
         original = entry.get("original") if isinstance(entry.get("original"), dict) else {}
-        vms_source = str((original or {}).get("text") or "").strip() or ("\n".join(bullets) or text)
+        # Feed the VMS BOTH the raw section text (so a step list split across
+        # "(1/2)" slides is still detected from the whole) AND the improved
+        # bullets (which, after enhancement, can carry structure — a worked
+        # example's derivation lines — that the raw chunk did not).
+        vms_source = "\n".join(
+            p for p in (str((original or {}).get("text") or "").strip(),
+                        "\n".join(bullets)) if p
+        ) or text
         vd = select_visual(vms_source, title)
 
         # A layout the pipeline actually populated with data (an LLM table,

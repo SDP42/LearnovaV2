@@ -269,6 +269,16 @@ def _score(f: Features) -> Dict[str, float]:
     if n_items >= 3:
         s["BULLETS"] += 1.4 + min(n_items, 8) * 0.15
 
+    # WORKED_EXAMPLE — a specific problem solved line by line. Distinct from
+    # FLOWCHART (a procedure to remember): here each line is an equation/step
+    # that follows from the one above, and all lines stay on screen.
+    _we_lines = [b for b in f.bullet_lines if re.search(r"[=<>≤≥→]|\b(?:therefore|hence|thus|so that|substitut|simplif|solve for|rearrang|both sides|factor(?:ise|ize)?)\b", b, re.I)]
+    _we_eq = sum(1 for b in f.bullet_lines if re.search(r"[A-Za-z0-9)\]]\s*=\s*[A-Za-z0-9(\-]", b))
+    if (_we_eq >= 2 and len(f.bullet_lines) >= 3) or (len(_we_lines) >= 3 and _we_eq >= 1):
+        s["WORKED_EXAMPLE"] += 3.4 + min(len(_we_lines), 6) * 0.5
+        s["FLOWCHART"] -= 1.5
+        s["FUNCTION_PLOT"] -= 1.0
+
     # ── STEM families (also reachable via the master prompt) ─────────────────
     # These beat the generic numeric families when their signal is present:
     # an array literal is a data structure, not a bar chart.
@@ -327,6 +337,7 @@ _FAMILY_EFFECT = {
     "KPI": "count-up",
     "ALGORITHM_TRACE": "trace", "DATA_STRUCTURE": "trace",
     "PROCESS_LINEAR": "slide-left", "PROCESS_CYCLIC": "slide-left",
+    "WORKED_EXAMPLE": "fade",  # each line fades in and stays
 }
 _INHERENTLY_ANIMATED = {"PHYSICS_DIAGRAM"}  # wave / orbit / pendulum sub-cases
 
@@ -337,8 +348,11 @@ def plan_animation_steps(bullets: List[str], treatment: str, family: str,
     Deterministic progressive-reveal timeline (master prompt DECISION 5).
 
     Superset of ``plan_reveal_groups``: same grouping, plus a per-step label,
-    an ``effect`` matched to the family, and the ``mode``. Capped at 7 steps
-    (CLT working-memory limit); overflow is dropped from the animation but the
+    an ``effect`` matched to the family, and the ``mode``. Capped at 7 steps for
+    text (CLT working-memory limit), but step-by-step families — a flowchart, a
+    worked example, an algorithm trace — are allowed up to 14, because walking
+    every step in order *is* the point and each earlier step stays visible as
+    scaffolding. Overflow past the cap is dropped from the animation only; the
     bullets themselves are untouched (pagination handles them).
     """
     groups = plan_reveal_groups(bullets, treatment, has_takeaway=bool(takeaway))
@@ -346,9 +360,15 @@ def plan_animation_steps(bullets: List[str], treatment: str, family: str,
     atomic = treatment in {"QUOTE", "METRIC", "DEFINITION"}
     mode = "static" if (atomic or len(groups) <= 1) else "build"
 
+    step_by_step = family in {
+        "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC",
+        "ALGORITHM_TRACE", "DATA_STRUCTURE", "PROOF_LADDER",
+    } or treatment in {"WORKED_EXAMPLE", "FLOWCHART", "CYCLE"}
+    cap = 14 if step_by_step else 7
+
     steps: List[Dict[str, Any]] = []
-    overflow = max(0, len(groups) - 7)
-    for i, g in enumerate(groups[:7]):
+    overflow = max(0, len(groups) - cap)
+    for i, g in enumerate(groups[:cap]):
         is_takeaway = bool(takeaway) and g == [len(bullets)]
         label = takeaway if is_takeaway else (
             bullets[g[0]] if (len(g) == 1 and g[0] < len(bullets)) else f"Reveal {i + 1}"
@@ -452,6 +472,25 @@ def build_family_data(bullets: List[str], family: str, f: "Features") -> Dict[st
     if family == "QUOTE":
         m = re.search(r"[\"“]([^\"”]{10,})[\"”]", f.text)
         return {"text": m.group(1) if m else (b[0] if b else ""), "attribution": ""}
+
+    if family == "WORKED_EXAMPLE":
+        # Each bullet is one line of the solution, in order. If a line reads
+        # "do X | because Y" or "do X — Y", split it into step/reason.
+        rows = []
+        for line in b:
+            line = re.sub(r"^\s*(?:step\s*)?\d+[.)]\s*", "", line, flags=re.I).strip()
+            if not line:
+                continue
+            m = re.split(r"\s+[|—–]\s+|\s+\((?:so|because|to)\s+", line, maxsplit=1)
+            if len(m) == 2:
+                rows.append({"step": m[0].strip(), "reason": m[1].strip(" )")})
+            else:
+                rows.append({"step": line, "reason": ""})
+        rows = rows[:12]
+        if len(rows) >= 2:
+            return {"steps": [r["step"] for r in rows], "rows": rows,
+                    "problem": (f.title if hasattr(f, "title") else "")}
+        return {}
 
     if family == "KPI":  # metric
         val = next((n for n in (f.percentages + f.numbers)), "")

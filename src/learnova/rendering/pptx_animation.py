@@ -28,7 +28,14 @@ _P = "http://schemas.openxmlformats.org/presentationml/2006/main"
 
 
 def animations_enabled() -> bool:
-    return os.getenv("LEARNOVA_PPTX_ANIM", "").lower() in {"1", "true", "yes", "on"}
+    """
+    Click-to-build entrance animations are ON by default so an exported PPTX
+    reveals one idea per click like the web deck. ``build_pptx`` re-parses the
+    finished file and strips all timing if it does not round-trip, so a bad
+    build degrades to a static (but valid) deck rather than a broken file.
+    Set ``LEARNOVA_PPTX_ANIM=0`` to force static.
+    """
+    return os.getenv("LEARNOVA_PPTX_ANIM", "1").lower() in {"1", "true", "yes", "on"}
 
 
 def _click_par(shape_id: int, tn_id: int, first: bool) -> str:

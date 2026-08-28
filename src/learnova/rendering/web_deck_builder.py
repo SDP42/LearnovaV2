@@ -130,6 +130,45 @@ def _fragment_index_for(idx0: int, animation: dict | None) -> dict:
     return out
 
 
+def _staged_flow_html(steps: list[str], frag_map: dict, theme, *, cyclic: bool = False) -> str:
+    """
+    A vertical numbered process flow where each step is its own reveal element.
+
+    Every step carries ``data-build`` (mapped from the deck-director animation, or
+    its own ordinal) so present mode reveals them **one click at a time, keeping
+    the earlier steps visible** — the fix for "it jumps straight to phase 5".
+    """
+    steps = [str(s).strip() for s in steps if str(s).strip()]
+    if not steps:
+        return ""
+    on = readable_text_hex(theme.primary_hex)
+    rows = []
+    for i, step in enumerate(steps):
+        build = frag_map.get(i, i)
+        # The connector line is always visible — only the step cards are reveal
+        # elements, so the step counter reads "3 / 5" not "3 / 9".
+        connector = (
+            f'<div style="width:2px;height:16px;margin:2px 0 2px 17px;'
+            f'background:{theme.primary_hex}55;"></div>' if i > 0 else ""
+        )
+        rows.append(
+            connector +
+            f'<div data-el="el.{i}" data-build="{build}" '
+            f'style="display:flex;gap:12px;align-items:flex-start;">'
+            f'<span style="flex-shrink:0;width:34px;height:34px;border-radius:50%;'
+            f'background:{theme.primary_hex};color:{on};font-weight:800;'
+            f'display:flex;align-items:center;justify-content:center;font-size:0.95rem;">'
+            f'{("↻" if cyclic and i == len(steps) - 1 else str(i + 1))}</span>'
+            f'<div style="flex:1;background:{theme.card_bg_hex};border:1px solid {theme.primary_hex}33;'
+            f'border-left:4px solid {theme.primary_hex};border-radius:8px;padding:12px 14px;'
+            f'font-size:1rem;line-height:1.45;color:{theme.text_hex};">{html.escape(step)}</div></div>'
+        )
+    return (
+        f'<div style="margin-top:20px;display:flex;flex-direction:column;'
+        f'max-width:760px;">{"".join(rows)}</div>'
+    )
+
+
 def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interactive Deck",
                    theme_id: str = "auto", theme_spec: dict | None = None,
                    deck_plan=None) -> str:
@@ -281,26 +320,21 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             </div>
             """
 
-        # ── 4. FLOWCHART LAYOUT ───────────────────────────────────────────────
-        elif layout_type == "FLOWCHART":
-            mermaid_code = imp.get("mermaid_code", "graph TD\n  A[Start] --> B[End]")
-            escaped_mermaid = html.escape(mermaid_code)
+        # ── 4. FLOWCHART / PROCESS LAYOUT — staged, one step per click ────────
+        elif layout_type in {"FLOWCHART", "PROCESS_DIAGRAM"}:
             bullets = imp.get("bullets", [])
-            b_items = _bullets_html(bullets, "margin-bottom:8px;")
-
-            slide_body = f"""
-            <div style="display:flex; gap:20px; text-align:left; margin-top:20px;">
-                <div style="flex:1; background:#ffffff; padding:15px; border:2px solid {theme.primary_hex}; border-radius:8px;">
-                    <div class="mermaid" style="font-size:0.8rem;">
-                        {escaped_mermaid}
-                    </div>
-                </div>
-                <div style="flex:1; font-size:0.9rem;">
-                    <h4 style="color:{theme.primary_hex}; margin-top:0;">Process Steps:</h4>
-                    <ul>{b_items}</ul>
-                </div>
-            </div>
-            """
+            cyclic = "cycl" in str(imp.get("title", "")).lower() or bool(imp.get("cyclic"))
+            slide_body = _staged_flow_html(bullets, frag_map, theme, cyclic=cyclic)
+            if not slide_body:
+                # No usable steps — fall back to whatever mermaid we have.
+                escaped_mermaid = html.escape(
+                    imp.get("mermaid_code", "graph TD\n  A[Start] --> B[End]")
+                )
+                slide_body = (
+                    f'<div style="margin-top:20px;background:#fff;padding:15px;'
+                    f'border:2px solid {theme.primary_hex};border-radius:8px;">'
+                    f'<div class="mermaid" style="font-size:0.8rem;">{escaped_mermaid}</div></div>'
+                )
 
         # ── 5. EXPANDED VISUAL FAMILIES (from the Deck Director) ─────────────
         elif sp and getattr(sp, "family", None) and getattr(sp, "data", None) and _family_block(
@@ -380,15 +414,19 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     <!-- Mermaid.js (cdnjs UMD standalone build – works in local file:// and data URIs) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js" crossorigin="anonymous"></script>
     <script>
-        // Present mode = ?build / #build in the URL, or a parent frame that set
-        // window.__learnovaBuild before load. Normal / preview view keeps every
-        // bullet visible; only present mode turns [data-build] into fragments.
+        // Progressive reveal (one idea per click) is ON by default whenever the
+        // deck is opened directly — a teacher double-clicking the .html gets the
+        // phase-by-phase build, not a wall of text. It is OFF only when the deck
+        // is embedded in a frame (the in-app Preview pane, which wants a flat
+        // view) unless that frame calls __enableBuilds(), or when ?flat is set.
         var LV_BUILD = (function () {{
             try {{
-                if (window.__learnovaBuild) return true;
                 var s = (location.search + location.hash);
-                return /[?#&]build\\b/.test(s);
-            }} catch (e) {{ return false; }}
+                if (/[?#&]flat\\b/.test(s)) return false;
+                if (window.__learnovaBuild) return true;
+                if (/[?#&]build\\b/.test(s)) return true;
+                return window.top === window.self;   // not embedded → build
+            }} catch (e) {{ return true; }}
         }})();
 
         function lvApplyBuilds() {{
@@ -408,8 +446,31 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         window.__enableBuilds = function () {{
             LV_BUILD = true;
             lvApplyBuilds();
+            lvUpdateStepHud();
             if (window.Reveal && Reveal.sync) Reveal.sync();
         }};
+        // ...and to switch them back off (study / scan mode).
+        window.__disableBuilds = function () {{
+            LV_BUILD = false;
+            lvApplyBuilds();
+            lvUpdateStepHud();
+            if (window.Reveal && Reveal.sync) Reveal.sync();
+        }};
+
+        // Small "Step 2 / 5" heads-up + a toggle, bottom-right. Only meaningful
+        // on slides that actually have build steps.
+        function lvUpdateStepHud() {{
+            var hud = document.getElementById('lv-step-hud');
+            if (!hud || !window.Reveal || !Reveal.getState) return;
+            var st = Reveal.getState();
+            var cur = Reveal.getCurrentSlide();
+            var total = cur ? cur.querySelectorAll('.fragment').length : 0;
+            if (!LV_BUILD || total === 0) {{ hud.style.display = 'none'; return; }}
+            var shown = cur.querySelectorAll('.fragment.visible').length;
+            hud.style.display = 'flex';
+            hud.querySelector('#lv-step-label').textContent =
+                'Step ' + Math.min(shown, total) + ' / ' + total;
+        }}
 
         lvApplyBuilds();
 
@@ -434,6 +495,28 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         }});
 
         mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
+
+        Reveal.on('ready', lvUpdateStepHud);
+        Reveal.on('slidechanged', lvUpdateStepHud);
+        Reveal.on('fragmentshown', lvUpdateStepHud);
+        Reveal.on('fragmenthidden', lvUpdateStepHud);
+        (function lvStepHudInit() {{
+            var hud = document.createElement('div');
+            hud.id = 'lv-step-hud';
+            hud.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:60;'
+                + 'display:none;gap:10px;align-items:center;background:{theme.primary_hex};'
+                + 'color:{on_primary};padding:6px 12px;border-radius:20px;font-size:13px;'
+                + 'font-family:sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.25);';
+            hud.innerHTML = '<span id="lv-step-label">Step 1 / 1</span>'
+                + '<button id="lv-step-toggle" style="all:unset;cursor:pointer;'
+                + 'border:1px solid currentColor;border-radius:12px;padding:1px 8px;font-size:11px;">'
+                + 'show all</button>';
+            document.body.appendChild(hud);
+            hud.querySelector('#lv-step-toggle').addEventListener('click', function () {{
+                if (LV_BUILD) {{ window.__disableBuilds(); this.textContent = 'step through'; }}
+                else {{ window.__enableBuilds(); this.textContent = 'show all'; }}
+            }});
+        }})();
 
         function checkAnswer(btn, isCorrect) {{
             const parent = btn.parentElement;

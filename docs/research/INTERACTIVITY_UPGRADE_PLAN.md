@@ -103,7 +103,7 @@ Each task names the exact files to touch.
 
 ### PHASE 2 — Real progressive reveal (the "explain phase by phase" fix)
 
-- [ ] **2.1 — Stage the Mermaid flowchart.**
+- [x] **2.1 — Stage the Mermaid flowchart.**
   Replace the single all-at-once Mermaid block with a **native step chip flow**
   (reuse `family_blocks._stages`) so each step is a `data-build` element, OR
   post-process the rendered Mermaid SVG to tag each node with a
@@ -111,7 +111,7 @@ Each task names the exact files to touch.
   visible.
   *Files:* `rendering/web_deck_builder.py`, `rendering/family_blocks.py`
 
-- [ ] **2.2 — Add the `WORKED_EXAMPLE` family.**
+- [x] **2.2 — Add the `WORKED_EXAMPLE` family.**
   New catalog entry + renderer: a vertical list of derivation lines where each
   click reveals the next line **and keeps all previous lines** (accumulating, not
   replacing). Sub-variant `WORKED_EXAMPLE_TWO_COL` = "step | reason". This is the
@@ -120,19 +120,19 @@ Each task names the exact files to touch.
   (detection: numbered lines with `=`, "step", "substitute", "therefore"),
   `rendering/family_blocks.py`, `rendering/ppt_builder.py`
 
-- [ ] **2.3 — Progressive reveal in the raw web deck too.**
+- [x] **2.3 — Progressive reveal in the raw web deck too.**
   Add a small on-slide "▶ step 1 / 5" control (and Space/→ still works) so the
   staging plays even when the file is opened directly, not only via the presenter
   console. Keep an "expand all" toggle for study mode.
   *Files:* `rendering/web_deck_builder.py`
 
-- [ ] **2.4 — Turn on PPTX click-builds by default.**
+- [x] **2.4 — Turn on PPTX click-builds by default.**
   Flip `LEARNOVA_PPTX_ANIM` default to on. Wire `deck_plan.animation.steps` →
   `apply_click_builds` for every layout, not just text. Verify in real PowerPoint
   + Keynote + Google Slides.
   *Files:* `rendering/ppt_builder.py`, `rendering/pptx_animation.py`
 
-- [ ] **2.5 — Raise / handle the 7-step cap.**
+- [x] **2.5 — Raise / handle the 7-step cap.**
   When a slide's reveal groups > 7, **paginate the visual** (steps 1-4 on slide
   A, 5-8 on slide B with 1-4 recapped dim) instead of dropping steps 8+ from the
   animation.

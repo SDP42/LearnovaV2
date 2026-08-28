@@ -158,6 +158,49 @@ def _definition(data: Dict[str, Any], theme) -> Optional[str]:
     )
 
 
+def _worked_example(data: Dict[str, Any], theme) -> Optional[str]:
+    """
+    A problem solved one line at a time. Every line carries ``data-build`` so
+    present mode reveals them one click apart — and because they are ordinary
+    (not replaced) elements, each solved line **stays on screen** as the
+    derivation grows. Optional per-line reason in a right column.
+    """
+    rows = data.get("rows") or [{"step": s, "reason": ""} for s in (data.get("steps") or [])]
+    rows = [r for r in rows if str(r.get("step", "")).strip()][:14]
+    if len(rows) < 2:
+        return None
+    problem = _esc(str(data.get("problem", "")))
+    has_reasons = any(str(r.get("reason", "")).strip() for r in rows)
+    head = (
+        f'<div style="font-weight:700;color:{theme.primary_hex};margin-bottom:10px;'
+        f'font-size:0.95rem;">{problem}</div>' if problem else ""
+    )
+    lines = ""
+    for i, r in enumerate(rows):
+        step = _esc(str(r.get("step", "")))
+        reason = _esc(str(r.get("reason", "")))
+        reason_html = (
+            f'<div style="flex:0 0 38%;color:{theme.subtext_hex};font-size:0.82rem;'
+            f'padding-left:12px;border-left:2px dashed {theme.primary_hex}44;">{reason}</div>'
+            if has_reasons else ""
+        )
+        lines += (
+            f'<div data-el="el.{i}" data-build="{i}" '
+            f'style="display:flex;align-items:baseline;gap:12px;padding:7px 0;'
+            f'border-bottom:1px solid {theme.primary_hex}14;">'
+            f'<span style="flex:0 0 22px;color:{theme.primary_hex};font-weight:700;'
+            f'font-size:0.8rem;">{i + 1}</span>'
+            f'<div style="flex:1;font-family:ui-monospace,Menlo,Consolas,monospace;'
+            f'font-size:1.05rem;color:{theme.text_hex};line-height:1.5;">{step}</div>'
+            f'{reason_html}</div>'
+        )
+    return (
+        f'<div style="margin-top:18px;background:{theme.card_bg_hex};border:1px solid '
+        f'{theme.primary_hex}33;border-radius:10px;padding:16px 18px;max-width:780px;">'
+        f'{head}{lines}</div>'
+    )
+
+
 def _quote(data: Dict[str, Any], theme) -> Optional[str]:
     text = _esc(str(data.get("text", "")))
     if not text:
@@ -452,6 +495,7 @@ def _chem(data: Dict[str, Any], theme) -> Optional[str]:
 _BUILDERS = {
     "LIST_STRUCTURED": _cards,
     "COMPARE_VISUAL": _pros_cons,
+    "WORKED_EXAMPLE": _worked_example,
     "TIMELINE": _timeline,
     "HIERARCHY_NEST": _pyramid,
     "DEFINITION": _definition,

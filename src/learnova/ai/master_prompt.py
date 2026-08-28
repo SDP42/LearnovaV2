@@ -104,6 +104,9 @@ VISUAL_TREATMENTS: List[Treatment] = [
     Treatment("METRIC", "KPI", "single", "one headline number is the message"),
     Treatment("FLOWCHART", "PROCESS_LINEAR", "flowchart", "ordered procedure, 3+ steps, may branch"),
     Treatment("CYCLE", "PROCESS_CYCLIC", "cycle", "a repeating process with no start or end"),
+    Treatment("WORKED_EXAMPLE", "WORKED_EXAMPLE", "steps",
+              "a problem solved step by step (a sum, a derivation, a proof) — "
+              "each line follows from the last and every line stays on screen"),
     Treatment("TIMELINE", "TIMELINE", "dated", "3+ dated or strictly chronological events"),
     Treatment("COMPARISON_TABLE", "COMPARE_TABLE", "comparison",
               "two or more named things compared across the same aspects"),

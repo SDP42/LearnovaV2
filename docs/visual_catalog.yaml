@@ -69,6 +69,13 @@ families:
       funnel:    {use_when: "a quantity shrinks monotonically through stages", avoid_when: "quantity grows or is unordered", needs: [stages_desc], reveal_unit: stage, params: [motion, emphasis]}
       chevron:   {use_when: "3-6 sequential phases, no data, emphasis on direction", avoid_when: "branching or timing detail exists", needs: [phases], reveal_unit: phase, params: [orientation, motion]}
 
+  WORKED_EXAMPLE:
+    domain: step-by-step solution / derivation / proof — every line stays on screen
+    variants:
+      steps:      {use_when: "a problem is solved one line at a time and each line follows from the previous (a sum, an equation rearrangement, a substitution)", avoid_when: "the steps are a procedure to memorise not a specific solved instance (PROCESS_LINEAR)", needs: [steps], reveal_unit: line, params: [motion]}
+      two_column: {use_when: "each step has a matching justification ('subtract 3 | isolate x', proof statements/reasons)", avoid_when: "there is no reason to give per step", needs: [rows], reveal_unit: row, params: [motion]}
+      annotated:  {use_when: "one worked instance with call-outs pointing at the parts that changed", avoid_when: "more than ~6 steps", needs: [steps, annotations], reveal_unit: line, params: [motion, emphasis]}
+
   PROCESS_CYCLIC:
     domain: cycle / feedback loop / iteration
     variants:
