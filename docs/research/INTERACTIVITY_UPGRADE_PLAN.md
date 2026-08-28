@@ -240,12 +240,12 @@ Each task names the exact files to touch.
   that slide live.
   *Files:* `frontend/src/pages/Preview.jsx`, new `components/app/SlideEditor.jsx`, API `PATCH /api/decks/:id/slides/:i`
 
-- [ ] **6.2 — Visual family picker with previews.**
+- [~] **6.2 — Visual family picker with previews.** _(gallery + templates done; per-slide apply needs a re-render endpoint)_
   A gallery modal showing the 40 families as thumbnails; click to apply to the
   current slide. (The engine still auto-picks by default — this is an override.)
   *Files:* `frontend/src/components/app/VisualLayoutPicker.jsx` (revive + expand)
 
-- [ ] **6.3 — Reveal-step timeline scrubber** in the presenter console — drag to
+- [x] **6.3 — Reveal-step timeline scrubber** in the presenter console — drag to
   any build step, not just next/prev.
   *Files:* `frontend/src/pages/Present.jsx`
 
@@ -264,7 +264,7 @@ Each task names the exact files to touch.
   not just the two light/dark radios.
   *Files:* `frontend/src/pages/Settings.jsx`, `rendering/theme_engine.py` (expose presets via API)
 
-- [ ] **6.8 — Export options dialog** — density, animation on/off, quiz
+- [x] **6.8 — Export options dialog** _(outputs + enrichment + quiz placement in the Create form)_ — density, animation on/off, quiz
   placement, which format(s), speaker-notes verbosity — before generating.
   *Files:* `frontend/src/pages/Create.jsx`, `Export.jsx`
 
