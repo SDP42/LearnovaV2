@@ -21,6 +21,18 @@ _CODE = re.compile(r"`([^`]+)`")
 _ESCAPE = re.compile(r"\\+(?=\s|$)")
 _LEADING_MARKER = re.compile(r"^\s*(?:[-*+•]|\d+[.)]|step\s*\d+\s*[:.\-])\s*", re.I)
 _HEADING_HASH = re.compile(r"^\s*#{1,6}\s*")
+# Figure-OCR wrapper (orchestrator) and its predecessors. Never belongs on a slide.
+_OCR_BLOCK = re.compile(
+    r"<<FIGURE_TEXT>>.*?<<END_FIGURE_TEXT>>"
+    r"|\[+\s*(?:Extracted OCR|OCR Transcription|Image Diagram Content)[^\]]*\]*"
+    r"|<<FIGURE_TEXT>>|<<END_FIGURE_TEXT>>",
+    re.I | re.S,
+)
+
+
+def strip_ocr_block(text: str) -> str:
+    """Remove any figure-OCR marker block from a chunk's text."""
+    return re.sub(r"\n{3,}", "\n\n", _OCR_BLOCK.sub("", str(text or ""))).strip()
 
 
 def strip_inline_markdown(text: str) -> str:
@@ -103,6 +115,7 @@ def dedupe_bullets(bullets: list[str]) -> list[str]:
 __all__ = [
     "strip_inline_markdown",
     "clean_bullet",
+    "strip_ocr_block",
     "truncate_words",
     "is_redundant",
     "dedupe_bullets",

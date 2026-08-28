@@ -26,6 +26,7 @@ from learnova.textutils import (
     dedupe_bullets,
     is_redundant,
     strip_inline_markdown,
+    strip_ocr_block,
     truncate_words,
 )
 
@@ -309,7 +310,9 @@ def _build_fallback(text: str, current_title: str, layout_type: str) -> dict:
     result: dict = {
         "layout_type": layout_type,
         "title": current_title or "Overview",
-        "takeaway": "Review key details carefully.",
+        # No LLM here to write a real takeaway; a repeated filler line on every
+        # slide is worse than none. Leave it blank.
+        "takeaway": "",
         "bullets": items[:60],
     }
     if layout_type == "FLOWCHART":
@@ -447,9 +450,12 @@ def _classify_with_master_prompt(text: str, current_title: str) -> Optional[dict
     )
 
     ocr = ""
-    marker = "[Extracted OCR & Image Diagram Content:"
-    if marker in text:
-        ocr = text.split(marker, 1)[1].rsplit("]", 1)[0]
+    m = re.search(r"<<FIGURE_TEXT>>(.*?)<<END_FIGURE_TEXT>>", text, re.S)
+    if m:
+        ocr = m.group(1).strip()
+    elif "[Extracted OCR" in text:  # legacy marker
+        ocr = text.split("[Extracted OCR", 1)[1].split(":", 1)[-1].rsplit("]", 1)[0]
+    text = strip_ocr_block(text)  # never let the marker reach the bulletiser
 
     raw = _call_llm(build_user_prompt(text[:1600], current_title, ocr),
                     MASTER_SYSTEM_PROMPT, max_tokens=900, timeout=14.0)
@@ -530,6 +536,14 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
     """
     global _groq_rate_limited
 
+    # The figure-OCR block informs classification but must never be bulletised.
+    # _classify_with_master_prompt handles it itself; every other path here
+    # works on the stripped text.
+    ocr_hint = ""
+    _m = re.search(r"<<FIGURE_TEXT>>(.*?)<<END_FIGURE_TEXT>>", text, re.S)
+    if _m:
+        ocr_hint = _m.group(1).strip()
+
     # Opt-in: drive the structuring call with the full master prompt
     # (ai/master_prompt.py) — 40-family taxonomy, per-sentence verbatim, and an
     # animation timeline. Falls back to the classic 5-type path on any failure.
@@ -543,6 +557,7 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
 
     t_start = time.monotonic()
     stage = "layout_router"
+    text = strip_ocr_block(text)
 
     try:
         # ── Circuit breaker ───────────────────────────────────────────────────
@@ -552,6 +567,8 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
         # ── Attempt 1: full prompt ────────────────────────────────────────────
         logger.info("[%s] START — title=%r", stage, current_title[:40] if current_title else "")
         user_prompt = f"Title: {current_title}\nText:\n{text[:1200]}"
+        if ocr_hint:
+            user_prompt += f"\n\n(A figure on this slide reads: {ocr_hint[:300]})"
         raw1: Optional[str] = None
 
         try:
@@ -604,7 +621,9 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
 
         # Ensure all string fields are actually strings
         title = str(data.get("title", current_title or "Key Concept")).strip()
-        takeaway = str(data.get("takeaway", "Review carefully.")).strip()
+        takeaway = str(data.get("takeaway", "")).strip()
+        if re.fullmatch(r"(review\b.*|n/?a|none|-)?\.?", takeaway, re.I):
+            takeaway = ""  # generic filler is worse than an empty bar
         # No cap here. This used to be `[:4]`, which silently deleted every
         # point past the fourth before the density stage ever saw them — the
         # continuity contract in docs/PPT_RULES.md says overflow moves to a

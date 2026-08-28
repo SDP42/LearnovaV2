@@ -34,6 +34,11 @@ ProgressFn = Callable[[str, str, float, str], None]
 # "Page 1" — indistinguishable from a renderer bug.
 _MIN_EXTRACTED_CHARS = 120
 
+# Marker wrapping a figure's OCR text inside a chunk. The layout classifier and
+# visual selector read it; every bulletiser strips it (textutils.strip_ocr_block).
+_OCR_OPEN = "<<FIGURE_TEXT>>"
+_OCR_CLOSE = "<<END_FIGURE_TEXT>>"
+
 STAGES: List[str] = [
     "convert",
     "chunk",
@@ -324,8 +329,11 @@ def generate(
                 continue
             description = by_bytes.get(image.get("bytes"))
             if description:
-                image["description"] = description
-                chunk["text"] += f"\n\n[Extracted OCR & Image Diagram Content:\n{description}]"
+                # Strip any nested marker the describer added; keep just the text.
+                clean = re.sub(r"^\s*\[[^\n\]]*:?\s*|\s*\]\s*$", "", str(description)).strip()
+                image["description"] = clean
+                # A single-line, easily-stripped marker (see textutils.strip_ocr_block).
+                chunk["text"] += f"\n\n{_OCR_OPEN}\n{clean}\n{_OCR_CLOSE}"
         return len(by_bytes)
 
     has_images = any(
@@ -352,6 +360,23 @@ def generate(
     # 5. Layout classification (LLM, with heuristic fallback inside)
     def _layout():
         result.improved = improve_chunks(result.chunks)
+        # A takeaway that repeats verbatim across slides (a filler line, or the
+        # same sentence the heuristic lifted twice) is noise — keep the first,
+        # blank the rest. Also drop a takeaway that just restates a bullet.
+        seen_tk: set = set()
+        for entry in result.improved:
+            imp = entry.get("improved") or {}
+            tk = re.sub(r"\s+", " ", str(imp.get("takeaway", ""))).strip()
+            if not tk:
+                continue
+            norm = re.sub(r"[^a-z0-9 ]", "", tk.lower())
+            bullets_norm = " ".join(
+                re.sub(r"[^a-z0-9 ]", "", str(b).lower()) for b in (imp.get("bullets") or [])
+            )
+            if norm in seen_tk or (len(norm) > 15 and norm in bullets_norm):
+                imp["takeaway"] = ""
+            else:
+                seen_tk.add(norm)
         return len(result.improved)
 
     runner.run("layout", _layout, critical=True)

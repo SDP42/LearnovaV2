@@ -392,6 +392,145 @@ def is_multi_column_pdf(path: str, sample_pages: int = 4) -> bool:
         return False
 
 
+_OCR_MARKER = re.compile(
+    r"^\s*\[*\s*(?:Extracted\s+OCR|OCR\s+Transcription|OCR\s*&\s*Image|"
+    r"Image\s+Diagram\s+Content|Local)\b.*$",
+    re.I,
+)
+_PAGE_NO = re.compile(r"^\s*(?:page\s*)?\d{1,3}\s*$", re.I)
+
+
+def strip_boilerplate(markdown: str) -> str:
+    """
+    Drop the running headers / footers / page numbers a PDF repeats on every
+    page, plus stray OCR wrapper markers. A non-heading line that shows up 3+
+    times (or on a third of the pages) is chrome, not content — a lecturer's
+    name-and-course footer, a copyright line, a slide number.
+    """
+    lines = (markdown or "").splitlines()
+    if len(lines) < 8:
+        return markdown
+
+    n_pages = max(1, sum(1 for l in lines if _HEADING_RE.match(l.strip())))
+    counts: Dict[str, int] = {}
+    for l in lines:
+        s = l.strip()
+        if not s or _HEADING_RE.match(s):
+            continue
+        key = re.sub(r"\s+", " ", re.sub(r"^[-*+•\d.)\s]+", "", s)).lower()
+        if len(key) >= 8:
+            counts[key] = counts.get(key, 0) + 1
+
+    # Three-plus identical content lines in a slide/lecture PDF is chrome.
+    repeat_floor = max(3, n_pages // 8)
+    boiler = {k for k, c in counts.items() if c >= repeat_floor}
+    # A line with a person's initials + an institution + a year range reads as a
+    # running author footer even if it only survived a couple of pages.
+    footerish = re.compile(
+        r"^(?:dr\.?|prof\.?|mr\.?|ms\.?|shri)\b.*\b\d{4}[-/]\d{2,4}\b"
+        r"|\bsem\.?\s*[-.]?\s*[iv\d]+\s*$",
+        re.I,
+    )
+    # The same footer AnyDoc sometimes glues onto the end of a content line.
+    trailing_footer = re.compile(
+        r"\s*(?:Dr\.?|Prof\.?|Mr\.?|Ms\.?)\s+[A-Z].{0,60}?\b\d{4}[-/]\d{2,4}\b.*$",
+    )
+
+    out: List[str] = []
+    for l in lines:
+        s = l.strip()
+        if _OCR_MARKER.match(s) or s in {"]", "]]"}:
+            continue
+        if not _HEADING_RE.match(s):
+            body = re.sub(r"^[-*+•>\d.)\s]+", "", s)
+            key = re.sub(r"\s+", " ", body).lower()
+            if key in boiler or _PAGE_NO.match(s) or footerish.search(body):
+                continue
+            l = trailing_footer.sub("", l).rstrip()
+            if not l.strip():
+                continue
+        out.append(l)
+    return _flatten_fake_tables("\n".join(out))
+
+
+_PIPE_ROW = re.compile(r"^\s*\|.*\|\s*$")
+_PIPE_SEP = re.compile(r"^\s*\|?[\s:|-]+\|?\s*$")
+
+
+def _flatten_fake_tables(markdown: str) -> str:
+    """
+    AnyDoc sometimes reads a bulleted slide as a pipe table where most cells are
+    empty or a lone bullet char. Turn such blocks back into bullet lists so the
+    content is readable instead of ``|•||NLP-Natural Language Processing.|``.
+    """
+    lines = markdown.splitlines()
+    out: List[str] = []
+    i = 0
+    while i < len(lines):
+        if _PIPE_ROW.match(lines[i]):
+            j = i
+            block = []
+            while j < len(lines) and _PIPE_ROW.match(lines[j]):  # one contiguous run
+                block.append(lines[j])
+                j += 1
+            cells_all, junk = [], 0
+            empty_lead = False
+            for row in block:
+                if _PIPE_SEP.match(row):
+                    continue
+                stripped = row.strip()
+                if stripped.startswith("||") or stripped.startswith("|•") or stripped.startswith("| |"):
+                    empty_lead = True
+                cells = [c.strip() for c in stripped.strip("|").split("|")]
+                for c in cells:
+                    if c in {"", "•", "-", "*", "Ø", "�"} or len(c) <= 1:
+                        junk += 1
+                    elif c:
+                        cells_all.append(c)
+            total = junk + len(cells_all)
+            if cells_all and total and (empty_lead or junk / total >= 0.3):
+                for c in cells_all:
+                    out.append(f"- {c}")
+                i = j
+                continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out)
+
+
+def merge_wrapped_headings(markdown: str) -> str:
+    """
+    A PDF heading that wrapped onto two visual lines becomes two ``##`` lines
+    ("## Introduction to Natural Language" then "## Processing"). If a heading is
+    short and directly follows another heading with no body between, fold it in.
+    """
+    lines = (markdown or "").splitlines()
+    out: List[str] = []
+    for l in lines:
+        m = _HEADING_RE.match(l.strip())
+        frag = m.group(2).strip() if m else ""
+        # A wrap fragment is 1-2 lowercase-continuation words, e.g. "Processing"
+        # or "Recognition" — not a new sub-heading like "Rule-based Systems".
+        is_wrap = bool(m) and len(frag.split()) <= 2 and not frag.endswith((":", ".", "?"))
+        if is_wrap:
+            k = len(out) - 1
+            while k >= 0 and not out[k].strip():
+                k -= 1
+            prev = _HEADING_RE.match(out[k].strip()) if k >= 0 else None
+            prev_txt = prev.group(2).rstrip() if prev else ""
+            # only when the previous heading itself looks truncated
+            if prev and prev.group(1) == m.group(1) and not prev_txt.endswith((":", ".", "?", ")")):
+                out[k] = f"{prev.group(1)} {prev_txt} {frag}"
+                del out[k + 1:]
+                continue
+        out.append(l)
+    return "\n".join(out)
+
+
+def _clean_markdown(markdown: str) -> str:
+    return merge_wrapped_headings(strip_boilerplate(strip_asset_placeholders(markdown or "")))
+
+
 def _convert_with_anydoc(path: str) -> Optional[str]:
     """Try AnyDoc for text. Returns None when unavailable or unhelpful."""
     try:
@@ -406,7 +545,7 @@ def _convert_with_anydoc(path: str) -> Optional[str]:
         logger.warning("AnyDoc conversion failed (%s) — using native parser.", exc)
         return None
 
-    markdown = strip_asset_placeholders(markdown or "")
+    markdown = _clean_markdown(markdown or "")
 
     if len(markdown) < _MIN_ANYDOC_CHARS:
         logger.info(
@@ -500,7 +639,7 @@ def _native_to_markdown(path: str, ext: str, textbook_mode: bool = False):
                     lines.append(f"- {stripped}")
             lines.append("")
 
-    return "\n".join(lines).strip(), document
+    return _clean_markdown("\n".join(lines).strip()), document
 
 
 # ── Public API ────────────────────────────────────────────────────────────────

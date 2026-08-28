@@ -248,6 +248,9 @@ def _list_items(text: str, title: str) -> List[str]:
 def structure_chunk(text: str, title: str = "", *,
                     max_bullets: int = 5, target_words: int = 16) -> dict:
     """The no-LLM replacement for a layout-router result."""
+    from learnova.textutils import strip_ocr_block
+
+    text = strip_ocr_block(text)
     # A chunk that is already a bulleted list is kept whole — the pipeline's
     # "content is never dropped" contract. We only lightly tidy each item.
     listed = _list_items(text, title)
