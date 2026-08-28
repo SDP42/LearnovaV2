@@ -299,7 +299,12 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         # the VMS only found text), adopt that family + data outright.
         vdata = imp.get("visual_data") if isinstance(imp.get("visual_data"), dict) else None
         if vdata and vdata.get("data"):
-            if vd.family in {"TEXT", "MINIMAL_TEXT", ""} or vd.family == vdata.get("family"):
+            # A user-forced family (from the editor) always wins. Otherwise adopt
+            # the extracted data only when it agrees with the VMS or the VMS
+            # found nothing structural.
+            if (vdata.get("forced")
+                    or vd.family in {"TEXT", "MINIMAL_TEXT", ""}
+                    or vd.family == vdata.get("family")):
                 from learnova.ai.visual_selector import VisualDecision
 
                 vd = VisualDecision(

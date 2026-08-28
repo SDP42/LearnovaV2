@@ -134,7 +134,7 @@ def editable_to_final_deck(editable: List[dict],
                 data = _fallback_family_data(fam, bullets, improved.get("title", ""))
             if data:
                 vdata = {"family": fam, "variant": s.get("variant") or "default",
-                         "confidence": 0.9, "data": data}
+                         "confidence": 0.9, "data": data, "forced": True}
         original = {"text": s.get("source_text", "") or "\n".join(improved.get("bullets") or [])}
         img = images.get(i)
         if img and img[0]:

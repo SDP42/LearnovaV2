@@ -227,26 +227,26 @@ export default function Preview() {
 
   return (
     <div data-learnova-app className="flex h-svh flex-col bg-background text-foreground">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3">
-        <Button asChild variant="ghost" size="icon">
+      <header className="flex h-14 shrink-0 items-center gap-2 overflow-hidden border-b px-3">
+        <Button asChild variant="ghost" size="icon" className="shrink-0">
           <Link to="/app">
             <ArrowLeft />
           </Link>
         </Button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
             {summary?.source_name || deck?.job_id || "Presentation"}
             {meta.version > 1 ? (
               <span className="ml-1.5 text-xs font-normal text-muted-foreground">v{meta.version}</span>
             ) : null}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="truncate whitespace-nowrap text-xs text-muted-foreground">
             {summary ? `${summary.slide_count} slides · ${summary.quiz_count} quizzes` : "…"}
             {summary?.overall_score != null ? ` · ${summary.overall_score}/100` : ""}
             {estMin ? ` · ≈ ${estMin} min` : ""}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {editing ? (
             <>
               <Button size="sm" onClick={save} disabled={saving || !dirty}>
