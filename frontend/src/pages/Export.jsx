@@ -33,13 +33,15 @@ export default function Export() {
   ).length;
 
   async function download(artifact) {
+    const name = `Learnova_${s?.source_name || "deck"}.${artifact}`;
     try {
-      await api.downloadArtifact(
-        api.jobDownloadPath(jobId, artifact),
-        `Learnova_${s?.source_name || "deck"}.${artifact}`
-      );
-    } catch (e) {
-      setError(e.message);
+      await api.downloadArtifact(api.jobDownloadPath(jobId, artifact), name);
+    } catch {
+      try {
+        await api.downloadArtifact(api.deckDownloadPath(jobId, artifact), name);
+      } catch (e) {
+        setError(e.message);
+      }
     }
   }
 

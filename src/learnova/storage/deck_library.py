@@ -29,6 +29,7 @@ MARKDOWN_FILE = "deck.md"
 PPTX_FILE = "deck.pptx"
 HTML_FILE = "deck.html"
 META_FILE = "meta.json"
+SLIDES_FILE = "deck.json"   # the slides payload, so a saved deck opens without a live job
 
 
 @dataclass
@@ -73,6 +74,7 @@ def save_deck(
     theme_id: str = "auto",
     theme_spec: Optional[dict] = None,
     title: Optional[str] = None,
+    slides_payload: Optional[list] = None,
 ) -> DeckRecord:
     """Persist a ``PipelineResult`` for one user and return its record."""
     deck_id = uuid.uuid4().hex[:16]
@@ -85,6 +87,18 @@ def save_deck(
         (target / PPTX_FILE).write_bytes(result.pptx_bytes)
     if result.html_bytes:
         (target / HTML_FILE).write_bytes(result.html_bytes)
+    if slides_payload is not None:
+        (target / SLIDES_FILE).write_text(
+            json.dumps(
+                {
+                    "slides": slides_payload,
+                    "quizzes": list(getattr(result, "quizzes", []) or []),
+                    "scores": dict(getattr(result, "scores", {}) or {}),
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
     record = DeckRecord(
         id=deck_id,
@@ -146,6 +160,17 @@ def read_markdown(user_id: str, deck_id: str) -> Optional[str]:
     return path.read_text(encoding="utf-8") if path.is_file() else None
 
 
+def read_slides(user_id: str, deck_id: str) -> Optional[dict]:
+    """The stored slides payload ({slides, quizzes, scores}), or None."""
+    path = _deck_dir(user_id, deck_id) / SLIDES_FILE
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 def read_artifact(user_id: str, deck_id: str, artifact: str) -> Optional[bytes]:
     """Read the stored ``pptx`` or ``html`` bytes for a deck."""
     filename = {"pptx": PPTX_FILE, "html": HTML_FILE}.get(artifact)
@@ -170,6 +195,7 @@ __all__ = [
     "list_decks",
     "get_deck",
     "read_markdown",
+    "read_slides",
     "read_artifact",
     "delete_deck",
 ]

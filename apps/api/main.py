@@ -318,12 +318,17 @@ def start_generate(
     config = _config_from(request)
 
     def _persist(finished: Job) -> None:
+        try:
+            payload = _slides_payload(finished.result.final_deck)
+        except Exception:
+            payload = None
         deck_library.save_deck(
             user_id=finished.user_id or ANONYMOUS_USER,
             result=finished.result,
             theme_id=config.theme_id,
             theme_spec=config.theme_spec,
             title=finished.source_name,
+            slides_payload=payload,
         )
 
     try:
@@ -461,6 +466,31 @@ def get_my_deck_markdown(deck_id: str, user_id: str = Depends(current_user)) -> 
     if markdown is None:
         raise HTTPException(status_code=404, detail="markdown not found")
     return {"deck_id": deck_id, "markdown": markdown}
+
+
+@app.get("/api/decks/{deck_id}/deck")
+def get_my_deck_slides(deck_id: str, user_id: str = Depends(current_user)) -> JSONResponse:
+    """Slides payload for a saved deck — the job-less counterpart of
+    ``/api/jobs/{id}/deck`` so Preview / Present / the diagram editor open a
+    library deck without a live job."""
+    record = deck_library.get_deck(user_id, deck_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    stored = deck_library.read_slides(user_id, deck_id) or {}
+    return JSONResponse(
+        {
+            "job_id": deck_id,
+            "summary": {
+                "source_name": record.get("title", ""),
+                "slide_count": record.get("slide_count", 0),
+                "quiz_count": record.get("quiz_count", 0),
+                "overall_score": record.get("overall_score", 0),
+            },
+            "slides": stored.get("slides", []),
+            "quizzes": stored.get("quizzes", []),
+            "scores": stored.get("scores", {}),
+        }
+    )
 
 
 @app.get("/api/decks/{deck_id}/download/{artifact}")

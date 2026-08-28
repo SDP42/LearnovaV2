@@ -100,7 +100,11 @@ export async function startGenerate(id, options) {
 }
 
 export async function getDeck(id) {
-  return json(await fetch(`${BASE}/api/jobs/${id}/deck`, { headers: await authHeaders() }));
+  // A fresh generation is a live job; a deck opened from the library is not.
+  const h = await authHeaders();
+  const jobResp = await fetch(`${BASE}/api/jobs/${id}/deck`, { headers: h });
+  if (jobResp.ok) return jobResp.json();
+  return json(await fetch(`${BASE}/api/decks/${id}/deck`, { headers: h }));
 }
 
 // ── Saved deck library ────────────────────────────────────────────────────
@@ -160,4 +164,17 @@ export async function artifactObjectUrl(path) {
   const response = await fetch(`${BASE}${path}`, { headers: await authHeaders() });
   if (!response.ok) throw new Error(`Could not load preview (${response.status})`);
   return URL.createObjectURL(await response.blob());
+}
+
+/**
+ * Object URL for a deck artifact by id, trying the live-job path then the
+ * saved-library path. Caller must URL.revokeObjectURL() when done.
+ */
+export async function deckArtifactUrl(id, artifact) {
+  const h = await authHeaders();
+  for (const path of [`/api/jobs/${id}/download/${artifact}`, `/api/decks/${id}/download/${artifact}`]) {
+    const r = await fetch(`${BASE}${path}`, { headers: h });
+    if (r.ok) return URL.createObjectURL(await r.blob());
+  }
+  throw new Error("Could not load the presentation");
 }

@@ -44,7 +44,7 @@ export default function Preview() {
     let revoked = false;
     let url;
     api
-      .artifactObjectUrl(api.jobDownloadPath(jobId, "html"))
+      .deckArtifactUrl(jobId, "html")
       .then((u) => {
         if (revoked) return URL.revokeObjectURL(u);
         url = u;
@@ -90,13 +90,15 @@ export default function Preview() {
   }, [slides]);
 
   async function download(artifact) {
+    const name = `Learnova_${summary?.source_name || "deck"}.${artifact}`;
     try {
-      await api.downloadArtifact(
-        api.jobDownloadPath(jobId, artifact),
-        `Learnova_${summary?.source_name || "deck"}.${artifact}`
-      );
-    } catch (e) {
-      setError(e.message);
+      await api.downloadArtifact(api.jobDownloadPath(jobId, artifact), name);
+    } catch {
+      try {
+        await api.downloadArtifact(api.deckDownloadPath(jobId, artifact), name);
+      } catch (e) {
+        setError(e.message);
+      }
     }
   }
 

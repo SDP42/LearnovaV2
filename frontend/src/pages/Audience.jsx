@@ -31,6 +31,8 @@ export default function Audience() {
     };
   }, [jobId]);
 
+  const [dark, setDark] = useState(false);
+
   useEffect(() => {
     const chan = new BroadcastChannel(`learnova-present-${jobId}`);
     const apply = (state) => {
@@ -47,12 +49,14 @@ export default function Audience() {
     };
     chan.onmessage = (e) => {
       if (e.data?.type === "state") apply(e.data.state);
+      else if (e.data?.type === "blackout") setDark(!!e.data.on);
     };
     return () => chan.close();
   }, [jobId]);
 
   return (
-    <div className="h-svh w-svw bg-black">
+    <div className="relative h-svh w-svw bg-black">
+      {dark ? <div className="absolute inset-0 z-10 bg-black" /> : null}
       {htmlUrl ? (
         <iframe
           ref={frameRef}

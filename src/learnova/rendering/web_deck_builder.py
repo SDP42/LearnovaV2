@@ -401,7 +401,12 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             controls: true,
             progress: true,
             center: true,
-            hash: true,
+            // Hash routing calls history.replaceState with the page URL, which
+            // throws a SecurityError inside a blob: iframe (the embedded
+            // preview / presenter view) and kills Reveal init. The deck is
+            // driven by Reveal.slide()/setState() there, so it is not needed.
+            hash: false,
+            respondToHashChanges: false,
             slideNumber: 'c/t',
             transition: 'slide',        // per-slide data-transition overrides this
             transitionSpeed: 'fast',

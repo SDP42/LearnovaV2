@@ -3,37 +3,66 @@ import { Link, useParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
+  Circle,
   Maximize2,
+  MonitorPlay,
   Pause,
   Play,
   RotateCcw,
+  SkipBack,
+  SkipForward,
+  Square,
   X,
 } from "lucide-react";
 import * as api from "@/api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 function fmt(ms) {
-  const s = Math.floor(ms / 1000);
+  const s = Math.max(0, Math.floor(ms / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+function clock() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Mini render of one slide — used for NEXT and the filmstrip. */
+function SlideMini({ slide, index, className }) {
+  return (
+    <div className={cn("rounded-md border border-white/10 bg-white/[0.04] p-2 text-left", className)}>
+      <div className="mb-1 flex items-center justify-between text-[10px] text-neutral-400">
+        <span>{index}</span>
+        {slide?.variant || slide?.family ? (
+          <span className="rounded bg-white/10 px-1 py-px">{slide.variant || slide.family}</span>
+        ) : null}
+      </div>
+      <p className="line-clamp-2 text-xs font-medium text-neutral-100">
+        {slide?.title || "—"}
+      </p>
+      <ul className="mt-1 space-y-0.5 text-[10px] text-neutral-400">
+        {(slide?.bullets ?? []).slice(0, 2).map((b, i) => (
+          <li key={i} className="line-clamp-1">• {b}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /**
- * Canva / PowerPoint-style presenter console.
+ * Dedicated Canva-style dual-screen presenter console.
  *
- * - Big current slide (the Reveal.js deck in an iframe, driven via Reveal.next/prev
- *   so fragment builds are respected).
- * - Next-slide preview, speaker notes, timer, slide counter, step indicator.
- * - "Open audience view" opens /app/audience/:jobId in a new window; the two
- *   stay in sync over a BroadcastChannel (Reveal state is posted on every move).
+ * Left: the live slide. Right: a big timer + wall clock, the next slide, and
+ * speaker notes. Bottom: a filmstrip for jump-to-slide. The reveal-step dots
+ * show progress through a slide's progressive-reveal builds. "Audience view"
+ * opens the clean deck in a second window, kept in sync (incl. blackout) over
+ * a BroadcastChannel.
  */
 export default function Present() {
   const { jobId } = useParams();
   const mainRef = useRef(null);
   const chan = useRef(null);
-  const audienceWin = useRef(null);
+  const filmRef = useRef(null);
 
   const [deck, setDeck] = useState(null);
   const [htmlUrl, setHtmlUrl] = useState(null);
@@ -42,6 +71,9 @@ export default function Present() {
 
   const [running, setRunning] = useState(true);
   const [elapsed, setElapsed] = useState(0);
+  const [now, setNow] = useState(clock());
+  const [audienceOpen, setAudienceOpen] = useState(false);
+  const [blackout, setBlackout] = useState(false);
 
   useEffect(() => {
     api.getDeck(jobId).then(setDeck).catch((e) => setError(e.message));
@@ -51,7 +83,7 @@ export default function Present() {
     let url;
     let dead = false;
     api
-      .artifactObjectUrl(api.jobDownloadPath(jobId, "html"))
+      .deckArtifactUrl(jobId, "html")
       .then((u) => {
         if (dead) return URL.revokeObjectURL(u);
         url = u;
@@ -74,6 +106,10 @@ export default function Present() {
     const t = setInterval(() => setElapsed((e) => e + 1000), 1000);
     return () => clearInterval(t);
   }, [running]);
+  useEffect(() => {
+    const t = setInterval(() => setNow(clock()), 15000);
+    return () => clearInterval(t);
+  }, []);
 
   const reveal = useCallback(() => mainRef.current?.contentWindow?.Reveal, []);
 
@@ -99,75 +135,123 @@ export default function Present() {
     [reveal, sync]
   );
 
+  const jump = useCallback(
+    (h) => {
+      const R = reveal();
+      if (!R) return;
+      try {
+        R.slide(h);
+      } catch {
+        /* ignore */
+      }
+      setTimeout(sync, 40);
+    },
+    [reveal, sync]
+  );
+
+  const toggleBlackout = useCallback(() => {
+    setBlackout((b) => {
+      chan.current?.postMessage({ type: "blackout", on: !b });
+      return !b;
+    });
+  }, []);
+
   useEffect(() => {
     const onKey = (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       if (["ArrowRight", "PageDown", " "].includes(e.key)) {
         e.preventDefault();
         go(1);
       } else if (["ArrowLeft", "PageUp"].includes(e.key)) {
         e.preventDefault();
         go(-1);
+      } else if (e.key === "Home") {
+        jump(0);
+      } else if (e.key === "End") {
+        jump((deck?.slides?.length ?? 0));
       } else if (e.key === "f") {
         mainRef.current?.requestFullscreen?.();
+      } else if (e.key === "b" || e.key === ".") {
+        toggleBlackout();
+      } else if (e.key === "p") {
+        setRunning((r) => !r);
+      } else if (e.key === "r") {
+        setElapsed(0);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go]);
+  }, [go, jump, toggleBlackout, deck]);
 
   function openAudience() {
-    audienceWin.current = window.open(
-      `/app/audience/${jobId}`,
-      "learnova-audience",
-      "noopener=false"
-    );
-    setTimeout(sync, 800);
+    const w = window.open(`/app/audience/${jobId}`, "learnova-audience");
+    setAudienceOpen(!!w);
+    const ping = setInterval(() => {
+      if (w?.closed) {
+        setAudienceOpen(false);
+        clearInterval(ping);
+      }
+    }, 1500);
+    setTimeout(() => {
+      sync();
+      chan.current?.postMessage({ type: "blackout", on: blackout });
+    }, 900);
   }
 
+  // keep the current filmstrip thumb visible
+  useEffect(() => {
+    filmRef.current?.querySelector(`[data-h="${pos.h}"]`)?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [pos.h]);
+
   const slides = deck?.slides ?? [];
-  // Reveal slide 0 is the generated title slide; deck.slides[0] is content slide 1.
+  const nContent = slides.length;
+  const total = nContent + 1; // + title slide
   const curSlide = slides[pos.h - 1] || null;
   const nextSlide = slides[pos.h] || null;
-  const total = (deck?.summary?.slide_count ?? slides.length) + 1;
 
+  const steps = curSlide?.reveal_steps || 0;
   const notes = useMemo(() => {
-    if (!curSlide) return pos.h === 0 ? "Title slide. Press → to begin." : "";
-    return curSlide.speaker_notes || curSlide.takeaway || "";
+    if (pos.h === 0) return "Title slide. Press → to begin.";
+    return curSlide?.speaker_notes || curSlide?.takeaway || "No notes for this slide.";
   }, [curSlide, pos.h]);
 
   return (
     <div data-learnova-app className="flex h-svh flex-col bg-neutral-950 text-neutral-100">
+      {/* header */}
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/10 px-3 text-sm">
         <Button asChild variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10">
-          <Link to={`/app/preview/${jobId}`}>
-            <X />
-          </Link>
+          <Link to={`/app/preview/${jobId}`}><X /></Link>
         </Button>
-        <span className="font-medium">{deck?.summary?.source_name || "Presenter view"}</span>
-        <span className="tabular-nums text-neutral-400">
-          Slide {pos.h + 1} / {total}
-          {pos.f >= 0 ? ` · step ${pos.f + 1}` : ""}
+        <span className="truncate font-medium">
+          {deck?.summary?.source_name || "Presenter view"}
+        </span>
+        <span className="hidden text-xs text-neutral-500 sm:inline">
+          ← → navigate · B blackout · F fullscreen · P timer
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <span className="rounded-md bg-white/10 px-2 py-1 font-mono text-sm tabular-nums">
-            {fmt(elapsed)}
+          <span
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs",
+              audienceOpen ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-neutral-400"
+            )}
+          >
+            <Circle className={cn("size-2 fill-current", audienceOpen && "animate-pulse")} />
+            {audienceOpen ? "Audience live" : "Audience off"}
           </span>
-          <Button size="icon" variant="ghost" className="text-neutral-300 hover:bg-white/10" onClick={() => setRunning((r) => !r)}>
-            {running ? <Pause /> : <Play />}
-          </Button>
-          <Button size="icon" variant="ghost" className="text-neutral-300 hover:bg-white/10" onClick={() => setElapsed(0)}>
-            <RotateCcw />
-          </Button>
           <Button size="sm" variant="secondary" onClick={openAudience}>
-            <ExternalLink /> Audience view
+            <MonitorPlay /> {audienceOpen ? "Re-sync" : "Audience view"}
           </Button>
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[1fr_360px]">
-        {/* Current slide */}
-        <div className="flex min-w-0 flex-col bg-black p-4">
-          <div className="relative flex-1 overflow-hidden rounded-xl border border-white/10 bg-white">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_380px]">
+        {/* ── current slide ─────────────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-col gap-3 bg-black p-4">
+          <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white">
             {htmlUrl ? (
               <iframe
                 ref={mainRef}
@@ -178,7 +262,7 @@ export default function Present() {
                   try {
                     mainRef.current?.contentWindow?.__enableBuilds?.();
                   } catch {
-                    /* cross-origin (shouldn't happen for a blob) */
+                    /* blob is same-origin */
                   }
                   setTimeout(sync, 500);
                 }}
@@ -186,64 +270,137 @@ export default function Present() {
             ) : (
               <Skeleton className="h-full w-full" />
             )}
+            {blackout ? (
+              <div className="absolute inset-0 grid place-items-center bg-black text-sm text-neutral-500">
+                Screen blacked out — press B
+              </div>
+            ) : null}
           </div>
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <Button variant="secondary" onClick={() => go(-1)}>
-              <ChevronLeft /> Previous
+
+          {/* transport + step dots */}
+          <div className="flex items-center justify-between gap-3">
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => jump(0)} title="First slide">
+              <SkipBack />
             </Button>
-            <Button onClick={() => go(1)}>
-              Next <ChevronRight />
+            <div className="flex flex-1 items-center justify-center gap-3">
+              <Button variant="secondary" onClick={() => go(-1)}>
+                <ChevronLeft /> Prev
+              </Button>
+              <div className="text-center">
+                <p className="text-sm font-medium tabular-nums">
+                  {pos.h + 1} <span className="text-neutral-500">/ {total}</span>
+                </p>
+                {steps > 1 ? (
+                  <div className="mt-1 flex justify-center gap-1">
+                    {Array.from({ length: steps }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          "h-1.5 w-4 rounded-full transition-colors",
+                          i <= pos.f ? "bg-primary" : "bg-white/15"
+                        )}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <Button onClick={() => go(1)}>
+                Next <ChevronRight />
+              </Button>
+            </div>
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => jump(nContent)} title="Last slide">
+              <SkipForward />
             </Button>
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => mainRef.current?.requestFullscreen?.()}>
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={toggleBlackout} title="Blackout (B)">
+              <Square className={blackout ? "fill-current" : ""} />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => mainRef.current?.requestFullscreen?.()} title="Fullscreen (F)">
               <Maximize2 />
             </Button>
           </div>
         </div>
 
-        {/* Notes + next */}
-        <aside className="flex min-h-0 flex-col gap-3 border-l border-white/10 p-3">
-          <div>
-            <p className="mb-1 text-xs uppercase tracking-wide text-neutral-400">Next</p>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              {nextSlide ? (
-                <>
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="text-xs text-neutral-400">Slide {pos.h + 2}</span>
-                    {nextSlide.variant || nextSlide.family ? (
-                      <Badge variant="secondary" className="bg-white/10 text-neutral-200">
-                        {nextSlide.variant || nextSlide.family}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="line-clamp-2 text-sm font-medium">{nextSlide.title}</p>
-                  <ul className="mt-1 space-y-0.5 text-xs text-neutral-400">
-                    {(nextSlide.bullets ?? []).slice(0, 3).map((b, i) => (
-                      <li key={i} className="line-clamp-1">• {b}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="text-sm text-neutral-500">End of deck</p>
-              )}
+        {/* ── right rail ────────────────────────────────────────────────── */}
+        <aside className="flex min-h-0 flex-col gap-3 border-t border-white/10 p-3 lg:border-l lg:border-t-0">
+          {/* timer */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-mono text-4xl font-semibold tabular-nums text-neutral-50">
+                  {fmt(elapsed)}
+                </p>
+                <p className="mt-0.5 text-xs text-neutral-500">elapsed · {now}</p>
+              </div>
+              <div className="flex gap-1">
+                <Button size="icon" variant="ghost" className="size-8 text-neutral-300 hover:bg-white/10" onClick={() => setRunning((r) => !r)} title="Play / pause (P)">
+                  {running ? <Pause /> : <Play />}
+                </Button>
+                <Button size="icon" variant="ghost" className="size-8 text-neutral-300 hover:bg-white/10" onClick={() => setElapsed(0)} title="Reset (R)">
+                  <RotateCcw />
+                </Button>
+              </div>
             </div>
           </div>
 
+          {/* next */}
+          <div>
+            <p className="mb-1 text-xs uppercase tracking-wide text-neutral-400">Next</p>
+            {nextSlide ? (
+              <SlideMini slide={nextSlide} index={pos.h + 2} className="border-primary/25 bg-primary/[0.06]" />
+            ) : (
+              <div className="rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-neutral-500">
+                End of deck
+              </div>
+            )}
+          </div>
+
+          {/* notes */}
           <div className="flex min-h-0 flex-1 flex-col">
-            <p className="mb-1 text-xs uppercase tracking-wide text-neutral-400">Speaker notes</p>
-            <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-white/10 bg-white/5 p-3">
+            <p className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-neutral-400">
+              Speaker notes
+              {curSlide?.summary_directive ? (
+                <span className="rounded bg-white/10 px-1.5 py-px text-[10px] tracking-normal">
+                  {curSlide.summary_directive}
+                </span>
+              ) : null}
+            </p>
+            <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-white/10 bg-white/[0.03] p-3">
               <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-neutral-200">
-                {notes || "—"}
+                {notes}
               </pre>
             </div>
           </div>
-
-          {curSlide?.transition ? (
-            <p className="text-xs text-neutral-500">
-              Transition in: <span className="text-neutral-300">{curSlide.transition}</span>
-              {curSlide.summary_directive ? ` · ${curSlide.summary_directive}` : ""}
-            </p>
-          ) : null}
         </aside>
+      </div>
+
+      {/* ── filmstrip (jump to slide) ───────────────────────────────────── */}
+      <div ref={filmRef} className="flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 bg-neutral-950 p-2">
+        <button
+          data-h="0"
+          onClick={() => jump(0)}
+          className={cn(
+            "w-28 shrink-0 rounded-md border p-2 text-left text-[10px] transition-colors",
+            pos.h === 0 ? "border-primary bg-primary/10" : "border-white/10 hover:bg-white/[0.06]"
+          )}
+        >
+          <span className="text-neutral-400">Title</span>
+          <p className="mt-1 line-clamp-2 font-medium text-neutral-100">
+            {deck?.summary?.source_name || "Learnova"}
+          </p>
+        </button>
+        {slides.map((s, i) => (
+          <button
+            key={s.index ?? i}
+            data-h={i + 1}
+            onClick={() => jump(i + 1)}
+            className={cn(
+              "w-28 shrink-0 rounded-md border p-2 transition-colors",
+              pos.h === i + 1 ? "border-primary bg-primary/10" : "border-white/10 hover:bg-white/[0.06]"
+            )}
+          >
+            <SlideMini slide={s} index={i + 1} className="border-0 bg-transparent p-0" />
+          </button>
+        ))}
       </div>
 
       {error ? <p className="bg-red-950/60 px-4 py-2 text-sm text-red-300">{error}</p> : null}
