@@ -52,6 +52,8 @@ export default function Create() {
   const [wantPptx, setWantPptx] = useState(true);
   const [wantHtml, setWantHtml] = useState(true);
   const [enrich, setEnrich] = useState(true);
+  const [themes, setThemes] = useState([]);
+  const [themeId, setThemeId] = useState("auto");
 
   const [phase, setPhase] = useState("input"); // input | review | generating | done
   const [error, setError] = useState("");
@@ -59,6 +61,9 @@ export default function Create() {
   const poll = useRef(null);
 
   useEffect(() => () => clearInterval(poll.current), []);
+  useEffect(() => {
+    api.listThemes().then((r) => setThemes(r.themes || [])).catch(() => {});
+  }, []);
 
   const loadMarkdown = useCallback(async (id) => {
     const md = await api.getMarkdown(id);
@@ -130,7 +135,7 @@ export default function Create() {
         .map((n) => parseInt(n, 10))
         .filter((n) => Number.isInteger(n) && n > 0);
       await api.startGenerate(job.id, {
-        theme_id: "auto",
+        theme_id: themeId,
         quiz_frequency: Number(quizFreq),
         quiz_style: quizStyle,
         quiz_positions: positions.length ? positions : null,
@@ -319,6 +324,39 @@ export default function Create() {
                     a full checkpoint slide goes in after each
                   </span>
                 </div>
+
+                {themes.length ? (
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Theme
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {themes.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setThemeId(t.id)}
+                          title={t.name}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
+                            themeId === t.id
+                              ? "border-primary bg-primary/10"
+                              : "hover:bg-muted/60"
+                          )}
+                        >
+                          {t.primary ? (
+                            <span className="flex gap-0.5">
+                              <span className="size-3 rounded-full" style={{ background: t.primary }} />
+                              <span className="size-3 rounded-full" style={{ background: t.secondary }} />
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">✦</span>
+                          )}
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
