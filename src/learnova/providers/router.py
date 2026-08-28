@@ -47,6 +47,8 @@ import os as _os
 # returning 404 for newer accounts). Make it overridable and default to a
 # currently-GA fast model.
 _GROQ_MODEL = _os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+# NVIDIA rotates ids too; one env var drives every task.
+_NVIDIA_MODEL = _os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
 
 # Per-provider default model for each task.
 TASK_MODEL: Dict[str, Dict[str, str]] = {
@@ -63,11 +65,11 @@ TASK_MODEL: Dict[str, Dict[str, str]] = {
     # runs once per chunk. `meta/llama-3.3-70b-instruct` was measured at 158 s
     # per call on this endpoint and is not usable as a failover target.
     "nvidia": {
-        TASK_LAYOUT: "meta/llama-3.1-8b-instruct",
-        TASK_IMPROVE: "nvidia/nemotron-3-ultra-550b-a55b",
-        TASK_QUIZ: "nvidia/nemotron-3-ultra-550b-a55b",
-        TASK_ENHANCE: "nvidia/nemotron-3-ultra-550b-a55b",
-        TASK_DIAGRAM: "meta/llama-3.1-8b-instruct",
+        TASK_LAYOUT: _NVIDIA_MODEL,
+        TASK_IMPROVE: _NVIDIA_MODEL,
+        TASK_QUIZ: _NVIDIA_MODEL,
+        TASK_ENHANCE: _NVIDIA_MODEL,
+        TASK_DIAGRAM: _NVIDIA_MODEL,
     },
 }
 
