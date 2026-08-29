@@ -94,16 +94,18 @@ PROFILES: Dict[str, DensityProfile] = {
     "medium": DensityProfile(
         id="medium",
         label="Medium — balanced (default)",
-        description="Five points per slide, each a full teaching sentence, "
-                    "with one supporting example. Teaching and self-study.",
-        max_bullets=5,
+        description="Seven points per slide, each a full teaching sentence — "
+                    "a real lecture slide, not a headline. Teaching and self-study.",
+        # A proper lecture PPTX carries 6-9 points per slide, not 3. Fewer,
+        # fuller slides beat a run of near-empty "(1/6)" continuations.
+        max_bullets=7,
         # A complete teaching point keeps its reasoning ("... because ...",
         # "... so that ..."). 20 words clipped that mid-clause; 30 does not.
-        max_words_per_bullet=30,
-        max_chars_per_bullet=210,
-        max_table_rows=6,
-        max_flow_steps=4,
-        max_grid_cards=4,
+        max_words_per_bullet=32,
+        max_chars_per_bullet=240,
+        max_table_rows=8,
+        max_flow_steps=5,
+        max_grid_cards=6,
         include_enhancement=True,
         enhancement_items=1,
     ),
@@ -125,13 +127,13 @@ PROFILES: Dict[str, DensityProfile] = {
     "heavy": DensityProfile(
         id="heavy",
         label="Heavy — study notes",
-        description="Eight longer bullets plus examples, analogies and "
-                    "revision points. Handouts meant to be read alone.",
-        max_bullets=8,
-        max_words_per_bullet=32,
-        max_chars_per_bullet=220,
-        max_table_rows=10,
-        max_flow_steps=6,
+        description="Ten full bullets plus examples, analogies and revision "
+                    "points. Handouts meant to be read alone.",
+        max_bullets=10,
+        max_words_per_bullet=38,
+        max_chars_per_bullet=280,
+        max_table_rows=12,
+        max_flow_steps=7,
         max_grid_cards=4,
         include_enhancement=True,
         enhancement_items=3,
@@ -476,6 +478,65 @@ def _partial_mermaid(steps: List[str]) -> str:
     return f"graph LR\n  {chain}"
 
 
+def _real_bullets(im: dict) -> list:
+    out = []
+    for b in (im.get("bullets") or []):
+        s = str(b).strip()
+        # a lone title echo or a stray page number is not content
+        if len(s.split()) >= 3 and not re.fullmatch(r"\d+\s.*", s):
+            out.append(s)
+    return out
+
+
+def _has_content(improved: dict, original: dict) -> bool:
+    """True when a slide has something to show — real bullets, a table, a
+    metric, a diagram, a quiz, or a figure with a meaningful caption. A bare
+    heading (even one with a mis-anchored decorative image) is not a slide."""
+    im = improved or {}
+    if _real_bullets(im):
+        return True
+    if im.get("table_rows") or str(im.get("metric_value", "")).strip():
+        return True
+    if im.get("mermaid_code") or im.get("question") or im.get("flowchart_spec"):
+        return True
+    if str(im.get("takeaway", "")).strip():
+        return True
+    # An image-only slide survives only if its title is a real topic name, not a
+    # generic label ("Course Contents:", "Section 4", "Overview").
+    img = (original or {}).get("image")
+    title = str(im.get("title", "")).strip().rstrip(":")
+    generic = re.fullmatch(
+        r"(section|page|slide|overview|contents?|course contents?|agenda|outline|index)\s*\d*",
+        title, re.I,
+    )
+    return bool(img) and not generic
+
+
+def _drop_empty_and_fold_titles(deck: List[dict]) -> List[dict]:
+    """
+    Drop content-less slides. If a dropped slide had a distinct heading, carry
+    that heading onto the next slide as a lead line so the topic name is not
+    lost. Keeps a single deliberate section divider if it is followed by real
+    content under a *different* title.
+    """
+    out: List[dict] = []
+    carried_title = None
+    for entry in deck:
+        im = entry.get("improved") or {}
+        orig = entry.get("original") or {}
+        if _has_content(im, orig):
+            if carried_title and not str(im.get("title", "")).strip():
+                im = {**im, "title": carried_title}
+                entry = {**entry, "improved": im}
+            carried_title = None
+            out.append(entry)
+        else:
+            t = str(im.get("title", "")).strip()
+            if t and not re.fullmatch(r"(section|page|slide)\s*\d+", t, re.I):
+                carried_title = t
+    return out
+
+
 def apply_density(deck: List[dict], density: str,
                   enhanced_by_index: Dict[int, Any] | None = None) -> List[dict]:
     """
@@ -491,9 +552,14 @@ def apply_density(deck: List[dict], density: str,
     for index, entry in enumerate(deck):
         out.extend(paginate_slide(entry, profile, enhanced_by_index.get(index)))
 
+    before_drop = len(out)
+    out = _drop_empty_and_fold_titles(out)
+    if before_drop != len(out):
+        logger.info("density: dropped %d empty slide(s)", before_drop - len(out))
+
     if len(out) != len(deck):
         logger.info(
-            "density '%s': %d slide(s) expanded to %d after overflow",
+            "density '%s': %d slide(s) -> %d after overflow/cleanup",
             profile.id, len(deck), len(out),
         )
     return out

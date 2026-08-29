@@ -152,8 +152,10 @@ def split_sections(markdown: str, max_level: int = 2) -> List[Dict[str, Any]]:
 
 
 # A merged section beyond this size stops being one topic and becomes an
-# unreadable dump, so merging stops and a fresh part is started.
-_MAX_MERGED_SECTION_CHARS = 1800
+# unreadable dump. The density stage then paginates it into "Topic (2/4)".
+# Generous, because a lecture topic ("Applications of NLP") legitimately spans
+# 6-10 slide pages and should read as ONE numbered run, not six "(1/2)" pairs.
+_MAX_MERGED_SECTION_CHARS = 6000
 
 
 def _merge_repeated_titles(sections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -392,6 +394,33 @@ def is_multi_column_pdf(path: str, sample_pages: int = 4) -> bool:
         return False
 
 
+def is_slide_style_pdf(path: str) -> bool:
+    """
+    True when a PDF is a slide deck exported to PDF — many pages, each with only
+    a headline and a few bullets. AnyDoc merges these pages and drops structure;
+    the native page-per-slide parser keeps one slide per page, which is what a
+    lecture deck needs.
+    """
+    try:
+        import fitz
+    except ImportError:
+        return False
+    try:
+        with fitz.open(path) as doc:
+            n = len(doc)
+            if n < 12:
+                return False
+            sample = list(range(0, n, max(1, n // 15)))[:15]
+            light = 0
+            for i in sample:
+                words = len(re.findall(r"\S+", doc[i].get_text("text")))
+                if words <= 140:
+                    light += 1
+            return light >= 0.7 * len(sample)
+    except Exception:
+        return False
+
+
 _OCR_MARKER = re.compile(
     r"^\s*\[*\s*(?:Extracted\s+OCR|OCR\s+Transcription|OCR\s*&\s*Image|"
     r"Image\s+Diagram\s+Content|Local)\b.*$",
@@ -607,6 +636,77 @@ def _extract_native_assets(path: str, ext: str, textbook_mode: bool) -> List[dic
     return assets
 
 
+# Any stack of list markers a parser may leave: "- ", "- • ", "- - • ", "Ø ",
+# "1. ", "a) " …
+_BULLET_LEAD = re.compile(
+    r"^\s*(?:[-*+]\s*)*(?:[•●▪◦‣▶►➢➤»]\s*)*"
+    r"(?:\d+[.)]\s+|[a-hA-H][.)]\s+)?",
+)
+_MARKER_ONLY = re.compile(r"^[\s\-*+•●▪◦‣·]+$")
+_SENT_END = re.compile(r"[.!?:;]$|[.!?][\"'”’)\]]$")
+
+
+def _reflow_slide_body(body: str, title: str) -> List[str]:
+    """
+    Turn one PDF/PPTX slide's raw text (which the parser gives line-by-line,
+    broken at the visual line width) into clean bullet lines:
+
+    * strip stacked list markers ("- - • foo" -> "foo");
+    * rejoin a line that was wrapped mid-sentence with its continuation;
+    * fix "word ," / "word ." spacing that PyMuPDF leaves between spans;
+    * drop a sub-heading that just repeats the slide title.
+    """
+    title_norm = re.sub(r"[^a-z0-9]", "", (title or "").lower())
+    raw_lines = [l.rstrip() for l in (body or "").splitlines()]
+
+    items: List[str] = []
+    buf = ""
+
+    def _flush():
+        nonlocal buf
+        s = re.sub(r"\s+([,.;:!?)”’])", r"\1", buf).strip()
+        s = re.sub(r"([(“‘])\s+", r"\1", s)
+        s = re.sub(r"\s{2,}", " ", s).strip(" -•·–—")
+        if s and re.sub(r"[^a-z0-9]", "", s.lower()) != title_norm and len(s) > 1:
+            items.append(s)
+        buf = ""
+
+    for raw in raw_lines:
+        line = raw.strip()
+        if not line or line in {"[TABLE DATA]", "(No readable text on this slide)"}:
+            continue
+        if line.startswith("## ") or line.startswith("### "):
+            frag = line.lstrip("#").strip()
+            if re.sub(r"[^a-z0-9]", "", frag.lower()) == title_norm:
+                continue  # duplicate of the slide title
+            _flush()
+            buf = frag
+            _flush()
+            continue
+        if _MARKER_ONLY.match(line):
+            continue
+
+        lead = _BULLET_LEAD.match(line).group(0)
+        has_marker = bool(re.search(r"[-*+•●▪◦‣▶►➢➤»]|\d+[.)]|[a-h][.)]", lead))
+        content = line[len(lead):].strip()
+        if not content:
+            continue
+
+        if has_marker:                     # a new list item begins
+            _flush()
+            buf = content
+        elif not buf:                      # first line of the slide, no marker
+            buf = content
+        elif _SENT_END.search(buf):        # previous item finished — new line is its own
+            _flush()
+            buf = content
+        else:                              # wrapped continuation of the current item
+            buf = f"{buf} {content}"
+
+    _flush()
+    return items
+
+
 def _native_to_markdown(path: str, ext: str, textbook_mode: bool = False):
     """Convert via the existing parsers, flattening their output to markdown."""
     from learnova.parsers.pdf_parser import parse_pdf, parse_textbook_pdf
@@ -622,22 +722,25 @@ def _native_to_markdown(path: str, ext: str, textbook_mode: bool = False):
     lines: List[str] = []
     for unit in document.slide_units:
         title = (unit.title or "").strip() or f"Section {unit.id + 1}"
+        body = (unit.text or "").strip()
+        items = _reflow_slide_body(body, title)
+        # A table the parser flagged is kept as a pipe block for split_sections.
+        table_rows = [l for l in (body or "").splitlines() if " | " in l]
+
+        # Only keep a real table: 2+ data rows that each have 2+ non-empty
+        # cells. PyMuPDF's table finder fires on any aligned bullet layout.
+        real_table = [
+            r for r in table_rows
+            if sum(1 for c in r.split(" | ") if c.strip() and c.strip() not in "•-*") >= 2
+        ]
         lines.append(f"## {title}")
         lines.append("")
-
-        body = (unit.text or "").strip()
-        if body and body != "(No readable text on this slide)":
-            for raw in body.splitlines():
-                stripped = raw.strip()
-                if not stripped or stripped == "[TABLE DATA]":
-                    continue
-                if stripped.startswith("## "):
-                    lines.append(f"### {stripped[3:]}")
-                elif " | " in stripped:
-                    lines.append(f"| {stripped} |")
-                else:
-                    lines.append(f"- {stripped}")
-            lines.append("")
+        for it in items:
+            lines.append(f"- {it}")
+        if len(real_table) >= 2:
+            for row in real_table:
+                lines.append(f"| {row.strip()} |")
+        lines.append("")
 
     return _clean_markdown("\n".join(lines).strip()), document
 
@@ -685,11 +788,16 @@ def convert_to_markdown(
             assets=assets,
         )
 
-    # AnyDoc has no column awareness, so a multi-column PDF must go native.
+    # AnyDoc has no column awareness and merges slide pages, so a multi-column
+    # PDF or a slide deck exported to PDF must go through the native parser.
     use_anydoc = prefer_anydoc
-    if use_anydoc and ext == ".pdf" and is_multi_column_pdf(str(file_path)):
-        logger.info("%s is multi-column — using the column-aware native parser", name)
-        use_anydoc = False
+    if use_anydoc and ext == ".pdf":
+        if is_multi_column_pdf(str(file_path)):
+            logger.info("%s is multi-column — using the native parser", name)
+            use_anydoc = False
+        elif is_slide_style_pdf(str(file_path)):
+            logger.info("%s is a slide deck PDF — using the page-per-slide native parser", name)
+            use_anydoc = False
 
     if use_anydoc:
         markdown = _convert_with_anydoc(str(file_path))

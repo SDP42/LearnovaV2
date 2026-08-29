@@ -8,13 +8,17 @@ exits and Python GC destroys the GroqProvider (httpx client), those background t
 macOS with exit code 139 (SIGSEGV). Sequential processing with singleton provider is safe.
 """
 
+import os
+
 from learnova.ai.layout_router import classify_and_structure_chunk
 from learnova.logging_config import logger
 
-MAX_CHUNKS = 60
+MAX_CHUNKS = 80
 
 
 def _provider_available() -> bool:
+    if os.getenv("LEARNOVA_NO_LLM", "").lower() in {"1", "true", "yes", "on"}:
+        return False
     try:
         from learnova.providers.router import get_router
 

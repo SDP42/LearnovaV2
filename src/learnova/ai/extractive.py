@@ -179,11 +179,16 @@ def compress_bullet(sentence: str, target_words: int = 16) -> str:
 
 
 def _should_summarise(sentences: List[str], text: str) -> bool:
-    """Keep short definitional passages almost verbatim; summarise the rest."""
+    """
+    Restructure, don't summarise. We only ever *compress individual over-long
+    sentences* — we never drop whole sentences. So this returns True (do the
+    light per-sentence compression) unless the passage is already tight.
+    """
     wc = len(text.split())
-    if len(sentences) <= 3 and wc <= 60:
+    if len(sentences) <= 4 and wc <= 90:
         return False
-    if re.search(r"\bis defined as\b|\brefers to\b|\bmeans that\b", text, re.I) and len(sentences) <= 4:
+    if re.search(r"\bis defined as\b|\brefers to\b|\bmeans that\b|\bstates that\b",
+                 text, re.I) and len(sentences) <= 5:
         return False
     return True
 
@@ -195,14 +200,20 @@ def heuristic_layout(text: str, bullets: List[str]) -> str:
     ordinals = len(_ORDINAL.findall(lower))
     if ordinals >= 3 or re.search(r"step\s*1\b.*step\s*2\b", lower, re.S):
         return "FLOWCHART"
-    if re.search(r"\bvs\.?\b|\bversus\b|\bcompared? (?:to|with)\b|\bwhereas\b", lower):
+    # TABLE only for a genuine two-thing comparison — several "A vs B" cues AND
+    # roughly parallel bullets. One stray "whereas" in a narrative is not a table.
+    vs_cues = len(re.findall(r"\bvs\.?\b|\bversus\b|\bwhereas\b|on the other hand", lower))
+    if vs_cues >= 2 and 3 <= len(bullets) <= 10:
         return "TABLE"
-    if len(re.findall(r"\b\d{1,3}(?:\.\d+)?\s?%|\b\d+\s?(?:percent)\b", lower)) >= 3:
+    pcts = len(re.findall(r"\b\d{1,3}(?:\.\d+)?\s?%|\b\d+\s?percent\b", lower))
+    if pcts >= 3 and pcts >= 0.5 * max(1, len(bullets)):
         return "TABLE"
     if len(re.findall(r"\b\d{1,3}(?:\.\d+)?\s?%", lower)) == 1 and len(joined.split()) < 40:
         return "METRIC"
+    # A card grid is for 3-6 *parallel pillars*. A long flat list of "Label:
+    # detail" items (20 NLP applications) is a bullet slide, not 5 card grids.
     labelled = sum(1 for b in bullets if re.match(r"^[A-Z][\w /&.\-]{1,32}:\s", b))
-    if labelled >= 3:
+    if 3 <= labelled <= 6 and len(bullets) <= 7:
         return "CARD_GRID"
     return "MINIMAL_TEXT"
 
@@ -246,8 +257,16 @@ def _list_items(text: str, title: str) -> List[str]:
 
 
 def structure_chunk(text: str, title: str = "", *,
-                    max_bullets: int = 5, target_words: int = 16) -> dict:
-    """The no-LLM replacement for a layout-router result."""
+                    max_bullets: int = 40, target_words: int = 26) -> dict:
+    """
+    The no-LLM replacement for a layout-router result.
+
+    Philosophy: **restructure, never summarise.** Every sentence in the source
+    becomes a bullet (the density stage paginates any overflow onto numbered
+    continuation slides — nothing is dropped). Only an individual sentence
+    longer than ~30 words is lightly compressed, and to ~26 words, so a
+    100-word paragraph lands at roughly 70-80, not 30.
+    """
     from learnova.textutils import strip_ocr_block
 
     text = strip_ocr_block(text)
@@ -291,29 +310,37 @@ def structure_chunk(text: str, title: str = "", *,
         }
 
     scores = _score_sentences(sentences, title)
-    summarise = _should_summarise(sentences, clean)
+    light_compress = _should_summarise(sentences, clean)
 
     top = max(range(len(sentences)), key=lambda i: scores[i])
 
-    if summarise:
-        n_keep = min(max_bullets, max(3, round(len(sentences) * 0.6)))
-        ranked = sorted(range(len(sentences)), key=lambda i: scores[i], reverse=True)
-        # The single best sentence becomes the takeaway; the rest are bullets.
-        keep = sorted(r for r in ranked[: n_keep + 1] if r != top)[:n_keep]
+    # Keep EVERY sentence, in original order. A pathologically long section
+    # (a whole merged chapter) is the only case we trim, and only to the
+    # highest-scoring 30 — the density stage then paginates those.
+    if len(sentences) > 30:
+        keep = sorted(sorted(range(len(sentences)),
+                             key=lambda i: scores[i], reverse=True)[:30])
     else:
         keep = list(range(len(sentences)))
 
     seen: set = set()
     bullets: List[str] = []
     for i in keep:
-        b = compress_bullet(sentences[i], target_words) if summarise else sentences[i].rstrip(".")
+        raw = sentences[i].rstrip(".")
+        # Only touch a sentence that is genuinely unwieldy; otherwise keep it
+        # whole so the explanation survives.
+        if light_compress and len(raw.split()) > 30:
+            b = compress_bullet(raw, target_words)
+        else:
+            b = _LEAD_MARKERS.sub("", raw, count=1).strip() or raw
+            b = (b[:1].upper() + b[1:]) if b else b
         key = re.sub(r"[^a-z0-9 ]", "", b.lower())[:55]
         if b and key not in seen and len(b.split()) >= 3:
             seen.add(key)
             bullets.append(b)
 
     takeaway = ""
-    if summarise and len(bullets) >= 2:
+    if light_compress and len(bullets) >= 3:
         cand = compress_bullet(sentences[top], 22)
         if cand and re.sub(r"[^a-z0-9]", "", cand.lower())[:40] not in {
             re.sub(r"[^a-z0-9]", "", b.lower())[:40] for b in bullets
@@ -327,7 +354,7 @@ def structure_chunk(text: str, title: str = "", *,
         "title": (title or bullets[0][:60] if bullets else "Overview").strip(),
         "bullets": bullets or [clean[:240]],
         "takeaway": takeaway,
-        "verbatim": [] if summarise else bullets,
+        "verbatim": [] if light_compress else bullets,
         "visual_source": "extractive",
     }
     if layout == "FLOWCHART":
