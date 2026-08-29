@@ -377,6 +377,32 @@ def generate(
                 imp["takeaway"] = ""
             else:
                 seen_tk.add(norm)
+
+        # Consecutive slides the LLM gave the *same* title (it splits a sparse
+        # title/intro page into 2-3 chunks and labels each one "Unit 1: ...").
+        # Fold them into the first so the deck opens with one clean slide.
+        def _tnorm(s: str) -> str:
+            return re.sub(r"[^a-z0-9 ]", "", re.sub(r"\s+", " ", str(s).lower())).strip()
+
+        merged: list = []
+        for entry in result.improved:
+            imp = entry.get("improved") or {}
+            if merged:
+                prev = merged[-1].get("improved") or {}
+                pt, ct = _tnorm(prev.get("title")), _tnorm(imp.get("title"))
+                if pt and pt == ct:
+                    pb = list(prev.get("bullets") or [])
+                    seen_b = {_tnorm(b) for b in pb}
+                    for b in imp.get("bullets") or []:
+                        if _tnorm(b) not in seen_b:
+                            pb.append(b)
+                            seen_b.add(_tnorm(b))
+                    prev["bullets"] = pb
+                    if not str(prev.get("takeaway", "")).strip():
+                        prev["takeaway"] = imp.get("takeaway", "")
+                    continue
+            merged.append(entry)
+        result.improved = merged
         return len(result.improved)
 
     runner.run("layout", _layout, critical=True)

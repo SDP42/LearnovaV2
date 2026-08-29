@@ -414,11 +414,33 @@ def _restore_dropped_points(bullets: list[str], source: str) -> list[str]:
     if not candidates:
         return bullets
 
+    _STOP = {"the", "a", "an", "of", "to", "and", "or", "in", "on", "for", "is",
+             "are", "was", "were", "be", "as", "at", "by", "it", "its", "this",
+             "that", "these", "those", "with", "from", "which", "such"}
+
+    def _content_words(s: str) -> set:
+        return {w for w in re.findall(r"[a-z0-9]+", s.lower()) if w not in _STOP and len(w) > 2}
+
+    covered = [_content_words(b) for b in bullets]
+
+    def _already_said(cw: set) -> bool:
+        if not cw:
+            return True
+        for other in covered:
+            if other and len(cw & other) >= 0.7 * len(cw):
+                return True
+        return False
+
     restored = list(bullets)
     for sentence in candidates:
         cleaned = clean_bullet(sentence)
-        if cleaned and not is_redundant(cleaned, restored):
-            restored.append(cleaned)
+        if not cleaned or is_redundant(cleaned, restored):
+            continue
+        cw = _content_words(cleaned)
+        if _already_said(cw):
+            continue
+        restored.append(cleaned)
+        covered.append(cw)
 
     if len(restored) > len(bullets):
         logger.info(
@@ -566,7 +588,7 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
 
         # ── Attempt 1: full prompt ────────────────────────────────────────────
         logger.info("[%s] START — title=%r", stage, current_title[:40] if current_title else "")
-        user_prompt = f"Title: {current_title}\nText:\n{text[:1200]}"
+        user_prompt = f"Title: {current_title}\nText:\n{text[:3500]}"
         if ocr_hint:
             user_prompt += f"\n\n(A figure on this slide reads: {ocr_hint[:300]})"
         raw1: Optional[str] = None
@@ -594,7 +616,7 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
             retry_prompt = (
                 f"Classify this educational text into one of: "
                 f"FLOWCHART, TABLE, METRIC, CARD_GRID, MINIMAL_TEXT.\n"
-                f"Text: {text[:600]}\n"
+                f"Text: {text[:1500]}\n"
                 f"Return ONLY JSON, nothing else."
             )
             raw2: Optional[str] = None
@@ -629,6 +651,7 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
         # continuity contract in docs/PPT_RULES.md says overflow moves to a
         # continuation slide, and it cannot if the content is already gone.
         bullets = dedupe_bullets([str(b) for b in data.get("bullets", [])])
+        _llm_bullets_raw = list(bullets)  # before restoration inflates the count
         bullets = _restore_dropped_points(bullets, text)
 
         result: dict = {
@@ -636,7 +659,29 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
             "title": title,
             "takeaway": takeaway,
             "bullets": bullets,
+            # What the model itself produced, so the improver can tell whether it
+            # over-summarised (and swap in extractive bullets) even after the
+            # restore pass padded the list back out.
+            "_llm_bullets_raw": _llm_bullets_raw,
         }
+
+        # gpt-oss-20b loves to call definitional prose a FLOWCHART. Only keep
+        # that verdict when the text actually reads like an ordered process.
+        if layout_type == "FLOWCHART":
+            _low = text.lower()
+            _proc = (
+                bool(re.search(r"^\s*(?:step\s*\d|\d+[.)]\s)", text, re.M))
+                or len(re.findall(r"\b(?:then|next|after that|finally|first|second|third)\b", _low)) >= 2
+                or len(re.findall(r"->|→|⟶|=>", text)) >= 1
+                or len(re.findall(r"\b(?:phase|stage)s?\b", _low)) >= 2
+            )
+            if not _proc:
+                fallback = _heuristic_layout_type(text)
+                logger.info(
+                    "[%s] LLM said FLOWCHART but no process cues — using %r", stage, fallback,
+                )
+                layout_type = fallback if fallback != "FLOWCHART" else "MINIMAL_TEXT"
+                result["layout_type"] = layout_type
 
         # ── Layout-specific extras ────────────────────────────────────────────
         if layout_type == "FLOWCHART":

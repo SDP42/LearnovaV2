@@ -15,6 +15,45 @@ from learnova.logging_config import logger
 
 MAX_CHUNKS = 80
 
+# Source words the bulletiser must retain. The LLM (esp. small reasoning models)
+# still over-summarises even when told not to — 8 sentences in, 3 bullets out.
+# When its bullets carry less than this fraction of the extractive baseline's
+# word count we keep the LLM's layout/title/visual decisions but swap in the
+# extractive bullets, which keep every sentence with only light compression.
+_MIN_RETENTION_VS_EXTRACTIVE = float(os.getenv("LEARNOVA_MIN_RETENTION", "0.72"))
+
+
+def _wc(bullets) -> int:
+    return sum(len(str(b).split()) for b in (bullets or []))
+
+
+def _reconcile_with_extractive(improved: dict, chunk_text: str, chunk_title: str) -> dict:
+    """Guarantee content retention: fall back to extractive bullets when the
+    LLM dropped too much, without losing its layout/visual choices."""
+    try:
+        from learnova.ai.extractive import structure_chunk as _sc
+
+        base = _sc(chunk_text, chunk_title)
+    except Exception:
+        return improved
+
+    # Judge the model on what it actually wrote, not on the restore-padded list.
+    raw = improved.get("_llm_bullets_raw")
+    llm_wc = _wc(raw if raw is not None else improved.get("bullets"))
+    base_wc = _wc(base.get("bullets"))
+    improved.pop("_llm_bullets_raw", None)
+    if base_wc and llm_wc < _MIN_RETENTION_VS_EXTRACTIVE * base_wc:
+        logger.info(
+            "[improver] LLM bullets kept %d/%d words (<%.0f%%) — using extractive bullets for %r",
+            llm_wc, base_wc, _MIN_RETENTION_VS_EXTRACTIVE * 100, chunk_title[:40],
+        )
+        merged = dict(improved)
+        merged["bullets"] = base.get("bullets") or improved.get("bullets")
+        if not str(merged.get("takeaway", "")).strip():
+            merged["takeaway"] = base.get("takeaway", "")
+        return merged
+    return improved
+
 
 def _provider_available() -> bool:
     if os.getenv("LEARNOVA_NO_LLM", "").lower() in {"1", "true", "yes", "on"}:
@@ -53,6 +92,7 @@ def improve_chunks(chunks: list[dict]) -> list[dict]:
                 improved = structure_chunk(chunk_text, chunk_title)
             else:
                 improved = classify_and_structure_chunk(chunk_text, chunk_title)
+                improved = _reconcile_with_extractive(improved, chunk_text, chunk_title)
         except Exception as e:
             logger.error("Error structuring chunk %d: %s", chunk.get("id", i), e)
             from learnova.ai.extractive import structure_chunk as _sc

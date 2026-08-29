@@ -257,7 +257,12 @@ class TestPipelineDensity:
         from learnova.parsers.markdown_converter import from_typed_text
         from learnova.pipeline import PipelineConfig, generate
 
+        # Pad past the 2000-char "short typed input" threshold so the pipeline
+        # honours the requested density instead of auto-promoting to teaching.
         source = "## Photosynthesis\n" + "".join(f"- {b}\n" for b in LONG_BULLETS)
+        source += "\n\n## Notes\n" + "".join(
+            f"- {b}\n" for b in LONG_BULLETS
+        ) * (1 + 2200 // max(1, len(source)))
         result = generate(
             from_typed_text(source, "Density"),
             PipelineConfig(
