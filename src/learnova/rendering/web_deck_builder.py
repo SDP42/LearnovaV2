@@ -418,10 +418,13 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         # ── 6. DEFAULT MINIMAL TEXT LAYOUT ───────────────────────────────────
         else:
             bullets = imp.get("bullets", [])
-            b_items = _bullets_html(bullets, "margin-bottom:12px;")
+            n = len(bullets)
+            fs = "1.05rem" if n <= 4 else ("0.95rem" if n <= 6 else "0.86rem")
+            lh = "1.55" if n <= 5 else "1.4"
+            b_items = _bullets_html(bullets, f"margin-bottom:{'10px' if n <= 5 else '7px'};")
             slide_body = f"""
-            <div style="text-align:left; margin-top:20px; font-size:1.1rem; line-height:1.6;">
-                <ul>{b_items}</ul>
+            <div style="text-align:left; margin-top:14px; font-size:{fs}; line-height:{lh};">
+                <ul style="padding-left:22px; list-style:disc;">{b_items}</ul>
             </div>
             """
 
@@ -432,16 +435,19 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         </div>
         """ if takeaway_text else ""
 
-        # Slide wrapper
+        # Slide wrapper. The body is a single .lv-body block so the auto-fit
+        # script can scale it down when a dense slide would overflow.
         slides_html_list.append(f"""
         <section data-transition="{slide_transition}" style="text-align:left;">
-            <div style="border-bottom:3px solid {theme.primary_hex}; padding-bottom:10px;">
-                <h2 style="color:{theme.primary_hex}; font-family:'{theme.heading_font}', sans-serif; font-size:2.2rem; margin:0; text-transform:uppercase;">{title_text}</h2>
+            <div style="border-bottom:3px solid {theme.primary_hex}; padding-bottom:8px; margin-bottom:6px;">
+                <h2 style="color:{theme.primary_hex}; font-family:'{theme.heading_font}', sans-serif; font-size:2rem; margin:0; text-transform:uppercase;">{title_text}</h2>
             </div>
+            <div class="lv-body">
             {slide_body}
             {image_block}
             {_inline_quiz_html(imp.get("inline_quiz"), theme)}
             {takeaway_html}
+            </div>
             {notes_html}
         </section>
         """)
@@ -520,6 +526,20 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             lvUpdateStepHud();
             if (window.Reveal && Reveal.sync) Reveal.sync();
         }};
+        // Presenter's own screen: keep fragment tracking (so Next advances the
+        // audience one point at a time) but SHOW every point + figure, dimming
+        // the ones the audience has not seen yet.
+        window.__presenterPeek = function () {{
+            window.__enableBuilds();
+            if (document.getElementById('lv-peek-style')) return;
+            var st = document.createElement('style');
+            st.id = 'lv-peek-style';
+            st.textContent =
+              '.reveal .slides section .fragment{{opacity:1!important;visibility:visible!important;}}'
+              + '.reveal .slides section .fragment:not(.visible):not(.current-fragment){{opacity:.32!important;}}'
+              + '.reveal figure,.reveal img{{opacity:1!important;visibility:visible!important;}}';
+            document.head.appendChild(st);
+        }};
 
         // Small "Step 2 / 5" heads-up + a toggle, bottom-right. Only meaningful
         // on slides that actually have build steps.
@@ -541,7 +561,16 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         Reveal.initialize({{
             controls: true,
             progress: true,
-            center: true,
+            // Content-heavy lecture slides: top-align (not vertically centred,
+            // which pushes an 8-bullet slide off both edges) and allow the deck
+            // to shrink further so nothing is clipped.
+            center: false,
+            width: 1180,
+            height: 740,
+            margin: 0.045,
+            minScale: 0.2,
+            maxScale: 1.6,
+            disableLayout: false,
             // Hash routing calls history.replaceState with the page URL, which
             // throws a SecurityError inside a blob: iframe (the embedded
             // preview / presenter view) and kills Reveal init. The deck is
@@ -559,6 +588,26 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         }});
 
         mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
+
+        // Auto-fit: if a slide's content is taller than the stage, scale its
+        // body down so nothing is clipped (a dense lecture slide with 8 points
+        // + a figure would otherwise overflow off the bottom).
+        function lvAutoFit(slide) {{
+            if (!slide) return;
+            var body = slide.querySelector('.lv-body');
+            if (!body) return;
+            body.style.transform = '';
+            var avail = slide.clientHeight - (slide.querySelector('h2') ? slide.querySelector('h2').offsetHeight : 0) - 30;
+            var need = body.scrollHeight;
+            if (need > avail && avail > 120) {{
+                var k = Math.max(0.62, avail / need);
+                body.style.transform = 'scale(' + k.toFixed(3) + ')';
+                body.style.transformOrigin = 'top left';
+                body.style.width = (100 / k).toFixed(1) + '%';
+            }}
+        }}
+        Reveal.on('ready', function (e) {{ lvAutoFit(e.currentSlide); }});
+        Reveal.on('slidechanged', function (e) {{ lvAutoFit(e.currentSlide); }});
 
         Reveal.on('ready', lvUpdateStepHud);
         Reveal.on('slidechanged', lvUpdateStepHud);

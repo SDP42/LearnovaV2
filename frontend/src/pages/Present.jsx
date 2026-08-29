@@ -260,7 +260,9 @@ export default function Present() {
                 className="h-full w-full"
                 onLoad={() => {
                   try {
-                    mainRef.current?.contentWindow?.__enableBuilds?.();
+                    // The presenter sees the whole slide (text + figures),
+                    // upcoming points dimmed; Next still steps the audience.
+                    mainRef.current?.contentWindow?.__presenterPeek?.();
                   } catch {
                     /* blob is same-origin */
                   }

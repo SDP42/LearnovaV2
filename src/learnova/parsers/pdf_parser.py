@@ -425,7 +425,11 @@ class PDFParser(BaseDocumentParser):
         word_count = sum(len(tb.text.split()) for tb in text_blocks)
 
         rendered_page_img = None
-        if (not visual_assets and has_image_blocks) or word_count < 30:
+        # Render a full-page image only for a genuinely scanned / image-only page
+        # — it has raster blocks and little or no extractable text. A sparse
+        # *text* slide (a title page, a section divider) has no image blocks and
+        # must not become a page screenshot.
+        if has_image_blocks and word_count < 30:
             rendered = _render_page_as_image(page)
             if rendered:
                 rendered_page_img = VisualAssetElement(

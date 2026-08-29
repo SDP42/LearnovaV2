@@ -692,16 +692,23 @@ def _reflow_slide_body(body: str, title: str) -> List[str]:
         if not content:
             continue
 
-        if has_marker:                     # a new list item begins
-            _flush()
-            buf = content
-        elif not buf:                      # first line of the slide, no marker
-            buf = content
-        elif _SENT_END.search(buf):        # previous item finished — new line is its own
-            _flush()
-            buf = content
-        else:                              # wrapped continuation of the current item
-            buf = f"{buf} {content}"
+        # A bullet char mid-line ("... foo. • bar ...") joins two items on one
+        # physical line — split them.
+        pieces = re.split(r"\s+[•●▪◦‣▶►➢➤]\s+", content)
+        for pi, piece in enumerate(pieces):
+            piece = piece.strip()
+            if not piece:
+                continue
+            if pi > 0 or has_marker:        # a new list item begins
+                _flush()
+                buf = piece
+            elif not buf:                   # first line of the slide, no marker
+                buf = piece
+            elif _SENT_END.search(buf):     # previous item finished
+                _flush()
+                buf = piece
+            else:                           # wrapped continuation
+                buf = f"{buf} {piece}"
 
     _flush()
     return items

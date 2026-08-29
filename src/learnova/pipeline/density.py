@@ -488,12 +488,24 @@ def _real_bullets(im: dict) -> list:
     return out
 
 
+def _echoes_title(bullet: str, title: str) -> bool:
+    bw = set(re.findall(r"[a-z]{3,}", (bullet or "").lower()))
+    tw = set(re.findall(r"[a-z]{3,}", (title or "").lower()))
+    if not bw:
+        return True
+    return len(bw & tw) / len(bw) >= 0.6
+
+
 def _has_content(improved: dict, original: dict) -> bool:
     """True when a slide has something to show — real bullets, a table, a
     metric, a diagram, a quiz, or a figure with a meaningful caption. A bare
     heading (even one with a mis-anchored decorative image) is not a slide."""
     im = improved or {}
-    if _real_bullets(im):
+    rb = _real_bullets(im)
+    # A single bullet that is really the title again is not content.
+    if len(rb) == 1 and _echoes_title(rb[0], str(im.get("title", ""))):
+        rb = []
+    if rb:
         return True
     if im.get("table_rows") or str(im.get("metric_value", "")).strip():
         return True
