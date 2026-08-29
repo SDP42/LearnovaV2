@@ -74,9 +74,9 @@ export default function Hero() {
           style={{ animationDelay: "0.84s" }}
         >
           {[
-            ["1000+", "addressable visuals"],
-            ["16", "diagram families"],
-            ["PSF", "engagement metric"],
+            ["40", "visual families"],
+            ["1 click", "per idea"],
+            ["2 files", "web deck + PPTX"],
           ].map(([v, l]) => (
             <span key={l} className="flex items-baseline gap-1.5">
               <span className="text-base font-semibold text-foreground">{v}</span> {l}

@@ -3,6 +3,7 @@ import { ArrowRight, Check, GraduationCap, Presentation, Users, X } from "lucide
 import LandingNav from "@/components/landing/LandingNav";
 import Hero from "@/components/landing/Hero";
 import FeatureBento from "@/components/landing/FeatureBento";
+import Reveal from "@/components/landing/Reveal";
 import { Button } from "@/components/ui/button";
 
 const STEPS = [
@@ -94,40 +95,102 @@ export default function Landing() {
       <Hero />
       <FeatureBento />
 
+      {/* before / after — the transform, shown not told */}
+      <section className="relative overflow-hidden border-t">
+        <div className="lv-dots absolute inset-0" />
+        <div className="relative mx-auto max-w-6xl px-4 py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-semibold tracking-tight">From a wall of text to a slide that teaches</h2>
+            <p className="mt-3 text-muted-foreground">
+              Same content. One paginated, one paced.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-5 md:grid-cols-2">
+            <div className="lv-card rounded-2xl p-6">
+              <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                <X className="size-3" /> Your source
+              </p>
+              <div className="rounded-lg border bg-muted/30 p-4 text-[13px] leading-relaxed text-muted-foreground">
+                The machine learning workflow begins by framing the problem and
+                choosing an evaluation metric, because that metric shapes every
+                later decision. Next you collect and label a representative
+                dataset, since the model can only learn from what it is shown.
+                You then split the data into training, validation and test sets
+                before doing anything else, so you never tune against data you
+                will later use to judge the model…
+              </div>
+            </div>
+            <div className="lv-card lv-glow-host relative overflow-hidden rounded-2xl p-6">
+              <div className="lv-glow left-1/2 top-0 h-[160px] w-[320px] -translate-x-1/2 opacity-40" />
+              <p className="relative mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                <Check className="size-3" /> Learnova
+              </p>
+              <p className="relative text-sm font-semibold text-foreground">The ML workflow</p>
+              <div className="relative mt-3 flex flex-col gap-2">
+                {[
+                  "Frame the problem & choose a metric",
+                  "Collect and label a representative dataset",
+                  "Split into train / validation / test",
+                  "Choose a model family and loss function",
+                  "Train, tune on validation",
+                  "Evaluate once on the held-out test set",
+                ].map((s, i) => (
+                  <div
+                    key={s}
+                    className="lv-in flex items-center gap-3 rounded-lg border bg-card/60 px-3 py-2 text-[13px]"
+                    style={{ animationDelay: `${i * 70}ms` }}
+                  >
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                      {i + 1}
+                    </span>
+                    {s}
+                  </div>
+                ))}
+              </div>
+              <p className="relative mt-3 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
+                Revealed one step per click · full detail kept in the speaker notes
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="how" className="border-t bg-muted/20">
         <div className="mx-auto max-w-6xl px-4 py-20">
-          <h2 className="text-center text-3xl font-semibold tracking-tight">How it works</h2>
-          <div className="lv-rule mx-auto mt-4 w-24" />
+          <Reveal>
+            <h2 className="text-center text-3xl font-semibold tracking-tight">How it works</h2>
+            <div className="lv-rule mx-auto mt-4 w-24" />
+          </Reveal>
           <div className="mt-12 grid gap-4 md:grid-cols-4">
             {STEPS.map(([title, body], i) => (
-              <div key={title} className="lv-card flex flex-col gap-2 rounded-xl p-5">
+              <Reveal key={title} delay={i * 90} className="lv-card flex flex-col gap-2 rounded-xl p-5">
                 <span className="inline-flex w-fit items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                   Step {i + 1}
                 </span>
                 <h3 className="font-medium">{title}</h3>
                 <p className="text-sm text-muted-foreground">{body}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-20">
-        <div className="mx-auto max-w-2xl text-center">
+        <Reveal className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight">Who it's for</h2>
           <p className="mt-3 text-muted-foreground">
             Anyone who has to turn dense source material into something a room can follow.
           </p>
-        </div>
+        </Reveal>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
-          {AUDIENCES.map(({ icon: Icon, title, body }) => (
-            <div key={title} className="lv-card flex flex-col gap-3 rounded-xl p-6">
+          {AUDIENCES.map(({ icon: Icon, title, body }, i) => (
+            <Reveal key={title} delay={i * 90} className="lv-card flex flex-col gap-3 rounded-xl p-6">
               <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Icon className="size-5" />
               </span>
               <h3 className="font-medium">{title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">{body}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
