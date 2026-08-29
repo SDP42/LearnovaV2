@@ -12,8 +12,8 @@ Two jobs:
    dropped, and a slide is never split mid-bullet.
 
 Continuation slides are titled ``"Topic (2/3)"`` so a reader can see the run is
-one continuous thought. Only the final part carries the takeaway bar, so the
-conclusion lands once rather than repeating on every page.
+one continuous thought. Every part carries the topic's takeaway bar — a reader
+landing on part 2 in isolation still gets the key point.
 """
 
 from __future__ import annotations
@@ -94,18 +94,22 @@ PROFILES: Dict[str, DensityProfile] = {
     "medium": DensityProfile(
         id="medium",
         label="Medium — balanced (default)",
-        description="Seven points per slide, each a full teaching sentence — "
-                    "a real lecture slide, not a headline. Teaching and self-study.",
-        # A proper lecture PPTX carries 6-9 points per slide, not 3. Fewer,
-        # fuller slides beat a run of near-empty "(1/6)" continuations.
-        max_bullets=7,
+        description="About five points per slide, each a full teaching sentence — "
+                    "a real lecture slide, not a headline. Overflow moves to a "
+                    "numbered continuation. Teaching and self-study.",
+        # 5 points per slide keeps each screen inside working-memory limits and
+        # lets the deck breathe — overflow moves to a numbered continuation
+        # rather than piling a 9-bullet wall onto one slide. Full coverage is
+        # preserved by the continuation, not by cramming.
+        max_bullets=5,
         # A complete teaching point keeps its reasoning ("... because ...",
-        # "... so that ..."). 20 words clipped that mid-clause; 30 does not.
-        max_words_per_bullet=32,
+        # "... so that ..."). 30 words holds one clause pair without clipping;
+        # a reasoning bullet gets 1.5x that before a split is worthwhile.
+        max_words_per_bullet=30,
         max_chars_per_bullet=240,
-        max_table_rows=8,
-        max_flow_steps=5,
-        max_grid_cards=6,
+        max_table_rows=7,
+        max_flow_steps=4,
+        max_grid_cards=4,
         include_enhancement=True,
         enhancement_items=1,
     ),
@@ -396,7 +400,7 @@ def paginate_slide(entry: dict, profile: DensityProfile,
                 "title": _title_for_part(title, i, total),
                 "table_rows": rows,
                 "bullets": page_bullets,
-                "takeaway": takeaway if i == total - 1 else "",
+                "takeaway": takeaway,  # every part keeps the topic's key point
                 "continued": i > 0,
             }
             # A continuation page with no rows left is not a table. Leaving it
@@ -426,7 +430,7 @@ def paginate_slide(entry: dict, profile: DensityProfile,
                     **improved,
                     "title": _title_for_part(title, i, len(pages)),
                     "bullets": group,
-                    "takeaway": takeaway if i == len(pages) - 1 else "",
+                    "takeaway": takeaway,  # repeated on every continuation, not just the last
                     "continued": i > 0,
                     # A partial flow must not reuse the whole-diagram mermaid.
                     **({} if len(pages) == 1 else {"mermaid_code": _partial_mermaid(group)}),
@@ -460,7 +464,7 @@ def paginate_slide(entry: dict, profile: DensityProfile,
                 **improved,
                 "title": _title_for_part(title, i, len(pages)),
                 "bullets": group,
-                "takeaway": takeaway if i == len(pages) - 1 else "",
+                "takeaway": takeaway,  # repeated on every continuation, not just the last
                 "continued": i > 0,
             },
             "original": original if i == 0 else {**original, "image": None},
@@ -524,6 +528,38 @@ def _has_content(improved: dict, original: dict) -> bool:
     return bool(img) and not generic
 
 
+def _fold_thin_slides(deck: List[dict]) -> List[dict]:
+    """Merge a slide that carries only one real point (and no visual) into the
+    next slide of the same run. A lone-bullet slide scores badly and reads as
+    filler; its point is better shown as the first bullet of the next slide."""
+    if len(deck) < 4:  # a short deck needs every slide it has
+        return deck
+    out: List[dict] = []
+    pending: List[str] = []
+    for i, entry in enumerate(deck):
+        im = entry.get("improved") or {}
+        rb = _real_bullets(im)
+        has_visual = bool(
+            im.get("table_rows") or str(im.get("metric_value", "")).strip()
+            or im.get("mermaid_code") or im.get("flowchart_spec") or im.get("question")
+        )
+        is_last = i == len(deck) - 1
+        if not is_last and len(rb) <= 1 and not has_visual:
+            pending.extend(rb)
+            continue
+        if pending:
+            merged_bullets = pending + [str(b) for b in (im.get("bullets") or [])]
+            im = {**im, "bullets": merged_bullets}
+            entry = {**entry, "improved": im}
+            pending = []
+        out.append(entry)
+    if pending and out:  # trailing thin slide — attach to the last real one
+        last = out[-1].get("improved") or {}
+        last = {**last, "bullets": [str(b) for b in (last.get("bullets") or [])] + pending}
+        out[-1] = {**out[-1], "improved": last}
+    return out or deck
+
+
 def _drop_empty_and_fold_titles(deck: List[dict]) -> List[dict]:
     """
     Drop content-less slides. If a dropped slide had a distinct heading, carry
@@ -568,6 +604,11 @@ def apply_density(deck: List[dict], density: str,
     out = _drop_empty_and_fold_titles(out)
     if before_drop != len(out):
         logger.info("density: dropped %d empty slide(s)", before_drop - len(out))
+
+    before_fold = len(out)
+    out = _fold_thin_slides(out)
+    if before_fold != len(out):
+        logger.info("density: folded %d lone-point slide(s) forward", before_fold - len(out))
 
     if len(out) != len(deck):
         logger.info(

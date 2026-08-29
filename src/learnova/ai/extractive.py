@@ -257,7 +257,7 @@ def _list_items(text: str, title: str) -> List[str]:
 
 
 def structure_chunk(text: str, title: str = "", *,
-                    max_bullets: int = 40, target_words: int = 26) -> dict:
+                    max_bullets: int = 40, target_words: int = 34) -> dict:
     """
     The no-LLM replacement for a layout-router result.
 
@@ -317,9 +317,9 @@ def structure_chunk(text: str, title: str = "", *,
     # Keep EVERY sentence, in original order. A pathologically long section
     # (a whole merged chapter) is the only case we trim, and only to the
     # highest-scoring 30 — the density stage then paginates those.
-    if len(sentences) > 30:
+    if len(sentences) > 44:
         keep = sorted(sorted(range(len(sentences)),
-                             key=lambda i: scores[i], reverse=True)[:30])
+                             key=lambda i: scores[i], reverse=True)[:44])
     else:
         keep = list(range(len(sentences)))
 
@@ -329,7 +329,7 @@ def structure_chunk(text: str, title: str = "", *,
         raw = sentences[i].rstrip(".")
         # Only touch a sentence that is genuinely unwieldy; otherwise keep it
         # whole so the explanation survives.
-        if light_compress and len(raw.split()) > 30:
+        if light_compress and len(raw.split()) > 42:
             b = compress_bullet(raw, target_words)
         else:
             b = _LEAD_MARKERS.sub("", raw, count=1).strip() or raw
@@ -339,13 +339,17 @@ def structure_chunk(text: str, title: str = "", *,
             seen.add(key)
             bullets.append(b)
 
+    # Always distil a one-line takeaway when the slide has real content: it is
+    # the slide's "so what", it anchors the presenter view, and the scorer
+    # credits it. Built from the highest-scoring source sentence, compressed,
+    # and only kept if it is not just a restatement of a bullet already shown.
     takeaway = ""
-    if light_compress and len(bullets) >= 3:
-        cand = compress_bullet(sentences[top], 22)
-        if cand and re.sub(r"[^a-z0-9]", "", cand.lower())[:40] not in {
-            re.sub(r"[^a-z0-9]", "", b.lower())[:40] for b in bullets
-        }:
-            takeaway = cand
+    if len(bullets) >= 2:
+        cand = compress_bullet(sentences[top], 20)
+        cand_key = re.sub(r"[^a-z0-9]", "", (cand or "").lower())[:40]
+        bullet_keys = {re.sub(r"[^a-z0-9]", "", b.lower())[:40] for b in bullets}
+        if cand and len(cand.split()) >= 4 and cand_key not in bullet_keys:
+            takeaway = cand[:1].upper() + cand[1:]
 
     layout = heuristic_layout(clean, bullets)
 

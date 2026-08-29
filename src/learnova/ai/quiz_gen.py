@@ -47,6 +47,10 @@ _quiz_provider: LLMProvider | None = None
 
 def _get_quiz_provider() -> LLMProvider | None:
     global _quiz_provider
+    import os
+
+    if os.getenv("LEARNOVA_NO_LLM", "").lower() in {"1", "true", "yes", "on"}:
+        return None
     if _quiz_provider is None:
         router = get_router()
         if not router.available:

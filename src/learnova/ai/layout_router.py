@@ -427,12 +427,26 @@ def _restore_dropped_points(bullets: list[str], source: str) -> list[str]:
         if not cw:
             return True
         for other in covered:
-            if other and len(cw & other) >= 0.7 * len(cw):
+            if not other:
+                continue
+            # Either this sentence is mostly covered by an existing bullet, or
+            # an existing bullet is mostly a subset of this sentence (the model
+            # paraphrased it shorter). Both mean "no new point here".
+            if len(cw & other) >= 0.5 * len(cw):
+                return True
+            if len(cw & other) >= 0.6 * len(other):
                 return True
         return False
 
+    # Don't let restoration balloon a slide — past this the model clearly kept
+    # the gist and the extras are mostly re-statements the density stage would
+    # just paginate into filler.
+    cap = max(len(bullets) + 6, 14)
+
     restored = list(bullets)
     for sentence in candidates:
+        if len(restored) >= cap:
+            break
         cleaned = clean_bullet(sentence)
         if not cleaned or is_redundant(cleaned, restored):
             continue

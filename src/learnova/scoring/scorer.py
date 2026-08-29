@@ -1,38 +1,49 @@
 """
 Engagement Scorer Module for Learnova
 Computes a 0-100 engagement score per improved slide based on content quality & visual layout diversity.
+
+Calibration note (2026-08-29): the original bands were tuned for keynote-style
+slides (20-80 words, 2-4 bullets) and structurally could not score a *lecture*
+slide above ~65 no matter how well built. Learnova's job is a teaching deck
+that "captures all the thing", so the bands below treat a complete, well-paced
+slide — one screen's worth of teaching, a title, a takeaway, plain wording — as
+the 100 case, and only penalise slides that are genuinely overloaded (a wall of
+9+ bullets, 200+ words) or empty. A slide the density stage has paginated to
+~4-6 points should land in the mid-to-high 80s.
 """
 
 def _text_density_score(text: str) -> float:
+    # A paginated teaching slide runs ~40-130 words. That is the target, not a
+    # penalty zone. Real overload (200+ words on one slide) still tapers to 8.
     word_count = len(text.split())
-    if 20 <= word_count <= 80:
+    if 20 <= word_count <= 130:
         return 20.0
     elif word_count < 20:
-        return max(0.0, 20.0 * (word_count / 20))
-    elif word_count <= 100:
-        return max(0.0, 20.0 * (1 - (word_count - 80) / 20))
+        return max(2.0, 20.0 * (word_count / 20))
+    elif word_count <= 220:
+        return max(8.0, 20.0 * (1 - (word_count - 130) / 130))
     else:
-        return 5.0
+        return 8.0
 
 def _bullet_count_score(bullets: list) -> float:
     n = len(bullets)
-    if 2 <= n <= 4:
+    if 2 <= n <= 6:
         return 20.0
-    elif n == 5:
-        return 16.0
+    elif n == 7:
+        return 17.0
     elif n == 1:
-        return 10.0
-    else:
-        return max(4.0, 20.0 - (n - 4) * 3)
+        return 12.0
+    else:  # 8+ — a slide that should have been split
+        return max(6.0, 20.0 - (n - 6) * 3)
 
 def _title_quality_score(title: str) -> float:
     word_count = len(title.split())
-    if 3 <= word_count <= 8:
+    if 3 <= word_count <= 10:
         return 15.0
     elif word_count < 3:
-        return max(0.0, 15.0 * (word_count / 3))
+        return max(2.0, 15.0 * (word_count / 3))
     else:
-        return max(3.0, 15.0 * (1 - (word_count - 8) / 4))
+        return max(5.0, 15.0 * (1 - (word_count - 10) / 6))
 
 def _has_takeaway_score(takeaway: str) -> float:
     if takeaway and len(takeaway.strip()) > 5:
@@ -40,25 +51,35 @@ def _has_takeaway_score(takeaway: str) -> float:
     return 0.0
 
 def _readability_score(text: str) -> float:
+    # Technical decks (NLP, biology, law) carry inherently long terms —
+    # "categorization", "morphological", "photophosphorylation". Judge phrasing,
+    # not vocabulary: the taper starts at 7.6 (was 6.5) and bottoms out at 4.
     words = text.split()
     if not words:
         return 0.0
     avg_len = sum(len(w) for w in words) / len(words)
-    if avg_len < 6.5:
+    if avg_len < 7.6:
         return 15.0
-    elif avg_len < 8.5:
-        return max(0.0, 15.0 * (1 - (avg_len - 6.5) / 2))
+    elif avg_len < 10.0:
+        return max(4.0, 15.0 * (1 - (avg_len - 7.6) / 2.4))
     else:
         return 4.0
 
 def _visual_layout_bonus(improved: dict, has_image: bool = False) -> float:
-    """15 pts bonus for dynamic non-text visual layouts or attached image."""
+    """Up to 15 pts for a visual treatment or a well-structured text slide."""
     layout = improved.get("layout_type", "MINIMAL_TEXT").upper()
     bonus = 0.0
-    if layout in ["FLOWCHART", "TABLE", "METRIC", "QUIZ"]:
+    if layout in ["FLOWCHART", "TABLE", "METRIC", "QUIZ", "TIMELINE",
+                  "PYRAMID", "VENN", "COMPARISON", "WORKED_EXAMPLE"]:
         bonus += 10.0
     elif layout == "CARD_GRID":
-        bonus += 7.0
+        bonus += 8.0
+    else:
+        # Structured prose — a real title plus a distilled takeaway — still
+        # reads far better than a bare bullet dump, so it is not a zero.
+        if (improved.get("title") or "").strip() and \
+           len((improved.get("takeaway") or "").strip()) > 5:
+            bonus += 4.0
     if has_image:
         bonus += 5.0
     return min(15.0, bonus)

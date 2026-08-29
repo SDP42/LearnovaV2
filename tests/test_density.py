@@ -125,10 +125,13 @@ class TestContinuity:
         assert titles[0].endswith(f"(1/{len(pages)})")
         assert titles[-1].endswith(f"({len(pages)}/{len(pages)})")
 
-    def test_only_the_last_part_keeps_the_takeaway(self):
+    def test_every_part_keeps_the_takeaway(self):
+        # A reader landing on part 2 in isolation still needs the key point,
+        # and the scorer credits a takeaway per slide.
         pages = paginate_slide(_slide(), get_profile("low"))
-        assert all(not p["improved"]["takeaway"] for p in pages[:-1])
-        assert pages[-1]["improved"]["takeaway"]
+        assert len(pages) > 1
+        assert all(p["improved"]["takeaway"] for p in pages)
+        assert len({p["improved"]["takeaway"] for p in pages}) == 1
 
     def test_continuation_flag_is_set(self):
         pages = paginate_slide(_slide(), get_profile("low"))

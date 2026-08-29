@@ -384,13 +384,25 @@ def generate(
         def _tnorm(s: str) -> str:
             return re.sub(r"[^a-z0-9 ]", "", re.sub(r"\s+", " ", str(s).lower())).strip()
 
+        def _same_topic(a: str, b: str) -> bool:
+            # Exact after normalisation, or a near-identical reword (the LLM
+            # renames "What is NLP?" and "Introduction to NLP" both to
+            # "Introduction to Natural Language Processing").
+            na, nb = _tnorm(a), _tnorm(b)
+            if not na or not nb:
+                return False
+            if na == nb:
+                return True
+            wa, wb = set(na.split()), set(nb.split())
+            long = wa if len(wa) >= len(wb) else wb
+            return len(wa & wb) >= 0.9 * len(long) and len(long) >= 3
+
         merged: list = []
         for entry in result.improved:
             imp = entry.get("improved") or {}
             if merged:
                 prev = merged[-1].get("improved") or {}
-                pt, ct = _tnorm(prev.get("title")), _tnorm(imp.get("title"))
-                if pt and pt == ct:
+                if _same_topic(prev.get("title"), imp.get("title")):
                     pb = list(prev.get("bullets") or [])
                     seen_b = {_tnorm(b) for b in pb}
                     for b in imp.get("bullets") or []:
@@ -485,6 +497,31 @@ def generate(
             result.improved, config.text_density, enhanced_by_index
         )
         result.density_profile = profile.id
+
+        # Guarantee a takeaway on every content slide. The presenter view and
+        # the engagement score both rely on it, and neither the LLM nor the
+        # extractive path fills it reliably (continuation slides especially).
+        from learnova.ai.extractive import split_sentences
+        from learnova.textutils import clean_bullet
+
+        for entry in result.improved:
+            imp = entry.get("improved") or {}
+            if str(imp.get("takeaway", "")).strip():
+                continue
+            bl = [str(b) for b in (imp.get("bullets") or []) if str(b).strip()]
+            if len(bl) < 2:
+                continue
+            # Shortest substantive bullet reads best as a one-line "so what".
+            cand = min(
+                (b for b in bl if 4 <= len(b.split()) <= 26),
+                key=lambda b: len(b.split()), default="",
+            )
+            if not cand:
+                sents = split_sentences(" ".join(bl))
+                cand = next((s for s in sents if 4 <= len(s.split()) <= 24), "")
+            cand = clean_bullet(cand).rstrip(".")
+            if cand:
+                imp["takeaway"] = cand[:1].upper() + cand[1:]
         return f"{before} -> {len(result.improved)} slides"
 
     runner.run("density", _density)

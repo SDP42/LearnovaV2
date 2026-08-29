@@ -28,21 +28,30 @@ TASK_DIAGRAM = "diagram"        # mermaid generation
 TASK_VISUAL_DATA = "visual_data"  # extract structured data for a chosen visual family
 
 # Preferred provider order per task. First available wins; the rest are fallback.
+#
+# Gemini (2.5-flash-lite, free tier) sits in front of Groq for quality-sensitive
+# work — its daily budget is far larger than Groq's 200k-token/day ceiling and
+# it structures teaching JSON better than gpt-oss-20b. Groq still leads the
+# bulk latency-bound tasks while it has quota; Gemini catches the failover, and
+# NVIDIA is the last resort. A provider that fails repeatedly is circuit-broken
+# for the rest of the run (see LLMRouter._attempt).
 TASK_PREFERENCE: Dict[str, Sequence[str]] = {
-    TASK_LAYOUT: ("groq", "nvidia"),
-    TASK_IMPROVE: ("nvidia", "groq"),
-    TASK_QUIZ: ("nvidia", "groq"),
+    TASK_LAYOUT: ("groq", "gemini", "nvidia"),
+    # Groq first while it has quota (fast, free); Gemini is the quality-grade
+    # failover and self-paces to stay under its 15 req/min free-tier cap.
+    TASK_IMPROVE: ("groq", "gemini", "nvidia"),
+    TASK_QUIZ: ("groq", "gemini", "nvidia"),
     # Enhancement is the highest-volume LLM stage in the pipeline: six
     # sequential calls per slide across up to MAX_ENHANCED_SLIDES slides, so 72
     # calls in a full run. At ~13 s per Nemotron Ultra call that is 15 minutes
     # of wall clock, and the payload is short-form ("give me one analogy") where
     # a small model is already good enough. Latency wins here; NVIDIA stays as
     # the failover for when Groq hits its TPM ceiling.
-    TASK_ENHANCE: ("groq", "nvidia"),
-    TASK_DIAGRAM: ("groq", "nvidia"),
+    TASK_ENHANCE: ("groq", "gemini", "nvidia"),
+    TASK_DIAGRAM: ("groq", "gemini", "nvidia"),
     # Structured extraction — a compact JSON classification job, latency-sensitive
     # (one call per visual slide). Fast model first.
-    TASK_VISUAL_DATA: ("groq", "nvidia"),
+    TASK_VISUAL_DATA: ("groq", "gemini", "nvidia"),
 }
 
 import os as _os
@@ -53,6 +62,11 @@ import os as _os
 _GROQ_MODEL = _os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 # NVIDIA rotates ids too; one env var drives every task.
 _NVIDIA_MODEL = _os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
+# gemini-3.5-flash-lite is the current GA free-tier model (2.5-flash and
+# 2.5-flash-lite are now closed to new keys). Both slots point at it; override
+# GEMINI_MODEL per env if a bigger model is wanted for the quality tasks.
+_GEMINI_MODEL = _os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+_GEMINI_FAST = _os.getenv("GEMINI_FAST_MODEL", "gemini-3.5-flash-lite")
 
 # Per-provider default model for each task.
 TASK_MODEL: Dict[str, Dict[str, str]] = {
@@ -77,6 +91,14 @@ TASK_MODEL: Dict[str, Dict[str, str]] = {
         TASK_DIAGRAM: _NVIDIA_MODEL,
         TASK_VISUAL_DATA: _NVIDIA_MODEL,
     },
+    "gemini": {
+        TASK_LAYOUT: _GEMINI_FAST,
+        TASK_IMPROVE: _GEMINI_MODEL,
+        TASK_QUIZ: _GEMINI_MODEL,
+        TASK_ENHANCE: _GEMINI_FAST,
+        TASK_DIAGRAM: _GEMINI_FAST,
+        TASK_VISUAL_DATA: _GEMINI_FAST,
+    },
 }
 
 # Call sites choose their timeout for Groq's small, fast models. A large NIM
@@ -84,6 +106,10 @@ TASK_MODEL: Dict[str, Dict[str, str]] = {
 # it every failover to Nemotron Ultra would time out before it could answer.
 PROVIDER_MIN_TIMEOUT: Dict[str, float] = {
     "nvidia": 90.0,
+    # Gemini 2.5-flash with thinking disabled answers in 2-6 s, but a cold
+    # connection or a thinking fallback can run longer — don't let an 8 s
+    # caller timeout kill an otherwise-good call.
+    "gemini": 30.0,
 }
 
 
@@ -93,6 +119,11 @@ def _model_fits(provider_name: str, model: str) -> bool:
     # also uses namespaced ids now for the hosted OSS models
     # ("openai/gpt-oss-20b", "moonshotai/…"), so match those explicitly rather
     # than treating any "/" as NVIDIA.
+    gemini_ns = model.startswith(("gemini", "models/gemini"))
+    if provider_name == "gemini":
+        return gemini_ns
+    if gemini_ns:
+        return False
     nvidia_ns = model.startswith(("meta/", "nvidia/", "nv-", "mistralai/", "google/"))
     if provider_name == "nvidia":
         return nvidia_ns
@@ -106,8 +137,10 @@ def _is_retryable(exc: Exception) -> bool:
     text = f"{type(exc).__name__} {exc}".lower()
     needles = (
         "ratelimit", "rate limit", "429", "quota", "too many requests",
-        "timeout", "timed out", "connection", "unavailable", "503", "502", "500",
-        "overloaded", "capacity",
+        "resource_exhausted", "resource exhausted",
+        "timeout", "timed out", "connection", "unavailable",
+        "500", "502", "503", "504",
+        "overloaded", "capacity", "deadline exceeded", "deadline_exceeded",
     )
     return any(n in text for n in needles)
 
@@ -152,6 +185,13 @@ class LLMRouter(LLMProvider):
             key=lambda pair: rank.get(pair[0], len(preference)),
         )
 
+    # Per-process circuit breaker. A provider that has failed this many times
+    # in a row (quota exhausted, endpoint down) is skipped for the rest of the
+    # run instead of being retried on every one of the ~200 pipeline calls —
+    # that retry storm was adding minutes of dead wait to a single deck.
+    _TRIP_AFTER = 4
+    _fail_streak: Dict[str, int] = {}
+
     def _attempt(self, call: Callable[[LLMProvider, dict], str], task: Optional[str],
                  kwargs: dict) -> str:
         chain = self._ordered_for(task)
@@ -160,8 +200,14 @@ class LLMRouter(LLMProvider):
                 "No LLM provider is configured. Set GROQ_API_KEY and/or NVIDIA_API_KEY."
             )
 
+        live = [(n, p) for n, p in chain
+                if self._fail_streak.get(n, 0) < self._TRIP_AFTER]
+        if not live:  # every provider tripped — give the top one one more try
+            self._fail_streak.clear()
+            live = chain
+
         errors: List[str] = []
-        for name, provider in chain:
+        for name, provider in live:
             call_kwargs = dict(kwargs)
             requested = call_kwargs.get("model")
 
@@ -184,15 +230,26 @@ class LLMRouter(LLMProvider):
             if floor:
                 call_kwargs["timeout"] = max(float(call_kwargs.get("timeout") or 0), floor)
             try:
-                return call(provider, call_kwargs)
+                result = call(provider, call_kwargs)
+                self._fail_streak[name] = 0
+                return result
             except Exception as exc:
                 errors.append(f"{name}: {exc}")
-                if _is_retryable(exc) and len(chain) > 1:
+                self._fail_streak[name] = self._fail_streak.get(name, 0) + 1
+                tripped = self._fail_streak[name] >= self._TRIP_AFTER
+                if _is_retryable(exc) and len(live) > 1:
                     logger.warning(
-                        "LLMRouter: %s failed (%s) — falling through to next provider.",
+                        "LLMRouter: %s failed (%s) — falling through to next provider.%s",
                         name, exc,
+                        " Circuit opened for the rest of the run." if tripped else "",
                     )
                     continue
+                if _is_retryable(exc):
+                    # last provider in the chain, but the error is transient —
+                    # surface it as retryable so the caller can use its own
+                    # heuristic fallback rather than crashing the stage.
+                    logger.warning("LLMRouter: %s failed (%s) — no providers left.", name, exc)
+                    raise
                 logger.error("LLMRouter: %s failed non-retryably: %s", name, exc)
                 raise
 
@@ -227,6 +284,13 @@ def _build_default_chain() -> List[tuple[str, LLMProvider]]:
         chain.append(("groq", GroqProvider()))
     except Exception as exc:
         logger.info("LLMRouter: Groq unavailable (%s)", exc)
+
+    try:
+        from learnova.providers.gemini_provider import GeminiProvider
+
+        chain.append(("gemini", GeminiProvider()))
+    except Exception as exc:
+        logger.info("LLMRouter: Gemini unavailable (%s)", exc)
 
     try:
         from learnova.providers.nvidia_provider import NvidiaProvider
