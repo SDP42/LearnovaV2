@@ -74,9 +74,19 @@ export default function Create() {
 
   const watch = useCallback((id, onSettled) => {
     clearInterval(poll.current);
+    const startedAt = Date.now();
+    const MAX_MS = 25 * 60 * 1000; // matches the backend generation watchdog
+    let misses = 0;
     poll.current = setInterval(async () => {
+      if (Date.now() - startedAt > MAX_MS) {
+        clearInterval(poll.current);
+        setBusy(false);
+        setError("This is taking longer than expected — check Projects in a minute.");
+        return;
+      }
       try {
         const next = await api.getJob(id);
+        misses = 0;
         setJob(next);
         if (["awaiting_review", "done", "failed"].includes(next.status)) {
           clearInterval(poll.current);
@@ -87,9 +97,13 @@ export default function Create() {
           } else onSettled?.(next);
         }
       } catch (e) {
-        clearInterval(poll.current);
-        setBusy(false);
-        setError(e.message);
+        // Tolerate a few transient errors (server restart, brief network drop)
+        // before giving up — the job may still be fine.
+        if (++misses >= 5) {
+          clearInterval(poll.current);
+          setBusy(false);
+          setError(e.message);
+        }
       }
     }, POLL_MS);
   }, []);

@@ -15,6 +15,7 @@ Run with:  uvicorn apps.api.main:app --reload --port 8000
 
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
 import tempfile
@@ -44,6 +45,7 @@ from learnova.parsers.markdown_converter import from_typed_text, split_sections
 from learnova.pipeline.jobs import Job, get_store
 from learnova.pipeline.orchestrator import STAGES, PipelineConfig
 from learnova.pipeline.density import PROFILES
+from learnova.rendering.deck_payload import payload_to_editable, slides_payload as _slides_payload
 from learnova.rendering.theme_engine import FONT_CHOICES, THEMES
 from learnova.storage import deck_library
 
@@ -55,13 +57,16 @@ app = FastAPI(
     description="Transform text-heavy PPTX/PDF documents into visual decks.",
 )
 
+# Dev origins by default; CORS_ORIGINS (comma-separated) adds deployed frontends.
+_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+] + [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -162,17 +167,16 @@ def health() -> dict:
 @app.get("/api/config")
 def config_status() -> dict:
     """Which optional integrations are configured (booleans only — no values)."""
-    import os
-
     from learnova.config import get_gemini_key, get_groq_key, get_nvidia_key
 
+    groq, nvidia, gemini = (
+        bool(get_groq_key()), bool(get_nvidia_key()), bool(get_gemini_key()),
+    )
     return {
-        "providers": {
-            "groq": bool(get_groq_key()),
-            "nvidia": bool(get_nvidia_key()),
-            "gemini": bool(get_gemini_key()),
-        },
-        "llm_available": bool(get_groq_key() or get_nvidia_key()),
+        "providers": {"groq": groq, "nvidia": nvidia, "gemini": gemini},
+        # Gemini is a first-class text provider in the router chain, so any one
+        # of the three means the LLM path is usable.
+        "llm_available": groq or nvidia or gemini,
         "flags": {
             "master_prompt": os.getenv("LEARNOVA_MASTER_PROMPT", "").lower() in {"1", "true", "yes", "on"},
             "class_segmentation": os.getenv("LEARNOVA_USE_CLASS", "").lower() in {"1", "true", "yes", "on"},
@@ -326,26 +330,7 @@ def start_generate(
             payload = _slides_payload(finished.result.final_deck)
         except Exception:
             payload = None
-        editable = None
-        if payload:
-            editable = [
-                {
-                    "layout_type": s.get("layout_type", "MINIMAL_TEXT"),
-                    "title": s.get("title", ""),
-                    "bullets": list(s.get("bullets") or []),
-                    "takeaway": s.get("takeaway", ""),
-                    "family": s.get("family"),
-                    "mermaid_code": s.get("mermaid_code"),
-                    "table_headers": s.get("table_headers"),
-                    "table_rows": s.get("table_rows"),
-                    "question": s.get("question"),
-                    "options": s.get("options"),
-                    "correct": s.get("correct"),
-                    "explanation": s.get("explanation"),
-                    "source_text": s.get("source_text", ""),
-                }
-                for s in payload
-            ]
+        editable = payload_to_editable(payload) if payload else None
         record = deck_library.save_deck(
             user_id=finished.user_id or ANONYMOUS_USER,
             result=finished.result,
@@ -354,6 +339,9 @@ def start_generate(
             title=finished.source_name,
             slides_payload=payload,
             editable_slides=editable,
+            # Reuse the job id so /api/decks/{id}/* (editor, history, figures)
+            # resolve with the same id the client already has.
+            deck_id=finished.id,
         )
         # Persist each slide's figure so it survives an edit / re-render.
         try:
@@ -376,9 +364,6 @@ def start_generate(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return job.to_dict()
-
-
-from learnova.rendering.deck_payload import slides_payload as _slides_payload
 
 
 @app.get("/api/jobs/{job_id}/deck")

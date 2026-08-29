@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SignedIn, SignedOut, useAuth } from "@/auth";
 import * as api from "./api";
 import Cursor from "./components/Cursor.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Audience from "./pages/Audience.jsx";
@@ -60,6 +61,7 @@ export default function App() {
   return (
     <AuthBridge>
       <Cursor />
+      <ErrorBoundary>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/sign-in/*" element={<AuthPage mode="sign-in" />} />
@@ -99,6 +101,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ErrorBoundary>
     </AuthBridge>
   );
 }

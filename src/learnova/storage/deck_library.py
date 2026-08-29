@@ -83,9 +83,15 @@ def save_deck(
     title: Optional[str] = None,
     slides_payload: Optional[list] = None,
     editable_slides: Optional[list] = None,
+    deck_id: Optional[str] = None,
 ) -> DeckRecord:
-    """Persist a ``PipelineResult`` for one user and return its record."""
-    deck_id = uuid.uuid4().hex[:16]
+    """Persist a ``PipelineResult`` for one user and return its record.
+
+    ``deck_id`` lets the caller reuse the originating job id, so the same id
+    opens the deck through both ``/api/jobs/{id}/*`` and ``/api/decks/{id}/*``
+    (the editor, version history and figure routes are decks-only).
+    """
+    deck_id = _safe(deck_id, "deck id") if deck_id else uuid.uuid4().hex[:16]
     target = _deck_dir(user_id, deck_id)
     target.mkdir(parents=True, exist_ok=True)
 
@@ -246,24 +252,10 @@ def read_editable(user_id: str, deck_id: str) -> Optional[list]:
         except (OSError, json.JSONDecodeError):
             pass
     # Fallback: reconstruct from the display payload (deck.json).
+    from learnova.rendering.deck_payload import payload_to_editable
+
     stored = read_slides(user_id, deck_id) or {}
-    out = []
-    for s in stored.get("slides", []):
-        out.append({
-            "layout_type": s.get("layout_type", "MINIMAL_TEXT"),
-            "title": s.get("title", ""),
-            "bullets": list(s.get("bullets") or []),
-            "takeaway": s.get("takeaway", ""),
-            "family": s.get("family"),
-            "mermaid_code": s.get("mermaid_code"),
-            "table_headers": s.get("table_headers"),
-            "table_rows": s.get("table_rows"),
-            "question": s.get("question"),
-            "options": s.get("options"),
-            "correct": s.get("correct"),
-            "explanation": s.get("explanation"),
-            "source_text": s.get("source_text", ""),
-        })
+    out = payload_to_editable(stored.get("slides", []))
     return out or None
 
 

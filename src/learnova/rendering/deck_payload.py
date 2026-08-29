@@ -97,6 +97,23 @@ _EDITABLE_KEYS = (
 )
 
 
+def payload_to_editable(payload: List[dict]) -> List[Dict[str, Any]]:
+    """Project a display ``slides_payload`` down to the editable-slide shape
+    (``_EDITABLE_KEYS``). One definition, used by both the persist hook and the
+    deck-library fallback, so the two can't drift."""
+    out: List[Dict[str, Any]] = []
+    for s in payload or []:
+        s = s or {}
+        row = {k: s.get(k) for k in _EDITABLE_KEYS}
+        row["layout_type"] = row.get("layout_type") or "MINIMAL_TEXT"
+        row["title"] = row.get("title") or ""
+        row["bullets"] = list(row.get("bullets") or [])
+        row["takeaway"] = row.get("takeaway") or ""
+        row["source_text"] = row.get("source_text") or ""
+        out.append(row)
+    return out
+
+
 def editable_to_final_deck(editable: List[dict],
                            images: Dict[int, tuple] | None = None) -> List[dict]:
     """Rebuild a minimal ``final_deck`` (original/improved pairs) from edited slides.
@@ -150,4 +167,4 @@ def editable_to_final_deck(editable: List[dict],
     return deck
 
 
-__all__ = ["slides_payload", "editable_to_final_deck"]
+__all__ = ["slides_payload", "editable_to_final_deck", "payload_to_editable"]

@@ -64,15 +64,44 @@ class Job:
 
 
 class JobStore:
-    """Thread-safe registry of jobs."""
+    """Thread-safe registry of jobs.
+
+    In-memory and single-process by design (see module docstring). To keep it
+    from growing without bound it self-prunes on every ``create``: finished /
+    failed jobs past ``_TTL_SECONDS`` are dropped, and the newest
+    ``_MAX_JOBS`` are kept regardless.
+    """
+
+    _TTL_SECONDS = 6 * 3600
+    _MAX_JOBS = 200
+    _GEN_TIMEOUT_SECONDS = 20 * 60
 
     def __init__(self) -> None:
         self._jobs: Dict[str, Job] = {}
         self._lock = threading.Lock()
 
+    def _prune_locked(self) -> None:
+        now = time.time()
+        done = {"done", "failed", "awaiting_review"}
+        stale = [
+            jid for jid, j in self._jobs.items()
+            if j.status in done and now - j.created_at > self._TTL_SECONDS
+        ]
+        for jid in stale:
+            self._jobs.pop(jid, None)
+        if len(self._jobs) > self._MAX_JOBS:
+            # Keep running jobs + the most recent ones.
+            keep_running = {jid for jid, j in self._jobs.items() if j.status == "running"}
+            by_age = sorted(self._jobs.items(), key=lambda kv: kv[1].created_at, reverse=True)
+            keep = keep_running | {jid for jid, _ in by_age[: self._MAX_JOBS]}
+            for jid in list(self._jobs):
+                if jid not in keep:
+                    self._jobs.pop(jid, None)
+
     def create(self, source_name: str, user_id: str = "") -> Job:
         job = Job(id=uuid.uuid4().hex[:16], source_name=source_name, user_id=user_id)
         with self._lock:
+            self._prune_locked()
             self._jobs[job.id] = job
         return job
 
@@ -90,9 +119,15 @@ class JobStore:
 
     # ── Execution ────────────────────────────────────────────────────────────
     def start_conversion(self, job: Job, path: str, config: PipelineConfig) -> None:
-        """Run only the markdown conversion, so the user can review/edit it."""
+        """Run only the markdown conversion, so the user can review/edit it.
+
+        ``path`` is a caller-owned temp upload; it is deleted once conversion
+        has read it (success or failure) so uploads don't leak onto disk.
+        """
 
         def _work() -> None:
+            import os as _os
+
             job.status = "running"
             job.stage = "convert"
             job.stage_status = "running"
@@ -108,6 +143,11 @@ class JobStore:
                 job.status = "failed"
                 job.stage_status = "failed"
                 job.error = str(exc)
+            finally:
+                try:
+                    _os.unlink(path)
+                except OSError:
+                    pass
 
         threading.Thread(target=_work, daemon=True, name=f"convert-{job.id}").start()
 
@@ -141,20 +181,37 @@ class JobStore:
             job.status = "running"
             try:
                 job.result = generate(job._markdown_doc, config=config, progress=_progress)
-                job.status = "done"
-                job.progress = 1.0
+                # Persist before flipping to "done": the client navigates to the
+                # editor as soon as it sees "done", and the editor / figure /
+                # history routes read from the saved library entry.
                 if on_complete:
                     try:
                         on_complete(job)
                     except Exception:
                         # Persisting is best-effort; never fail a good deck.
                         logger.error("job %s post-completion hook failed", job.id, exc_info=True)
+                job.status = "done"
+                job.progress = 1.0
             except Exception as exc:
                 logger.error("job %s generation failed: %s", job.id, exc, exc_info=True)
                 job.status = "failed"
                 job.error = str(exc)
 
-        threading.Thread(target=_work, daemon=True, name=f"generate-{job.id}").start()
+        worker = threading.Thread(target=_work, daemon=True, name=f"generate-{job.id}")
+        worker.start()
+
+        # Watchdog: a wedged provider or subprocess must not leave a job
+        # "running" forever. The daemon worker keeps going, but the job is
+        # reported failed so the client stops polling.
+        def _watchdog() -> None:
+            worker.join(self._GEN_TIMEOUT_SECONDS)
+            if worker.is_alive() and job.status == "running":
+                logger.error("job %s generation exceeded %ds — marking failed",
+                             job.id, self._GEN_TIMEOUT_SECONDS)
+                job.status = "failed"
+                job.error = "generation timed out"
+
+        threading.Thread(target=_watchdog, daemon=True, name=f"watchdog-{job.id}").start()
 
 
 _store: Optional[JobStore] = None
