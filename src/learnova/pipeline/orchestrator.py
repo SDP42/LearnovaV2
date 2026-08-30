@@ -402,6 +402,11 @@ def generate(
                 continue
             imp = entry.get("improved") or {}
             imp["enum_item"] = ei
+            # Keep the "Stage 2 of 5: …" title the split assigned — the LLM
+            # tends to rename it to just the concept and lose the step context.
+            chunk_title = str((entry.get("original") or {}).get("title") or "").strip()
+            if chunk_title and re.match(r"^[A-Za-z]+\s+\d+\s+of\s+\d+", chunk_title):
+                imp["title"] = chunk_title
             if ei.get("overview") and ei.get("items"):
                 items = [str(x) for x in ei["items"] if str(x).strip()]
                 imp["layout_type"] = "FLOWCHART"
