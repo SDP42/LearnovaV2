@@ -179,6 +179,46 @@ def _act_search(nlu, session, entries):
         f"about \"{q}\".", results, intent=nlu.intent.value)
 
 
+def _act_gallery(nlu, session):
+    """Is there a ready-made deck on this topic? Answer yes/no and, when yes,
+    hand back the matches so the frontend can open the Gallery."""
+    topic = str(nlu.entities.get("topic") or nlu.entities.get("concept")
+                or nlu.entities.get("query") or "").strip()
+    if not topic:
+        return R.clarify("Which topic should I check the Gallery for?", [],
+                         intent=nlu.intent.value)
+
+    res = T.search_gallery(topic)
+    if not res.ok:
+        return R.error(res.message, res.code, intent=nlu.intent.value)
+
+    rows = res.data.get("results", [])
+    ready = [r for r in rows if r["has_deck"]]
+    session.last_result_list = [{"pres_id": f"gallery:{r['slug']}", **r} for r in rows]
+
+    if ready:
+        top = ready[0]
+        others = [r["title"] for r in ready[1:3]]
+        msg = (f"Yes — there's a ready-made deck on \"{top['title']}\" "
+               f"({top['slide_count']} slides) in the Gallery. "
+               f"Opening it for you now.")
+        if others:
+            msg += f" (Also ready: {', '.join(others)}.)"
+        return R.gallery_results(msg, ready + [r for r in rows if not r["has_deck"]][:2],
+                                 intent=nlu.intent.value,
+                                 speech=f"Yes, a ready-made deck on {top['title']} is available. Opening it.")
+    if rows:
+        names = ", ".join(r["title"] for r in rows[:3])
+        return R.gallery_results(
+            f"Not pre-built yet, but the Gallery has the topic{'s' if len(rows) > 1 else ''} "
+            f"{names}. I can generate a deck from it in about a minute.",
+            rows, intent=nlu.intent.value)
+    return R.text(
+        f"There's no ready-made deck on \"{topic}\" in the Gallery yet. "
+        f"I can create one for you — just say \"create a presentation on {topic}\".",
+        intent=nlu.intent.value)
+
+
 def _act_voice_control(nlu, session):
     msg = {
         Intent.STOP_SPEAKING: "Stopped.",
@@ -332,6 +372,8 @@ def handle(utterance: str, session: SessionContext) -> R.AssistantResponse:
                 presentation_id=session.current_presentation,
                 payload={"control": nlu.intent.value}, intent=nlu.intent.value,
                 confidence=nlu.confidence)
+        elif nlu.intent == Intent.CHECK_GALLERY:
+            resp = _act_gallery(nlu, session)
         elif action == Action.SHOW_SEARCH_RESULTS:
             resp = _act_search(nlu, session, entries)
         elif action == Action.CREATE_PRESENTATION:

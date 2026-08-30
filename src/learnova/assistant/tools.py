@@ -186,6 +186,50 @@ def search_content(user_id: str, query: str) -> ToolResult:
     return ToolResult.done(f"{len(hits)} presentation(s) mention that.", results=hits)
 
 
+def search_gallery(query: str, *, limit: int = 6) -> ToolResult:
+    """Look for ready-made decks in the shared Gallery on a topic.
+
+    Returns rows ordered so that topics with a pre-built deck come first, each
+    with ``slug``, ``title``, ``subject``, ``has_deck`` and ``slide_count``.
+    """
+    q = (query or "").strip()
+    if not q:
+        return ToolResult.fail("EMPTY_QUERY", "Which topic should I check for?")
+    try:
+        from learnova.gallery import catalog as gcat
+        from learnova.gallery import store as gstore
+    except Exception as exc:  # pragma: no cover
+        logger.warning("assistant.tools: gallery unavailable: %s", exc)
+        return ToolResult.fail("GALLERY_UNAVAILABLE", "The Gallery isn't available right now.")
+
+    entries = gcat.list_entries(query=q)
+    ready = gstore.ready_slugs()
+    ql = q.lower()
+
+    def score(e) -> int:
+        hay = " ".join([e.title.lower(), e.subject.lower(), " ".join(e.tags)])
+        s = sum(tok in hay for tok in ql.split() if len(tok) > 1)
+        if ql in e.title.lower():
+            s += 3
+        if e.slug in ready:
+            s += 2
+        return s
+
+    ranked = sorted(entries, key=score, reverse=True)[:limit]
+    rows = []
+    for e in ranked:
+        meta = gstore.get_deck_meta(e.slug) if e.slug in ready else None
+        rows.append({
+            "slug": e.slug, "title": e.title, "subject": e.subject,
+            "tags": list(e.tags), "has_deck": bool(meta),
+            "slide_count": (meta or {}).get("slide_count", 0),
+            "overall_score": (meta or {}).get("overall_score", 0),
+        })
+    n_ready = sum(1 for r in rows if r["has_deck"])
+    return ToolResult.done(f"{len(rows)} gallery topic(s), {n_ready} pre-built.",
+                           results=rows, ready_count=n_ready)
+
+
 def explain_content(user_id: str, *, deck_id: Optional[str] = None,
                     slide_number: Optional[int] = None, concept: str = "",
                     style: str = "normal", target_language: str = "",
@@ -232,6 +276,7 @@ TOOLS = {
     "goToSlide": go_to_slide,
     "getSlideContent": get_slide_content,
     "searchContent": search_content,
+    "searchGallery": search_gallery,
     "explainContent": explain_content,
 }
 

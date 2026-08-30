@@ -98,6 +98,49 @@ def test_bake_progressive_reveal_flips_the_default():
     assert _bake_progressive_reveal(None) is None
 
 
+def test_assistant_recognises_gallery_check():
+    from learnova.assistant.nlu import classify
+    from learnova.assistant.intents import Intent
+
+    for utt in [
+        "do you have slides on photosynthesis",
+        "is there a ready-made deck on binary search",
+        "check that the cold war slides are pre built",
+        "is bayes theorem pre-built",
+    ]:
+        r = classify(utt)
+        assert r.intent == Intent.CHECK_GALLERY, (utt, r.intent)
+        assert r.entities.get("topic"), utt
+
+
+def test_assistant_confirms_and_offers_a_ready_deck(monkeypatch):
+    import learnova.assistant.orchestrator as orch
+    from learnova.assistant.session import SessionContext
+
+    monkeypatch.setattr(orch, "classify_llm", None)
+    monkeypatch.setattr(orch, "_entries", lambda s: [])
+
+    s = SessionContext(session_id="t", user_id="u")
+    r = orch.handle("is there a ready-made deck on photosynthesis", s)
+    assert r.type == "SHOW_GALLERY_RESULTS"
+    assert "yes" in r.message.lower()
+    assert any(row["has_deck"] and row["slug"] == "photosynthesis" for row in r.results)
+
+    r2 = orch.handle("do you have a deck on a topic that does not exist at all", s)
+    assert r2.type in ("TEXT_RESPONSE", "SHOW_GALLERY_RESULTS")
+    assert "create" in r2.message.lower() or "generate" in r2.message.lower()
+
+
+def test_search_gallery_tool_ranks_ready_first():
+    from learnova.assistant.tools import search_gallery
+
+    res = search_gallery("photosynthesis")
+    assert res.ok
+    assert res.data["results"][0]["slug"] == "photosynthesis"
+    assert res.data["results"][0]["has_deck"] is True
+    assert not search_gallery("").ok
+
+
 def test_clone_to_user_roundtrip(tmp_path, monkeypatch):
     # a fake gallery deck on disk
     from learnova.storage import deck_library as dl

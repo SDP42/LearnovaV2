@@ -25,6 +25,7 @@ class ResponseType:
     START_QUIZ = "START_QUIZ"
     QUIZ_QUESTION = "QUIZ_QUESTION"
     SHOW_SEARCH_RESULTS = "SHOW_SEARCH_RESULTS"
+    SHOW_GALLERY_RESULTS = "SHOW_GALLERY_RESULTS"
     CREATE_PRESENTATION = "CREATE_PRESENTATION"
     SEARCH_CONTENT = "SEARCH_CONTENT"
     EXPLAIN_CONTENT = "EXPLAIN_CONTENT"
@@ -111,5 +112,15 @@ def search_results(message: str, results: List[Dict[str, Any]], *, intent=None,
                              results=results, intent=intent, confidence=confidence)
 
 
+def gallery_results(message: str, results: List[Dict[str, Any]], *, intent=None,
+                    confidence=1.0, speech=None) -> AssistantResponse:
+    """Ready-made Gallery decks matching a topic. ``results`` rows carry
+    ``slug``, ``title``, ``subject``, ``has_deck`` and (when built)
+    ``slide_count`` — the frontend links each to /app/gallery."""
+    return AssistantResponse(ResponseType.SHOW_GALLERY_RESULTS, message,
+                             results=results, intent=intent, confidence=confidence,
+                             speech=speech)
+
+
 __all__ = ["ResponseType", "AssistantResponse", "text", "error", "clarify",
-           "open_presentation", "navigate", "search_results"]
+           "open_presentation", "navigate", "search_results", "gallery_results"]

@@ -78,6 +78,19 @@ POST /api/assistant/query {text, session_id}
 | 11 | Edge cases | 🟡 covered: not-found, out-of-range, ambiguous (clarify), no-decks, typo, wake-word, low-confidence→LLM, no-content; pending: transcription error surfacing, unauthorized cross-user |
 | 12 | UX polish | ✅ `frontend/src/components/app/AssistantWidget.jsx` — floating chat + mic panel in `AppLayout`; executes the typed response (route to deck, `?slide=N`, clarification chips, search-result cards, speak). |
 
+## Gallery awareness
+
+The assistant knows the shared Gallery (`docs/GALLERY.md`). The
+`CHECK_GALLERY` intent ("do you have slides on X", "is X pre-built",
+"check that the cold war slides are ready-made") runs the `searchGallery`
+tool and replies:
+
+- **ready deck exists** → `SHOW_GALLERY_RESULTS` — "Yes, there's a ready-made
+  deck on X (7 slides). Opening it." The widget routes to
+  `/app/gallery?topic=<slug>`, which auto-opens that deck's preview.
+- **topic in catalogue, not built** → offers to generate it.
+- **nothing** → suggests `create a presentation on X`.
+
 ## Remaining
 
 - Harden edge cases: surface STT errors in the widget; cross-user auth test

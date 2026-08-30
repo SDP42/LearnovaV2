@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Download, FileDown, LayoutGrid, Loader2, Search, Sparkles, Wand2 } from "lucide-react";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
@@ -25,6 +25,7 @@ function scaffold(title, subject) {
 
 export default function Gallery() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [subject, setSubject] = useState(null);
   const [q, setQ] = useState("");
   const [readyOnly, setReadyOnly] = useState(false);
@@ -77,6 +78,32 @@ export default function Gallery() {
     return () => clearTimeout(debounce.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject, q, readyOnly]);
+
+  // Deep link from the assistant: /app/gallery?topic=<slug> auto-opens it.
+  useEffect(() => {
+    const slug = searchParams.get("topic");
+    if (!slug) return;
+    let live = true;
+    api
+      .galleryEntry(slug)
+      .then((e) => {
+        if (!live) return;
+        setPreview(e);
+        if (!e.has_deck && e.title) {
+          navigate("/app/create", {
+            state: { template: { topic: e.title, text: scaffold(e.title, e.subject) } },
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (live) setSearchParams({}, { replace: true });
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     if (!preview?.has_deck) {

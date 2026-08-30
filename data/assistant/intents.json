@@ -486,6 +486,18 @@
   "description": ""
  },
  {
+  "intent": "CHECK_GALLERY",
+  "category": "presentation_search",
+  "action": "SHOW_SEARCH_RESULTS",
+  "entities": [
+   "topic"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": "Check the shared Gallery for a ready-made deck on a topic and, if one exists, offer to open it."
+ },
+ {
   "intent": "MAKE_VISUAL",
   "category": "system_platform",
   "action": "CREATE_VISUAL",

@@ -63,6 +63,7 @@ class Intent(str, enum.Enum):
     SEARCH_CONTENT = "SEARCH_CONTENT"
     WHERE_IS_TOPIC = "WHERE_IS_TOPIC"
     FIND_PRESENTATIONS_ABOUT = "FIND_PRESENTATIONS_ABOUT"
+    CHECK_GALLERY = "CHECK_GALLERY"   # "do you have a ready-made deck on X?"
     # ── Visualisation ──────────────────────────────────────────────────────
     MAKE_VISUAL = "MAKE_VISUAL"
     ADD_ANIMATION = "ADD_ANIMATION"
@@ -212,6 +213,9 @@ INTENT_SPEC: dict[Intent, IntentSpec] = {s.intent: s for s in [
     _s(I.SEARCH_CONTENT, C.CONTENT_SEARCH, A.SHOW_SEARCH_RESULTS, ["query"]),
     _s(I.WHERE_IS_TOPIC, C.CONTENT_SEARCH, A.SHOW_SEARCH_RESULTS, ["topic"]),
     _s(I.FIND_PRESENTATIONS_ABOUT, C.CONTENT_SEARCH, A.SHOW_SEARCH_RESULTS, ["subject", "topic"]),
+    _s(I.CHECK_GALLERY, C.PRESENTATION_SEARCH, A.SHOW_SEARCH_RESULTS, ["topic"],
+       description="Check the shared Gallery for a ready-made deck on a topic "
+                   "and, if one exists, offer to open it."),
 
     _s(I.MAKE_VISUAL, C.SYSTEM, A.CREATE_VISUAL, ["concept", "slide_number"], requires_context=True),
     _s(I.ADD_ANIMATION, C.SYSTEM, A.CREATE_VISUAL, ["slide_number"], requires_context=True),

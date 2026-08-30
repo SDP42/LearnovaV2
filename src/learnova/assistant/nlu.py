@@ -83,6 +83,26 @@ def _pref_ref(t: str) -> str:
     return s.strip() or t
 
 
+_READY = r"pre[- ]?built|prebuilt|ready[- ]?made|readymade|pre[- ]?made|premade|off[- ]the[- ]shelf|already (?:have|got|has|made|created|exists?|there)|in the gallery|from the gallery"
+
+
+def _gallery_topic(t: str) -> dict:
+    for rx in (
+        rf"\b(?:on|about|for|regarding|related to|covering|of)\s+(.+?)(?:\s+(?:{_READY}|slides?|deck|presentation|lesson).*)?$",
+        r"\bcheck (?:if |whether |that )?(?:there(?:'s| is) (?:a |an )?)?(.+?)\s+(?:related\s+)?(?:slides?|decks?|presentation|lesson)\b",
+        rf"\bcheck (?:if |whether |that )?(.+?)\s+(?:is|are|exists?)\s+(?:{_READY}|available|ready|there)\b",
+        rf"\bis\s+(?:there\s+(?:a\s+)?)?(.+?)\s+(?:{_READY}|available|ready)\b",
+        rf"\b(?:{_READY})\s+(?:slides?|decks?|presentation|lesson)?\s*(?:on|about|for)?\s*(.+)$",
+    ):
+        m = re.search(rx, t)
+        if m and m.group(1).strip(" ?"):
+            topic = re.sub(r"\b(slides?|decks?|presentation|lesson|please|already|"
+                           r"pre[- ]?built|ready[- ]?made)\b", "", m.group(1)).strip(" ?-")
+            if topic:
+                return {"topic": topic}
+    return {}
+
+
 _RULES = [
     # ── voice control (check first — very short, unambiguous) ───────────────
     ("voice.stop", r"^(stop|shut up|be quiet|quiet|enough)$", Intent.STOP_SPEAKING, 0.97, None),
@@ -171,6 +191,25 @@ _RULES = [
      r"(?!.*\bslide\b)",
      Intent.OPEN_PRESENTATION, 0.78,
      lambda t: {"presentation_reference": (re.search(r"the\s+(.+)$", t) or [None, ""])[1].strip()}),
+
+    # ── gallery: is there a ready-made deck on this? ──────────────────────
+    ("gallery.check", rf"\b({_READY})\b.*\b(deck|decks|presentation|presentations|slides?|"
+     r"slideshow|lesson|topic)\b|"
+     rf"\b(deck|decks|presentation|slides?|lesson)\b.*\b({_READY})\b|"
+     rf"\b(do you (?:have|already have)|is there|are there|have you got|got any|any)\b"
+     rf".*\b({_READY}|gallery)\b",
+     Intent.CHECK_GALLERY, 0.9, _gallery_topic),
+    ("gallery.check2",
+     rf"\bcheck (?:if |whether |that )?.*\b({_READY})\b|"
+     rf"\b(gallery|ready[- ]made|pre[- ]built)\b.*\b(has|have|contains?|includes?)\b|"
+     rf"\bis\s+(?:there\s+)?(?:a\s+)?.+\b({_READY}|already (?:made|there|built))\b",
+     Intent.CHECK_GALLERY, 0.84, _gallery_topic),
+    ("gallery.check3",
+     r"\b(do you (?:have|got|offer)|have you (?:got|made)|is there|are there|"
+     r"got any|what (?:slides?|decks?|presentations?) do you have)\b"
+     r".*\b(slides?|decks?|presentation|presentations|lesson|material|deck)\b"
+     r".*\b(on|about|for|covering|regarding)\b",
+     Intent.CHECK_GALLERY, 0.8, _gallery_topic),
 
     # ── presentation search ───────────────────────────────────────────────
     ("pres.search", r"\b(find|search( for)?|list|show( me)?( all| my)?|which|do i have)\b"

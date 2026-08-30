@@ -48,6 +48,9 @@ export default function AssistantWidget() {
         );
       } else if (t === "CREATE_PRESENTATION") {
         navigate("/app/create", { state: { topic: resp.payload?.topic } });
+      } else if (t === "SHOW_GALLERY_RESULTS") {
+        const ready = (resp.results || []).find((r) => r.has_deck);
+        if (ready) navigate(`/app/gallery?topic=${encodeURIComponent(ready.slug)}`);
       } else if (t === "SHOW_SEARCH_RESULTS" || t === "SHOW_WEB_DECK") {
         /* results are rendered inline */
       }
@@ -91,7 +94,8 @@ export default function AssistantWidget() {
   const lastResults = useMemo(() => {
     for (let i = turns.length - 1; i >= 0; i -= 1) {
       const r = turns[i].response;
-      if (r?.type === "SHOW_SEARCH_RESULTS") return r.results || [];
+      if (r?.type === "SHOW_SEARCH_RESULTS") return { kind: "deck", rows: r.results || [] };
+      if (r?.type === "SHOW_GALLERY_RESULTS") return { kind: "gallery", rows: r.results || [] };
       if (r?.type === "ASK_CLARIFICATION") return null;
     }
     return null;
@@ -162,21 +166,42 @@ export default function AssistantWidget() {
               </div>
             ))}
 
-            {lastResults?.length ? (
+            {lastResults?.rows?.length ? (
               <div className="space-y-1.5">
-                {lastResults.slice(0, 6).map((d) => (
-                  <button
-                    key={d.pres_id}
-                    onClick={() => navigate(`/app/preview/${d.deck_id}`)}
-                    className="flex w-full items-center gap-2 rounded-lg border p-2 text-left text-xs hover:border-primary/40 hover:bg-primary/5"
-                  >
-                    <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] text-primary">
-                      #{d.display_number}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-medium">{d.title}</span>
-                    <span className="text-muted-foreground">{d.slide_count} sl</span>
-                  </button>
-                ))}
+                {lastResults.rows.slice(0, 6).map((d) =>
+                  lastResults.kind === "gallery" ? (
+                    <button
+                      key={d.slug}
+                      onClick={() => navigate(`/app/gallery?topic=${encodeURIComponent(d.slug)}`)}
+                      className="flex w-full items-center gap-2 rounded-lg border p-2 text-left text-xs hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                          d.has_deck ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {d.has_deck ? "Ready" : "Generate"}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-medium">{d.title}</span>
+                      <span className="text-muted-foreground">
+                        {d.has_deck ? `${d.slide_count} sl` : d.subject}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      key={d.pres_id}
+                      onClick={() => navigate(`/app/preview/${d.deck_id}`)}
+                      className="flex w-full items-center gap-2 rounded-lg border p-2 text-left text-xs hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] text-primary">
+                        #{d.display_number}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-medium">{d.title}</span>
+                      <span className="text-muted-foreground">{d.slide_count} sl</span>
+                    </button>
+                  )
+                )}
               </div>
             ) : null}
 
