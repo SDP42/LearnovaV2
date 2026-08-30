@@ -69,26 +69,22 @@ POST /api/assistant/query {text, session_id}
 | 2 | Architecture | ✅ |
 | 3 | Presentation registry + stable ids | ✅ (registry builds + backfills; `save_deck` still assigns via registry lazily) |
 | 4 | Intent + entity system | ✅ 57 intents, deterministic NLU **88.7% intent / 90.6% action** on the 1640-row benchmark |
-| 5 | Tool / action layer | ✅ typed protocol + resolver + orchestrator; **tool execution** (openPresentation, goToSlide…) is returned as an action for the frontend, not yet a server-side tool bus |
+| 5 | Tool / action layer | ✅ `tools.py` — server-side tool bus (`openPresentation`, `getWebDeck`, `goToSlide`, `getSlideContent`, `searchContent`, `explainContent`, …); each validates existence / range / ownership; an LLM-supplied id is resolved + checked here, never trusted |
 | 6 | Context / session | ✅ in-memory; multi-turn tested (open → navigate → "explain this" → switch deck) |
-| 7 | Chat assistant | 🟡 deterministic path live; **LLM fallback** (`orchestrator.classify_llm`) is a wired hook, not implemented; content-retrieval for `EXPLAIN_CONTENT` returns a typed stub the LLM/frontend fills |
-| 8 | Voice (STT / TTS) | �⬜ not started — frontend Web Speech API + a `/api/assistant/voice` passthrough is the plan; `AssistantResponse.speech` field already exists |
+| 7 | Chat assistant | ✅ `llm.py` — `classify_intent` (LLM fallback for confidence < 0.55, validated against the taxonomy) + `answer_question` (grounded in retrieved deck/slide text; may simplify / translate the *reply*; deck untouched). Both route through `providers.router`; degrade to the rule path with no provider. |
+| 8 | Voice (STT / TTS) | ✅ `frontend/src/lib/useVoice.js` — `SpeechRecognition` in, `speechSynthesis` out, barge-in (new listen / stop cancels speech). Wired into the widget. Degrades to text-only where the APIs are absent. |
 | 9 | QA dataset (~1–2k) | ✅ 1640 rows + 40 gold |
-| 10 | Automated tests | ✅ `tests/test_assistant.py` — 32 tests, benchmark floors asserted |
-| 11 | Edge cases | 🟡 covered: not-found, out-of-range, ambiguous, no-decks, typo, wake-word; pending: transcription error, API failure, unauthorized cross-user |
-| 12 | UX polish | ⬜ frontend assistant widget not built |
+| 10 | Automated tests | ✅ `tests/test_assistant.py` — 36 tests (ids, NLU, resolver, orchestrator, multi-turn, edge cases, tool bus, LLM fallback, grounded explain) + benchmark floors |
+| 11 | Edge cases | 🟡 covered: not-found, out-of-range, ambiguous (clarify), no-decks, typo, wake-word, low-confidence→LLM, no-content; pending: transcription error surfacing, unauthorized cross-user |
+| 12 | UX polish | ✅ `frontend/src/components/app/AssistantWidget.jsx` — floating chat + mic panel in `AppLayout`; executes the typed response (route to deck, `?slide=N`, clarification chips, search-result cards, speak). |
 
-## Next milestones
+## Remaining
 
-1. **LLM fallback + content retrieval** (Phase 7 completion): implement
-   `classify_llm` (route through `providers.router`) and an
-   `EXPLAIN_CONTENT` handler that pulls the relevant slide/section text from
-   the deck (via `deck_library` + the rag store) and answers — the reply may
-   be simplified/translated per the user's ask; the deck is never modified.
-2. **Frontend assistant widget** (Phase 12): mic button + chat panel in
-   `AppLayout`, executes `response.type` actions against the existing
-   `api.js` + router.
-3. **Voice** (Phase 8): browser `SpeechRecognition` → `/api/assistant/query`
-   → `SpeechSynthesis` on `response.speech || response.message`; barge-in.
-4. **Server-side tool bus** (Phase 5 completion): so an LLM-planned action is
-   validated and executed centrally rather than trusted from the client.
+- Harden edge cases: surface STT errors in the widget; cross-user auth test
+  on the API routes.
+- `create_presentation` from the assistant currently returns a
+  `CREATE_PRESENTATION` action that routes to `/app/create` prefilled — a
+  direct "generate now" path (job creation) is a follow-up.
+- Quiz turns (`NEXT_QUIZ_QUESTION`, `SUBMIT_QUIZ_ANSWER`) return typed stubs;
+  wire them to `ai/quiz_gen` for a live quiz loop.
+- Persist sessions (Redis) if the API ever runs multi-worker.

@@ -19,6 +19,7 @@ import os
 from typing import Callable, List, Optional
 
 from learnova.assistant import actions as R
+from learnova.assistant import tools as T
 from learnova.assistant.intents import INTENT_SPEC, Action, Intent
 from learnova.assistant.nlu import classify
 from learnova.assistant.registry import PresentationEntry, build_registry
@@ -26,9 +27,19 @@ from learnova.assistant.resolver import resolve_presentation_reference
 from learnova.assistant.session import SessionContext
 from learnova.logging_config import logger
 
-# Optional LLM fallback for low-confidence utterances. Wired later; signature:
+
+def _default_llm_classify(utterance: str, context: dict):
+    try:
+        from learnova.assistant.llm import classify_intent
+        return classify_intent(utterance, context)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("assistant: llm import failed: %s", exc)
+        return None
+
+
+# LLM fallback for low-confidence utterances. Overridable for tests.
 #   (utterance: str, context: dict) -> NLUResult | None
-classify_llm: Optional[Callable] = None
+classify_llm: Optional[Callable] = _default_llm_classify
 
 _LLM_FALLBACK_BELOW = float(os.getenv("LEARNOVA_ASSISTANT_LLM_THRESHOLD", "0.55"))
 
@@ -73,25 +84,28 @@ def _clarify_from(candidates: List[PresentationEntry], what: str) -> R.Assistant
 # ── per-action handlers ─────────────────────────────────────────────────────
 def _act_open(nlu, session, entries, *, web_deck=False):
     ref = str(nlu.entities.get("presentation_reference", "")).strip()
-    res = _resolve(ref, session, entries)
-    if res.status == "empty":
-        return R.error("You don't have any presentations yet. Say "
-                       "\"create a presentation about …\" to make one.",
-                       "NO_PRESENTATIONS", intent=nlu.intent.value)
-    if res.status == "ambiguous":
-        return _clarify_from(res.candidates, f"\"{ref}\"")
-    if res.status != "resolved" or not res.entry:
-        return R.error(f"I couldn't find that presentation ({res.reason}).",
-                       "PRESENTATION_NOT_FOUND", intent=nlu.intent.value)
-    e = res.entry
+    tool = T.open_presentation if not web_deck else T.get_web_deck
+    res = tool(session.user_id, ref, **_ctx_kwargs(session))
+    if not res.ok:
+        if res.code == "AMBIGUOUS":
+            cands = res.data.get("candidates", [])
+            opts = [{"label": c["title"], "pres_id": c["pres_id"],
+                     "display_number": c["display_number"]} for c in cands[:5]]
+            names = " or ".join(f"'{c['title']}'" for c in cands[:3])
+            return R.clarify(f"I found {len(cands)} matches for \"{ref}\". "
+                             f"Which one — {names}?", opts, intent=Intent.AMBIGUOUS.value)
+        return R.error(res.message or f"I couldn't find that presentation.",
+                       res.code or "PRESENTATION_NOT_FOUND", intent=nlu.intent.value)
+    e: PresentationEntry = res.data["entry"]
     session.open_presentation(e.pres_id, e.deck_id, slide=1)
     session.current_subject = e.subject or session.current_subject
+    session.current_topic = e.topic or session.current_topic
     verb = "the web deck for" if web_deck else "presentation"
     return R.open_presentation(
         e.pres_id,
         f"Opening {verb} {e.title} (presentation {e.display_number}).",
-        web_deck=web_deck, url=e.web_deck_url if web_deck else None,
-        intent=nlu.intent.value, confidence=res.confidence,
+        web_deck=web_deck, url=res.data.get("web_deck_url"), deck_id=e.deck_id,
+        intent=nlu.intent.value, confidence=res.data.get("confidence", nlu.confidence),
     )
 
 
@@ -134,8 +148,8 @@ def _act_navigate(nlu, session, entries):
         target = n
     session.set_slide(target)
     return R.navigate(e.pres_id, target, f"Slide {target} of {total}.",
-                      slide_id=e.slide_ref(target), intent=nlu.intent.value,
-                      confidence=nlu.confidence)
+                      slide_id=e.slide_ref(target), deck_id=e.deck_id,
+                      intent=nlu.intent.value, confidence=nlu.confidence)
 
 
 def _act_search(nlu, session, entries):
@@ -197,6 +211,14 @@ def _act_create(nlu, session):
     )
 
 
+def _ctx_kwargs(session):
+    return {
+        "result_ids": {r.get("pres_id") for r in (session.last_result_list or [])},
+        "current": session.current_presentation,
+        "previous": session.previous_presentation,
+    }
+
+
 def _act_explain_or_quiz(nlu, session, entries):
     it, spec = nlu.intent, INTENT_SPEC[nlu.intent]
     if spec.action == Action.START_QUIZ:
@@ -220,8 +242,8 @@ def _act_explain_or_quiz(nlu, session, entries):
         return R.AssistantResponse(R.ResponseType.QUIZ_QUESTION, "…",
                                    payload={"turn": it.value, **session.quiz_state},
                                    intent=it.value, confidence=nlu.confidence)
-    # explain / answer — the actual content retrieval + generation happens in a
-    # later phase; for now return a typed EXPLAIN_CONTENT the frontend/LLM fills.
+    # explain / answer — retrieve the relevant deck/slide text and answer via
+    # the LLM. The reply may be simplified / translated; the deck is untouched.
     concept = str(nlu.entities.get("concept") or nlu.entities.get("term")
                   or nlu.entities.get("topic") or "").strip()
     needs_ctx = spec.requires_context and not concept
@@ -229,18 +251,39 @@ def _act_explain_or_quiz(nlu, session, entries):
         return R.clarify("Explain what exactly? Open a slide or name a topic.",
                          [], intent=it.value)
     e = _current_entry(session, entries)
+    style = ("simple" if it == Intent.SIMPLIFY else
+             "step_by_step" if it == Intent.STEP_BY_STEP else "normal")
+    q = concept
+    if it in (Intent.EXPLAIN_SLIDE, Intent.EXPLAIN_VISUAL, Intent.READ_SLIDE):
+        q = concept or "Explain this slide."
+    elif it == Intent.WHY_QUESTION:
+        q = f"Why: {concept}" if concept else session.last_user_request
+    elif it == Intent.WHAT_NEXT:
+        q = "What comes next, based on this slide?"
+    elif it in (Intent.GIVE_EXAMPLE, Intent.REAL_WORLD_EXAMPLE):
+        q = f"Give a{'real-world ' if it == Intent.REAL_WORLD_EXAMPLE else ' '}" \
+            f"example of {concept or session.current_topic or 'this'}."
+    elif it in (Intent.EASIER_EXAMPLE, Intent.HARDER_EXAMPLE):
+        q = f"Give a {'simpler' if it == Intent.EASIER_EXAMPLE else 'harder'} " \
+            f"example of {session.current_topic or 'this'}."
+    elif it == Intent.TRANSLATE:
+        q = session.last_user_request
+
+    res = T.explain_content(
+        session.user_id, deck_id=(e.deck_id if e else None),
+        slide_number=session.current_slide, concept=q or "Explain this.",
+        style=style, target_language=str(nlu.entities.get("target_language", "")),
+        from_content=(spec.action == Action.ANSWER_FROM_CONTENT or bool(e)),
+    )
+    if not res.ok:
+        return R.error(res.message, res.code, intent=it.value)
     return R.AssistantResponse(
-        R.ResponseType.EXPLAIN_CONTENT,
-        f"Here's an explanation of {concept or 'this'}." if concept
-        else "Here's what this covers.",
+        R.ResponseType.EXPLAIN_CONTENT, res.message,
         presentation_id=e.pres_id if e else None,
         slide_number=session.current_slide,
-        payload={"intent": it.value, "concept": concept,
-                 "style": ("simple" if it == Intent.SIMPLIFY else
-                           "step_by_step" if it == Intent.STEP_BY_STEP else "normal"),
-                 "target_language": nlu.entities.get("target_language", ""),
-                 "answer_type": spec.action.value,
-                 "requires_content": spec.action == Action.ANSWER_FROM_CONTENT},
+        payload={"intent": it.value, "concept": concept, "style": style,
+                 "grounded": res.data.get("grounded", False),
+                 "source": res.data.get("source", "general")},
         intent=it.value, confidence=nlu.confidence)
 
 

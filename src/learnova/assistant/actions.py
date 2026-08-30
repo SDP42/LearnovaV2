@@ -50,12 +50,14 @@ class AssistantResponse:
     confidence: float = 0.0
     error_code: Optional[str] = None
 
+    deck_id: Optional[str] = None
+
     def to_dict(self) -> dict:
         d = {"type": self.type, "message": self.message}
         if self.speech and self.speech != self.message:
             d["speech"] = self.speech
-        for k in ("presentation_id", "slide_id", "slide_number", "web_deck_url",
-                  "intent", "error_code"):
+        for k in ("presentation_id", "deck_id", "slide_id", "slide_number",
+                  "web_deck_url", "intent", "error_code"):
             v = getattr(self, k)
             if v is not None:
                 d[k] = v
@@ -87,19 +89,20 @@ def clarify(message: str, options: List[Dict[str, Any]], *, intent=None,
 
 
 def open_presentation(pid: str, message: str, *, web_deck=False, intent=None,
-                      confidence=1.0, url: Optional[str] = None) -> AssistantResponse:
+                      confidence=1.0, url: Optional[str] = None,
+                      deck_id: Optional[str] = None) -> AssistantResponse:
     return AssistantResponse(
         ResponseType.SHOW_WEB_DECK if web_deck else ResponseType.OPEN_PRESENTATION,
-        message, presentation_id=pid, web_deck_url=url, intent=intent,
-        confidence=confidence,
+        message, presentation_id=pid, deck_id=deck_id, web_deck_url=url,
+        intent=intent, confidence=confidence,
     )
 
 
 def navigate(pid: Optional[str], slide_number: Optional[int], message: str, *,
-             slide_id=None, intent=None, confidence=1.0) -> AssistantResponse:
+             slide_id=None, deck_id=None, intent=None, confidence=1.0) -> AssistantResponse:
     return AssistantResponse(ResponseType.NAVIGATE, message, presentation_id=pid,
                              slide_number=slide_number, slide_id=slide_id,
-                             intent=intent, confidence=confidence)
+                             deck_id=deck_id, intent=intent, confidence=confidence)
 
 
 def search_results(message: str, results: List[Dict[str, Any]], *, intent=None,

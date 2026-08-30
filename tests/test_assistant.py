@@ -35,7 +35,18 @@ DECKS = [
 
 @pytest.fixture
 def session(monkeypatch):
+    from learnova.assistant import registry as _reg
+    from learnova.assistant import tools as _tools
+    monkeypatch.setattr(_reg, "build_registry", lambda uid: list(DECKS))
     monkeypatch.setattr(orch, "build_registry", lambda uid: list(DECKS))
+    # keep the LLM path out of the deterministic tests
+    monkeypatch.setattr(orch, "classify_llm", None)
+    monkeypatch.setenv("LEARNOVA_ASSISTANT_LLM", "0")
+    # stub content retrieval + answer (no decks on disk in the test)
+    monkeypatch.setattr(_tools, "get_slide_content",
+                        lambda *a, **k: _tools.ToolResult.done(text="stub slide text", source="slide"))
+    monkeypatch.setattr("learnova.assistant.llm.answer_question",
+                        lambda **k: f"[answer to: {k.get('question','')[:40]}]")
     return SessionContext("s1", "u")
 
 
@@ -133,7 +144,10 @@ def test_navigate_without_presentation_errors(session):
 
 
 def test_no_presentations(monkeypatch):
+    from learnova.assistant import registry as _reg
+    monkeypatch.setattr(_reg, "build_registry", lambda uid: [])
     monkeypatch.setattr(orch, "build_registry", lambda uid: [])
+    monkeypatch.setattr(orch, "classify_llm", None)
     s = SessionContext("s2", "u")
     r = orch.handle("open presentation 2", s).to_dict()
     assert r["type"] == "ERROR_RESPONSE" and r["error_code"] == "NO_PRESENTATIONS"
@@ -195,6 +209,63 @@ def test_gold_examples_intent_exact():
         and not _lenient(classify(g["question"]).intent.value, g["intent"])
     ]
     assert len(misses) <= 2, misses
+
+
+# ── tools ───────────────────────────────────────────────────────────────────
+def test_tools_open_and_range(monkeypatch):
+    from learnova.assistant import registry as _reg, tools as T
+    monkeypatch.setattr(_reg, "build_registry", lambda uid: list(DECKS))
+    r = T.open_presentation("u", "the RSA deck")
+    assert r.ok and r.data["presentation_id"] == "LRN-PRES-0001"
+    r = T.go_to_slide("u", "LRN-PRES-0001", 99)
+    assert not r.ok and r.code == "SLIDE_OUT_OF_RANGE"
+    r = T.go_to_slide("u", "LRN-PRES-0001", 5)
+    assert r.ok and r.data["slide_id"] == "LRN-PRES-0001-S05"
+
+
+def test_tools_ambiguous(monkeypatch):
+    from learnova.assistant import registry as _reg, tools as T
+    monkeypatch.setattr(_reg, "build_registry", lambda uid: list(DECKS))
+    r = T.open_presentation("u", "the cybersecurity presentation")
+    assert not r.ok and r.code == "AMBIGUOUS" and len(r.data["candidates"]) == 2
+
+
+def test_llm_fallback_used_for_low_confidence(monkeypatch):
+    from learnova.assistant import registry as _reg
+    from learnova.assistant.nlu import NLUResult
+    from learnova.assistant.intents import Intent
+    monkeypatch.setattr(_reg, "build_registry", lambda uid: list(DECKS))
+    monkeypatch.setattr(orch, "build_registry", lambda uid: list(DECKS))
+    calls = []
+
+    def fake_llm(utt, ctx):
+        calls.append(utt)
+        return NLUResult(Intent.OPEN_PRESENTATION, 0.82,
+                         {"presentation_reference": "2"}, matched_rule="llm")
+
+    monkeypatch.setattr(orch, "classify_llm", fake_llm)
+    s = SessionContext("s9", "u")
+    r = orch.handle("mmm could you maybe surface the second thing", s).to_dict()
+    assert calls, "LLM fallback should fire on a low-confidence utterance"
+    assert r["type"] == "OPEN_PRESENTATION" and r["presentation_id"] == "LRN-PRES-0002"
+
+
+def test_explain_grounds_in_deck_text(monkeypatch):
+    from learnova.assistant import registry as _reg, tools as T
+    monkeypatch.setattr(_reg, "build_registry", lambda uid: list(DECKS))
+    monkeypatch.setattr(orch, "build_registry", lambda uid: list(DECKS))
+    monkeypatch.setattr(orch, "classify_llm", None)
+    seen = {}
+    monkeypatch.setattr(T, "get_slide_content",
+                        lambda uid, did, n=None: T.ToolResult.done(text="RSA uses two keys.", source="slide"))
+    monkeypatch.setattr("learnova.assistant.llm.answer_question",
+                        lambda **k: seen.update(k) or "RSA is asymmetric encryption.")
+    s = SessionContext("s10", "u")
+    orch.handle("open presentation 1", s)
+    r = orch.handle("explain this slide", s).to_dict()
+    assert r["type"] == "EXPLAIN_CONTENT"
+    assert "RSA uses two keys" in seen.get("context", "")     # grounded
+    assert r["message"] == "RSA is asymmetric encryption."
 
 
 def _lenient(a, b):

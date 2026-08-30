@@ -196,6 +196,23 @@ export async function downloadArtifact(path, filename) {
   URL.revokeObjectURL(url);
 }
 
+// ── Assistant ─────────────────────────────────────────────────────────────
+export async function assistantQuery(text, sessionId = "app") {
+  return json(
+    await fetch(`${BASE}/api/assistant/query`, {
+      method: "POST",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ text, session_id: sessionId }),
+    })
+  );
+}
+
+export async function assistantRegistry() {
+  return json(
+    await fetch(`${BASE}/api/assistant/registry`, { headers: await authHeaders() })
+  );
+}
+
 export const jobDownloadPath = (id, artifact) => `/api/jobs/${id}/download/${artifact}`;
 export const deckDownloadPath = (id, artifact) => `/api/decks/${id}/download/${artifact}`;
 

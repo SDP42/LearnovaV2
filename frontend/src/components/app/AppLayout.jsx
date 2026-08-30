@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme.jsx";
 import AppSidebar from "@/components/app/AppSidebar";
+import AssistantWidget from "@/components/app/AssistantWidget";
 
 /**
  * The shared app shell: collapsible icon sidebar + sticky header + inset
@@ -35,6 +36,7 @@ export default function AppLayout({ title, actions, children }) {
           </header>
           <div className="flex-1 p-4 sm:p-6">{children}</div>
         </SidebarInset>
+        <AssistantWidget />
       </SidebarProvider>
     </div>
   );
