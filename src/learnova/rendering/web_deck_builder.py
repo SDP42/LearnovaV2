@@ -529,9 +529,6 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             min-height: 690px;
             box-sizing: border-box;
         }}
-        .reveal .slides > section > .lv-body {{
-            min-height: 600px;
-        }}
         /* Teaching-slide bullet hierarchy + indentation */
         .reveal .lv-textbody ul {{ margin: 0; }}
         .reveal .lv-textbody li {{ padding-left: 2px; }}

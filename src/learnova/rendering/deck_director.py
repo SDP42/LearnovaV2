@@ -340,16 +340,22 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         # supporting visual beside it. Chart/table families that carry the data
         # themselves (KPI, real table) are exempt.
         _bwords = sum(len(b.split()) for b in bullets)
+        _longest = max((len(b.split()) for b in bullets), default=0)
         _content_heavy = len(bullets) > 7 or _bwords > 110
         _lossy_family = str(vd.family or "").upper() in {
             "PROCESS_LINEAR", "PROCESS_CYCLIC", "DECISION", "STATE_MACHINE",
             "MIND_MAP", "HIERARCHY_TREE", "HIERARCHY_NEST", "TIMELINE",
             "COMPARE_VISUAL", "SET_DIAGRAM", "LIST_STRUCTURED",
         }
+        # A diagram family only works when the bullets are genuinely short,
+        # parallel node labels. If any bullet is a full teaching sentence, or
+        # the slide is content-heavy, the diagram would garble / drop text —
+        # keep it as text and hang the visual beside it instead.
         force_text = (
-            _content_heavy and _lossy_family
+            _lossy_family
             and existing_layout in {"MINIMAL_TEXT", "", "CARD_GRID"}
             and not (vdata and vdata.get("forced"))
+            and (_content_heavy or _longest > 12)
         )
 
         override_bar = 0.75 if _has_real_data else 0.6
