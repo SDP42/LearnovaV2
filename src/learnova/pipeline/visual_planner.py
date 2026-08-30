@@ -349,22 +349,25 @@ def enrich_deck(improved: List[dict]) -> int:
         if not planned:
             continue
 
-        # Content-preservation gate. plan_visual compresses a slide down to ~6
-        # node labels. That is an upgrade for a thin MINIMAL_TEXT slide, but a
-        # loss when the router (or its restore pass) already assembled a full
-        # set of teaching points — the deck must "capture all the thing", not
-        # trade 20 sentences for a 4-box diagram.
-        cur_wc = sum(len(str(b).split()) for b in (current.get("bullets") or []))
-        new_wc = sum(len(str(b).split()) for b in (planned.get("bullets") or []))
-        # A table or metric keeps its own data payload, so a lower bullet count
-        # is not a content loss. A flowchart/timeline that squeezes the slide
-        # into 6 node labels *is* — even with a spec attached the 20 sentences
-        # it dropped are gone. Keep the fuller text slide in that case.
-        payload_visual = bool(planned.get("table_rows") or planned.get("metric_value"))
-        if cur_wc >= 45 and new_wc < 0.6 * cur_wc and not payload_visual:
+        # Content-preservation gate (MASTER_PROMPT). plan_visual re-expresses a
+        # slide as a handful of node labels / table rows. That is an upgrade for
+        # a thin MINIMAL_TEXT slide, but on a content-rich one the sentences it
+        # doesn't carry are simply gone. Compare ALL the words the new form
+        # would carry (bullets + table cells + mermaid labels) against the
+        # current slide; if it drops more than ~25%, keep the text.
+        def _wc(x):
+            return sum(len(str(t).split()) for t in (x or []))
+        cur_wc = _wc(current.get("bullets"))
+        new_wc = (
+            _wc(planned.get("bullets"))
+            + _wc([c for r in (planned.get("table_rows") or []) for c in r])
+            + _wc(str(planned.get("mermaid_code", "")).split("\n"))
+            + len(str(planned.get("metric_desc", "")).split())
+        )
+        if cur_wc >= 45 and new_wc < 0.75 * cur_wc:
             logger.info(
-                "visual planner: keeping fuller text slide %r (%dw) over %s (%dw)",
-                title[:40], cur_wc, planned.get("layout_type"), new_wc,
+                "visual planner: keeping fuller text slide %r (%dw kept vs %dw)",
+                title[:40], cur_wc, new_wc,
             )
             continue
 

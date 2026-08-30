@@ -91,14 +91,29 @@ def is_redundant(candidate: str, others: list[str]) -> bool:
     a = re.sub(r"[^a-z0-9 ]", "", (candidate or "").lower()).strip()
     if not a:
         return True
+    a_words = len(a.split())
     for other in others:
         b = re.sub(r"[^a-z0-9 ]", "", (other or "").lower()).strip()
         if not b or a == b:
             return True
-        # One wholly contained in the other, on a word boundary.
-        shorter, longer = sorted((a, b), key=len)
-        if len(shorter) >= 4 and re.search(rf"(?:^|\s){re.escape(shorter)}(?:\s|$)", longer):
-            return True
+        contained = lambda s, t: (
+            len(s) >= 4 and re.search(rf"(?:^|\s){re.escape(s)}(?:\s|$)", t)
+        )
+        if len(a) <= len(b):
+            # Candidate is the shorter string. It is redundant only if it is a
+            # bare fragment (few words, no real predicate) that the longer one
+            # already contains — a title fragment, not a standalone point.
+            if a_words <= 6 and contained(a, b):
+                return True
+        else:
+            # Candidate is the LONGER string. It is redundant only if it barely
+            # adds anything — a near-verbatim restatement of the shorter one.
+            # A full explanatory sentence that merely *mentions* a short label
+            # ("text categorization" inside "In email filtering, text
+            # categorization is applied to …") is NOT redundant — it is the
+            # explanation and must be kept (docs/MASTER_PROMPT.md).
+            if len(a) <= len(b) + 14 and contained(b, a):
+                return True
     return False
 
 

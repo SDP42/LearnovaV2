@@ -13,14 +13,16 @@ import os
 from learnova.ai.layout_router import classify_and_structure_chunk
 from learnova.logging_config import logger
 
-MAX_CHUNKS = 80
+# A hard ceiling only to bound cost on a pathological input — high enough that
+# a real lecture (with per-phase slide explosion) is never truncated. Content
+# preservation beats a shorter deck; see docs/MASTER_PROMPT.md.
+MAX_CHUNKS = int(os.getenv("LEARNOVA_MAX_CHUNKS", "400"))
 
-# Source words the bulletiser must retain. The LLM (esp. small reasoning models)
-# still over-summarises even when told not to — 8 sentences in, 3 bullets out.
-# When its bullets carry less than this fraction of the extractive baseline's
-# word count we keep the LLM's layout/title/visual decisions but swap in the
-# extractive bullets, which keep every sentence with only light compression.
-_MIN_RETENTION_VS_EXTRACTIVE = float(os.getenv("LEARNOVA_MIN_RETENTION", "0.9"))
+# The LLM path must not summarise a section away. When its own bullets carry
+# less than this fraction of the (now fully verbatim) extractive baseline, we
+# keep the LLM's layout / title / visual choices but swap in the extractive
+# bullets. At 0.95 the model has to keep essentially everything.
+_MIN_RETENTION_VS_EXTRACTIVE = float(os.getenv("LEARNOVA_MIN_RETENTION", "0.95"))
 
 
 def _wc(bullets) -> int:

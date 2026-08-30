@@ -392,9 +392,10 @@ def paginate_slide(entry: dict, profile: DensityProfile,
     title = improved.get("title", "Slide")
     takeaway = improved.get("takeaway", "")
 
-    # PRESERVE directive: slides that are mostly definitions / laws / quotations
-    # keep their exact wording — split_bullet returns them untouched.
-    preserve = _should_preserve(improved)
+    # MASTER_PROMPT: a sentence is never trimmed for length. For every teaching
+    # profile we keep bullets whole (the renderer wraps / auto-fits / paginates)
+    # — only "low" (deliberate headline mode) may split a run-on into ↳ lines.
+    preserve = profile.id != "low" or _should_preserve(improved)
 
     # Metrics and quizzes lose their meaning when split.
     if layout in _ATOMIC_LAYOUTS:

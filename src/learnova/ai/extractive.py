@@ -378,13 +378,11 @@ def structure_chunk(text: str, title: str = "", *,
     bullets: List[str] = []
     for i in keep:
         raw = sentences[i].rstrip(".")
-        # Only touch a genuine 55-word-plus run-on, and only trim it to ~50 —
-        # everything else is kept exactly as written.
-        if light_compress and len(raw.split()) > 55:
-            b = compress_bullet(raw, target_words)
-        else:
-            b = _LEAD_MARKERS.sub("", raw, count=1).strip() or raw
-            b = (b[:1].upper() + b[1:]) if b else b
+        # MASTER_PROMPT: never trim a sentence for being long — present it
+        # better (wrap / auto-fit / its own slide). Every sentence is kept
+        # verbatim; we only drop a leading discourse marker ("Moreover, ").
+        b = _LEAD_MARKERS.sub("", raw, count=1).strip() or raw
+        b = (b[:1].upper() + b[1:]) if b else b
         # Dedupe on the WHOLE normalised bullet, not a 55-char prefix — two
         # sentences that share an "X: Aspects: …" lead-in are different points.
         key = re.sub(r"[^a-z0-9]", "", b.lower())
@@ -413,7 +411,8 @@ def structure_chunk(text: str, title: str = "", *,
         "title": (title or bullets[0][:60] if bullets else "Overview").strip(),
         "bullets": bullets or [clean[:240]],
         "takeaway": takeaway,
-        "verbatim": [] if light_compress else bullets,
+        # Everything is verbatim now — protect all of it from density trimming.
+        "verbatim": list(bullets),
         "visual_source": "extractive",
     }
     if layout == "FLOWCHART":

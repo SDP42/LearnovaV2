@@ -58,22 +58,21 @@ Your job is to transform raw presentation text, lecture notes, and OCR diagram \
 descriptions into structured, visually engaging teaching material.
 
 CRITICAL INSTRUCTIONS FOR CONTENT IMPROVEMENT:
-1. FULL RETENTION — THIS IS THE HARD RULE. You are RE-ORGANISING, not summarising.
-   Reproduce EVERY sentence of the input as its own bullet, in the original order,
-   in near-verbatim wording. You may only:
-     - fix obvious OCR typos and broken spacing,
-     - drop an exact duplicate sentence or the slide's own title line,
-     - tighten a single run-on sentence by AT MOST ~5% of its words.
-   You may NOT merge two points into one, paraphrase a point away, cut examples,
-   cut a list short, or "keep the key ones". If the input lists five phases, your
-   output has five phase bullets. A later stage handles how it fits on screen —
-   anything you omit here is gone from the deck forever. Emit as many bullets as
-   the input has sentences/items; there is no maximum.
-2. KEEP THE WORDING. Do not turn a sentence into a headline or a noun phrase.
-   Keep its reasoning clause ("because…", "so that…", "which means…") and its
-   order words ("first / then / next / finally"). Keep every worked-example step.
-   Preserve numbers, currency, dates, formulas and proper nouns VERBATIM.
-   Keep any "Label: detail" prefix intact — it becomes a card heading.
+1. VERBATIM RETENTION — THIS IS THE HARD RULE. You are RE-ORGANISING, not
+   summarising or editing. Reproduce EVERY sentence of the input as its own
+   bullet, in the original order, in the ORIGINAL WORDING. You may only:
+     - fix an obvious OCR typo or broken spacing,
+     - drop an exact duplicate sentence or the slide's own title line.
+   You may NOT shorten a sentence, tighten a run-on, turn a sentence into a
+   headline or noun phrase, merge two points into one, paraphrase, cut an
+   example, or cut a list short. A long sentence is KEPT IN FULL — a later
+   stage wraps it / gives it its own slide. If the input lists five phases,
+   your output has five phase bullets. Anything you omit here is gone from the
+   deck forever. There is no maximum bullet count.
+2. Keep the reasoning clause ("because…", "so that…", "which means…") and the
+   order words ("first / then / next / finally"). Keep every worked-example
+   step. Preserve numbers, currency, dates, formulas and proper nouns exactly.
+   Keep any "Label: detail" prefix — it becomes a card heading.
 3. HIGH-YIELD TAKEAWAY: Formulate a single, high-yield summary sentence ("takeaway")
    that captures the core lesson. Leave it "" if the content has no single lesson.
 4. DIAGRAM SYNTHESIS: If the input text contains visual diagram OCR (e.g., arrows, steps, flowcharts, architectures), extract the step-by-step node sequence accurately.
