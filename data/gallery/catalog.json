@@ -1516,12 +1516,15 @@
    "subject": "Economics",
    "category": "Business",
    "tags": [
-    "economics"
+    "macroeconomics",
+    "prices",
+    "CPI",
+    "purchasing power"
    ],
    "level": "Introductory",
    "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "status": "outline",
+   "outline": "## Inflation and the CPI\n\nInflation is a sustained rise in the general price level; the Consumer Price Index (CPI) measures it by tracking the cost of a fixed basket of goods over time.\n\nInflation erodes purchasing power, and the CPI turns thousands of individual prices into one comparable number.\n\n## Why it matters\nIt determines interest rates, pension and wage adjustments, tax brackets and whether your savings are really growing.\n\n## The core ideas\n- Inflation is about the overall price level, not one product getting dearer\n- The CPI prices a representative basket and compares it to a base year\n- Real values adjust nominal values for inflation to compare across time\n- Moderate, predictable inflation (around 2%) is a common central-bank target\n\n## How it works, step by step\n1. Define a fixed basket of goods and services a typical household buys\n2. Record the basket's total cost in the base period\n3. Record its cost again in the current period\n4. CPI = (current cost / base cost) x 100\n5. The inflation rate is the percentage change in CPI between two periods\n\n## A worked example\nIf a basket cost 100 in 2015 and 128 in 2025, the CPI is 128, so prices rose 28% over the decade. A salary that stayed at 100 now buys what 78 did in 2015.\n\n## Where people go wrong\n- Confusing a one-off price jump with ongoing inflation\n- Comparing incomes across decades without adjusting for inflation\n- Assuming the fixed basket reflects your personal spending exactly\n\n## The takeaway\nInflation shrinks what money buys; the CPI measures it by re-pricing the same shopping basket year after year."
   },
   {
    "slug": "interest-rates-and-the-yield-curve",
@@ -1707,6 +1710,22 @@
    "minutes": 6,
    "status": "index",
    "outline": ""
+  },
+  {
+   "slug": "the-prisoner-s-dilemma",
+   "title": "The Prisoner's Dilemma",
+   "subject": "Economics",
+   "category": "Business",
+   "tags": [
+    "game theory",
+    "cooperation",
+    "incentives",
+    "strategy"
+   ],
+   "level": "Introductory",
+   "minutes": 6,
+   "status": "outline",
+   "outline": "## The Prisoner's Dilemma\n\nThe prisoner's dilemma is a game in which two players each do better by defecting whatever the other does, yet both are worse off than if they had cooperated.\n\nIndividual rationality leads to a collectively bad outcome; repetition and enforcement can rescue cooperation.\n\n## Why it matters\nIt models arms races, price wars, overfishing, climate negotiations and doping in sport — why good outcomes need rules, not just goodwill.\n\n## The core ideas\n- Each player has two choices: cooperate or defect\n- Defecting is the dominant strategy — best regardless of the other's choice\n- Mutual defection is the Nash equilibrium but is worse for both than mutual cooperation\n- Repeated play with memory (e.g. tit-for-tat) can sustain cooperation\n\n## How it works, step by step\n1. Lay out the payoff matrix for both players' choices\n2. For each player, check their best response to the other cooperating, then to the other defecting\n3. If defect beats cooperate in both cases, defect is dominant\n4. The equilibrium is where both play their dominant strategy\n5. Compare that outcome to mutual cooperation to see the dilemma\n\n## A worked example\nTwo suspects are questioned separately. If both stay silent they each get 1 year; if both confess, 5 years each; if one confesses and the other stays silent, the confessor walks free and the other gets 10. Each reasons their way to confessing — and both get 5 years.\n\n## Where people go wrong\n- Thinking the players can just agree to cooperate — they cannot enforce it\n- Assuming the one-shot logic applies to repeated interactions\n- Confusing the Nash equilibrium with the best joint outcome\n\n## The takeaway\nWhen defecting always pays individually, rational players reach an outcome both would have rejected together."
   },
   {
    "slug": "unemployment-types",
@@ -2252,12 +2271,15 @@
    "subject": "History",
    "category": "Humanities",
    "tags": [
-    "history"
+    "18th century",
+    "France",
+    "revolution",
+    "politics"
    ],
-   "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "level": "Intermediate",
+   "minutes": 8,
+   "status": "outline",
+   "outline": "## The French Revolution\n\nThe French Revolution (1789-1799) overthrew the absolute monarchy of France, abolished feudal privilege, and reshaped ideas of citizenship across Europe.\n\nFiscal crisis, Enlightenment ideas and food shortages combined to topple a rigid social order in a decade of upheaval.\n\n## Why it matters\nIt gave the modern world the language of citizenship, rights and revolution, and set the template for political upheaval ever since.\n\n## The core ideas\n- France was divided into three estates; the third (commoners) paid most tax and had least power\n- State bankruptcy forced the king to call the Estates-General in 1789\n- The Declaration of the Rights of Man asserted liberty, equality and popular sovereignty\n- The Revolution radicalised into the Terror, then swung to Napoleon's rule\n\n## How it works, step by step\n1. A debt crisis forces Louis XVI to summon the Estates-General\n2. The Third Estate breaks away as a National Assembly and swears the Tennis Court Oath\n3. Parisians storm the Bastille; peasants rise; feudal privileges are abolished in August 1789\n4. The monarchy is overthrown in 1792; the king is executed in 1793\n5. The Jacobin Terror gives way to the Directory, then Napoleon's coup in 1799\n\n## A worked example\nIn 1789 a Parisian labourer spent most of a day's wage on bread. When the price spiked that summer, crowds that might once have petitioned instead marched on the Bastille and later on Versailles — economic desperation turned political.\n\n## Where people go wrong\n- Treating it as one event rather than a decade of shifting regimes\n- Assuming it led straight to democracy — it led to the Terror and then an emperor\n- Ignoring the role of ordinary hunger alongside high ideals\n\n## The takeaway\nA bankrupt state plus Enlightenment ideals plus hungry cities dismantled a thousand-year-old order in ten turbulent years."
   },
   {
    "slug": "the-great-depression",
@@ -2502,12 +2524,15 @@
    "subject": "History",
    "category": "Humanities",
    "tags": [
-    "history"
+    "20th century",
+    "Europe",
+    "war",
+    "alliances"
    ],
-   "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "level": "Intermediate",
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## World War I: Causes\n\nThe First World War (1914-1918) grew from a single assassination into a continental war because of alliances, militarism, imperial rivalry and nationalism.\n\nLong-term tensions made Europe combustible; the assassination in Sarajevo was the spark that set rigid alliance systems in motion.\n\n## Why it matters\nIts causes are the classic case study in how alliances, arms races and miscalculation turn a crisis into catastrophe.\n\n## The core ideas\n- Two alliance blocs: the Triple Entente and the Triple Alliance\n- An arms race, especially the naval rivalry between Britain and Germany\n- Imperial competition for colonies and markets\n- Nationalism in the Balkans threatening Austria-Hungary\n\n## How it works, step by step\n1. A Serbian nationalist assassinates Archduke Franz Ferdinand in June 1914\n2. Austria-Hungary, backed by Germany, issues an ultimatum to Serbia\n3. Russia mobilises to defend Serbia; Germany declares war on Russia and France\n4. Germany invades Belgium to reach France, bringing Britain in\n5. Within weeks the alliance chain has pulled in most of Europe\n\n## A worked example\nAustria-Hungary's leaders wanted a small, local war against Serbia. But mobilisation timetables meant Russia could not partially mobilise, Germany's war plan required attacking France first, and each step forced the next — a local dispute became a world war in five weeks.\n\n## Where people go wrong\n- Blaming a single country or the assassination alone\n- Assuming leaders wanted the war they got\n- Ignoring how military plans removed room to slow down\n\n## The takeaway\nDeep rivalries loaded the gun; the alliance system and rigid war plans meant one shot fired it across a continent."
   },
   {
    "slug": "world-war-ii-the-pacific-theatre",
@@ -4648,6 +4673,22 @@
    "outline": ""
   },
   {
+   "slug": "solving-quadratic-equations",
+   "title": "Solving Quadratic Equations",
+   "subject": "Mathematics",
+   "category": "Math",
+   "tags": [
+    "algebra",
+    "quadratic formula",
+    "factoring",
+    "roots"
+   ],
+   "level": "Intermediate",
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## Solving Quadratic Equations\n\nA quadratic equation has the form ax^2 + bx + c = 0; solving it means finding the x values where the parabola crosses zero.\n\nThree tools cover every case: factoring, completing the square and the quadratic formula.\n\n## Why it matters\nQuadratics model projectile paths, areas, profit curves and optimisation — anywhere a rate of change itself changes.\n\n## The core ideas\n- A quadratic has at most two real roots\n- The discriminant b^2 - 4ac tells you how many: positive two, zero one, negative none real\n- The quadratic formula always works; factoring is faster when it applies\n- The roots are symmetric about x = -b/(2a), the vertex\n\n## How it works, step by step\n1. Rearrange the equation to ax^2 + bx + c = 0\n2. Try to factor into two brackets that multiply back correctly\n3. If factoring is awkward, compute the discriminant b^2 - 4ac\n4. Apply the quadratic formula x = (-b ± sqrt(discriminant)) / (2a)\n5. Check each solution by substituting back into the original equation\n\n## A worked example\nSolve x^2 - 5x + 6 = 0. It factors as (x - 2)(x - 3) = 0, so x = 2 or x = 3. The formula gives the same: discriminant 25 - 24 = 1, x = (5 ± 1)/2.\n\n## Where people go wrong\n- Dividing by x and losing the root x = 0\n- Forgetting the ± so only one root is found\n- Sign errors when b or c is negative in the formula\n\n## The takeaway\nRearrange to standard form, factor if you can, otherwise let the discriminant and the formula finish the job."
+  },
+  {
    "slug": "systems-of-linear-equations",
    "title": "Systems of Linear Equations",
    "subject": "Mathematics",
@@ -4713,30 +4754,20 @@
    "outline": ""
   },
   {
-   "slug": "the-normal-distribution",
-   "title": "The Normal Distribution",
-   "subject": "Mathematics",
-   "category": "Math",
-   "tags": [
-    "mathematics"
-   ],
-   "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
-  },
-  {
    "slug": "the-pythagorean-theorem",
    "title": "The Pythagorean Theorem",
    "subject": "Mathematics",
    "category": "Math",
    "tags": [
-    "mathematics"
+    "geometry",
+    "triangles",
+    "distance",
+    "proof"
    ],
    "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "minutes": 5,
+   "status": "outline",
+   "outline": "## The Pythagorean Theorem\n\nIn a right-angled triangle, the square of the hypotenuse equals the sum of the squares of the other two sides: a^2 + b^2 = c^2.\n\nIt links the three side lengths of any right triangle and generalises to distance in coordinate geometry.\n\n## Why it matters\nIt underlies navigation, construction, computer graphics and every distance calculation in coordinate geometry.\n\n## The core ideas\n- It only applies to right-angled triangles\n- The hypotenuse is the longest side, opposite the right angle\n- The converse is also true: if a^2 + b^2 = c^2, the triangle has a right angle\n- The distance formula is the theorem applied to coordinates\n\n## How it works, step by step\n1. Confirm the triangle has a right angle\n2. Identify which side is the hypotenuse (opposite the right angle)\n3. Substitute the two known sides into a^2 + b^2 = c^2\n4. Solve for the unknown, taking the positive square root\n5. Check the hypotenuse came out as the longest side\n\n## A worked example\nA ladder 5 m long leans against a wall with its foot 3 m out. The height it reaches is sqrt(5^2 - 3^2) = sqrt(16) = 4 m.\n\n## Where people go wrong\n- Applying it to triangles that are not right-angled\n- Assigning the hypotenuse to the wrong side\n- Forgetting to take the square root at the end\n\n## The takeaway\nFor a right triangle, the two shorter squares add up to the hypotenuse's square — and that is also how you measure straight-line distance."
   },
   {
    "slug": "trigonometric-identities",
@@ -4861,12 +4892,15 @@
    "subject": "Statistics & Data",
    "category": "Math",
    "tags": [
-    "statistics & data"
+    "statistics",
+    "confounding",
+    "experiments",
+    "reasoning"
    ],
    "level": "Introductory",
    "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "status": "outline",
+   "outline": "## Correlation versus Causation\n\nA correlation means two variables move together; causation means changing one changes the other. Correlation alone cannot establish causation.\n\nA correlation can arise from A causing B, B causing A, a common cause, or pure chance.\n\n## Why it matters\nIt is the single most common reasoning error in news headlines, health claims and business dashboards.\n\n## The core ideas\n- Correlation is measured by a coefficient from -1 to +1\n- A confounder is a third variable that drives both of the correlated ones\n- Reverse causation is when the effect actually drives the supposed cause\n- Only a randomised controlled experiment reliably isolates cause\n\n## How it works, step by step\n1. Confirm the correlation is real and not a small-sample fluke\n2. Ask whether A could plausibly cause B, and whether B could cause A\n3. Brainstorm confounders that could cause both\n4. Check whether the timing fits — causes precede effects\n5. Look for experimental or natural-experiment evidence before claiming causation\n\n## A worked example\nIce-cream sales correlate with drowning deaths. Neither causes the other — hot weather is a confounder that raises both. Banning ice cream would not save a single swimmer.\n\n## Where people go wrong\n- Reading any strong correlation as evidence of cause\n- Ignoring that the arrow of causation might point the other way\n- Forgetting that with enough variables, some will correlate by chance\n\n## The takeaway\nMoving together is not the same as one moving the other — always ask about reverse causation, confounders and chance."
   },
   {
    "slug": "cross-validation",
@@ -5127,6 +5161,22 @@
    "minutes": 6,
    "status": "index",
    "outline": ""
+  },
+  {
+   "slug": "the-normal-distribution",
+   "title": "The Normal Distribution",
+   "subject": "Statistics & Data",
+   "category": "Math",
+   "tags": [
+    "statistics",
+    "bell curve",
+    "standard deviation",
+    "z-score"
+   ],
+   "level": "Intermediate",
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## The Normal Distribution\n\nThe normal distribution is the symmetric bell-shaped curve that describes many natural measurements and the behaviour of sample means.\n\nIt is fully defined by its mean and standard deviation, and the 68-95-99.7 rule summarises how data spreads around the mean.\n\n## Why it matters\nIt underpins confidence intervals, hypothesis tests, quality control and risk models across every quantitative field.\n\n## The core ideas\n- It is symmetric about the mean, which equals the median and mode\n- About 68% of values lie within 1 standard deviation, 95% within 2, 99.7% within 3\n- A z-score says how many standard deviations a value is from the mean\n- The Central Limit Theorem makes sample means approximately normal even when the data is not\n\n## How it works, step by step\n1. Identify the mean and standard deviation of the distribution\n2. Convert the value of interest to a z-score: z = (x - mean) / standard deviation\n3. Look up the probability for that z in a table or software\n4. Adjust for whether you want the area below, above or between values\n5. Translate the probability back into a statement about the data\n\n## A worked example\nAdult IQ scores have mean 100 and standard deviation 15. A score of 130 is z = (130 - 100)/15 = 2, so about 2.5% of people score higher (the area beyond 2 standard deviations on one side).\n\n## Where people go wrong\n- Assuming every dataset is normal — skewed data is common\n- Confusing the standard deviation of the data with the standard error of the mean\n- Reading a z-table for 'below' when you need 'above'\n\n## The takeaway\nMean and standard deviation fix the whole curve, and the 68-95-99.7 rule tells you where the data lives."
   },
   {
    "slug": "time-series-decomposition",
@@ -5732,12 +5782,15 @@
    "subject": "Biology",
    "category": "Science",
    "tags": [
-    "biology"
+    "energy",
+    "metabolism",
+    "ATP",
+    "mitochondria"
    ],
-   "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "level": "Intermediate",
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## Cellular Respiration\n\nCellular respiration is the set of reactions that break down glucose to release energy the cell can use, stored as ATP.\n\nGlucose plus oxygen yields carbon dioxide, water and about 30–32 ATP; the process runs in three linked stages.\n\n## Why it matters\nIt is how every cell in your body powers itself, and why you breathe — oxygen's only job is to keep this chain running.\n\n## The core ideas\n- Glycolysis happens in the cytoplasm and needs no oxygen\n- The Krebs cycle and electron transport chain run in the mitochondria\n- Oxygen is the final electron acceptor — without it the chain backs up\n- Fermentation is the anaerobic fallback and yields only 2 ATP per glucose\n\n## How it works, step by step\n1. Glycolysis splits one glucose into two pyruvate, netting 2 ATP and 2 NADH\n2. Each pyruvate is oxidised to acetyl-CoA, releasing CO2 and making NADH\n3. The Krebs cycle spins twice, producing NADH, FADH2, 2 ATP and CO2\n4. NADH and FADH2 drop electrons into the electron transport chain\n5. The chain pumps protons; their flow back through ATP synthase makes most of the ATP\n\n## A worked example\nA sprinter's muscles outrun their oxygen supply. Glycolysis keeps making 2 ATP per glucose, but pyruvate is converted to lactate instead of entering the mitochondria — fast energy now, an oxygen debt and burning muscles later.\n\n## Where people go wrong\n- Thinking respiration only happens in animals — plants respire too, day and night\n- Confusing respiration (releases energy) with photosynthesis (stores it)\n- Saying ATP is made only in the electron transport chain — glycolysis and the Krebs cycle make some directly\n\n## The takeaway\nRespiration unlocks glucose's energy in three stages, and oxygen at the end is what makes the big ATP payoff possible."
   },
   {
    "slug": "dna-replication",
@@ -5851,12 +5904,15 @@
    "subject": "Biology",
    "category": "Science",
    "tags": [
-    "biology"
+    "inheritance",
+    "alleles",
+    "Punnett square",
+    "probability"
    ],
    "level": "Introductory",
    "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "status": "outline",
+   "outline": "## Mendelian Genetics\n\nMendelian genetics is the model of inheritance in which discrete factors — alleles — are passed from parents to offspring in predictable ratios.\n\nEach individual carries two alleles per gene, separates them into gametes, and offspring get one from each parent.\n\n## Why it matters\nIt is the foundation of genetic counselling, plant and animal breeding, and understanding why traits skip generations.\n\n## The core ideas\n- An allele can be dominant (masks) or recessive (masked)\n- Genotype is the allele pair; phenotype is the visible trait\n- Law of segregation: the two alleles separate into different gametes\n- Law of independent assortment: genes on different chromosomes sort independently\n\n## How it works, step by step\n1. Write the parents' genotypes, e.g. Aa x Aa\n2. List the gametes each parent can make (A or a)\n3. Draw a Punnett square with one parent's gametes on each axis\n4. Fill each cell by combining the row and column alleles\n5. Count the genotype and phenotype ratios — Aa x Aa gives 1:2:1 genotype, 3:1 phenotype\n\n## A worked example\nTwo brown-eyed parents each carry a hidden blue allele (Bb). The Punnett square predicts 1 BB : 2 Bb : 1 bb, so each child has a 1-in-4 chance of blue eyes even though neither parent has them.\n\n## Where people go wrong\n- Assuming a dominant allele is more common or 'stronger' — dominance is only about masking\n- Treating a 3:1 ratio as a guarantee rather than a probability over many offspring\n- Forgetting that most real traits are polygenic and don't follow simple ratios\n\n## The takeaway\nTwo alleles per gene, one to each gamete, recombined at random — that is enough to predict inheritance ratios."
   },
   {
    "slug": "mitosis-and-meiosis",
@@ -6013,12 +6069,15 @@
    "subject": "Biology",
    "category": "Science",
    "tags": [
-    "biology"
+    "cells",
+    "diffusion",
+    "osmosis",
+    "homeostasis"
    ],
    "level": "Introductory",
    "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "status": "outline",
+   "outline": "## The Cell Membrane and Transport\n\nThe cell membrane is a selectively permeable phospholipid bilayer that controls what enters and leaves the cell.\n\nSmall non-polar molecules cross freely; ions and large molecules need proteins, and moving against a gradient costs energy.\n\n## Why it matters\nIt explains IV fluid concentrations, why saltwater dehydrates you, and how nerve and muscle cells fire.\n\n## The core ideas\n- The bilayer is hydrophilic heads out, hydrophobic tails in\n- Passive transport (diffusion, osmosis, facilitated diffusion) needs no ATP\n- Active transport moves substances against their gradient using ATP\n- Osmosis is the diffusion of water toward the higher solute concentration\n\n## How it works, step by step\n1. Identify the substance and whether it is polar or charged\n2. Check which way its concentration gradient points\n3. If it moves down the gradient, it is passive — pick diffusion, osmosis or a channel\n4. If it moves up the gradient, it is active and needs a pump plus ATP\n5. For water, compare solute concentrations inside and outside to predict swelling or shrinking\n\n## A worked example\nA red blood cell is placed in pure water. Water rushes in by osmosis toward the higher internal solute concentration; with no cell wall to resist, the cell swells and bursts (lysis).\n\n## Where people go wrong\n- Saying osmosis moves solute — it moves water\n- Thinking facilitated diffusion needs energy because it uses a protein\n- Assuming 'selectively permeable' means nothing gets through\n\n## The takeaway\nThe membrane lets some things drift through for free and spends ATP to move the rest — that control is what keeps a cell alive."
   },
   {
    "slug": "the-circulatory-system",
@@ -6065,12 +6124,15 @@
    "subject": "Biology",
    "category": "Science",
    "tags": [
-    "biology"
+    "immunity",
+    "antibodies",
+    "vaccines",
+    "pathogens"
    ],
    "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## The Human Immune System\n\nThe immune system is the layered defence that detects and destroys pathogens while learning to respond faster next time.\n\nBarriers and innate cells respond within hours; the adaptive system takes days but remembers.\n\n## Why it matters\nIt is why vaccines work, why we get sick less as we age against familiar germs, and how allergies and autoimmune disease go wrong.\n\n## The core ideas\n- Innate immunity is fast, general and has no memory\n- Adaptive immunity is slow, specific and remembers via memory cells\n- B cells make antibodies; T cells kill infected cells or coordinate the response\n- A vaccine trains adaptive immunity without causing the disease\n\n## How it works, step by step\n1. A pathogen breaches a barrier such as skin or mucus\n2. Innate cells (macrophages, neutrophils) engulf invaders and raise the alarm\n3. Dendritic cells carry antigen fragments to lymph nodes\n4. Matching B and T cells are selected and multiply\n5. Antibodies and killer T cells clear the infection; memory cells stay behind\n\n## A worked example\nThe first time you meet a virus, the adaptive response takes about a week and you get sick. A vaccine gives your immune system that first meeting safely, so the real infection meets a memory response that clears it in a day or two.\n\n## Where people go wrong\n- Thinking antibiotics treat viral infections — they only work on bacteria\n- Assuming a fever is always harmful; a moderate fever helps the response\n- Believing natural infection is always safer than vaccination\n\n## The takeaway\nTwo systems: a fast generalist that buys time, and a slow specialist that wins the fight and never forgets."
   },
   {
    "slug": "the-kidney-and-osmoregulation",
@@ -6282,6 +6344,22 @@
    "minutes": 6,
    "status": "index",
    "outline": ""
+  },
+  {
+   "slug": "chemical-bonding-ionic-versus-covalent",
+   "title": "Chemical Bonding: Ionic versus Covalent",
+   "subject": "Chemistry",
+   "category": "Science",
+   "tags": [
+    "bonding",
+    "electrons",
+    "electronegativity",
+    "structure"
+   ],
+   "level": "Introductory",
+   "minutes": 6,
+   "status": "outline",
+   "outline": "## Chemical Bonding: Ionic versus Covalent\n\nAtoms bond to reach a full outer shell, either by transferring electrons (ionic) or sharing them (covalent).\n\nA large electronegativity difference transfers electrons and makes ions; a small one shares them and makes molecules.\n\n## Why it matters\nIt predicts whether a substance dissolves in water, conducts electricity or melts easily — the basics of materials and chemistry.\n\n## The core ideas\n- Ionic bonds form between a metal and a non-metal\n- Covalent bonds form between non-metals\n- Ionic compounds form lattices with high melting points and conduct when molten or dissolved\n- Covalent substances are often gases, liquids or soft solids and usually don't conduct\n\n## How it works, step by step\n1. Find each atom's number of valence electrons from its group\n2. Estimate the electronegativity difference between the atoms\n3. If the difference is large (roughly > 1.7), electrons transfer — write the ions and their charges\n4. If the difference is small, electrons are shared — draw the shared pairs\n5. Use the structure to predict melting point, conductivity and solubility\n\n## A worked example\nSodium (1 valence electron, low electronegativity) meets chlorine (7 valence electrons, high). Sodium hands over its electron, giving Na+ and Cl-, which stack into a crystal. Two chlorine atoms instead share a pair, forming the covalent molecule Cl2.\n\n## Where people go wrong\n- Thinking ionic compounds contain molecules — they are extended lattices\n- Assuming all covalent substances have low melting points (diamond does not)\n- Confusing polarity of a bond with polarity of the whole molecule\n\n## The takeaway\nBig electronegativity gap: transfer and make ions. Small gap: share and make molecules. Structure follows from there."
   },
   {
    "slug": "chemical-equilibrium",
@@ -6640,12 +6718,15 @@
    "subject": "Chemistry",
    "category": "Science",
    "tags": [
-    "chemistry"
+    "mole",
+    "stoichiometry",
+    "reactions",
+    "calculation"
    ],
-   "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "level": "Intermediate",
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## The Mole and Stoichiometry\n\nThe mole is a fixed count of particles (6.022 x 10^23) that lets chemists convert between mass and number, so balanced equations become recipes.\n\nA balanced equation gives mole ratios; molar mass converts those to grams.\n\n## Why it matters\nIt is how chemists scale a reaction from a test tube to a factory and predict yields before running anything.\n\n## The core ideas\n- One mole of any substance contains Avogadro's number of particles\n- Molar mass in grams per mole equals the formula mass\n- Coefficients in a balanced equation are mole ratios, not mass ratios\n- The limiting reagent runs out first and caps the product\n\n## How it works, step by step\n1. Write and balance the chemical equation\n2. Convert the known quantity to moles using molar mass\n3. Use the mole ratio from the equation to find moles of the target substance\n4. Convert moles of the target back to grams (or litres for a gas)\n5. If two reactants are given, find which is limiting and use that one\n\n## A worked example\nBurning 16 g of methane (CH4, 1 mol) in the reaction CH4 + 2 O2 -> CO2 + 2 H2O produces 1 mol of CO2, which is 44 g — and needs 2 mol (64 g) of oxygen.\n\n## Where people go wrong\n- Using mass ratios directly from the coefficients instead of converting to moles\n- Forgetting to balance the equation first\n- Assuming the reactant you were given first is the limiting one\n\n## The takeaway\nConvert to moles, apply the equation's ratio, convert back — the mole is the bridge between the lab balance and the equation."
   },
   {
    "slug": "the-periodic-table",
@@ -8810,6 +8891,22 @@
    "outline": ""
   },
   {
+   "slug": "conservation-of-energy",
+   "title": "Conservation of Energy",
+   "subject": "Physics",
+   "category": "Science",
+   "tags": [
+    "energy",
+    "mechanics",
+    "work",
+    "conservation"
+   ],
+   "level": "Introductory",
+   "minutes": 6,
+   "status": "outline",
+   "outline": "## Conservation of Energy\n\nEnergy cannot be created or destroyed, only transferred or transformed; the total energy of an isolated system stays constant.\n\nIn mechanics, kinetic plus potential energy is constant when only conservative forces act; friction moves energy to heat.\n\n## Why it matters\nIt is one of the deepest laws in physics and the accounting principle behind engines, power grids, climate and metabolism.\n\n## The core ideas\n- Kinetic energy is 1/2 m v^2; gravitational potential energy is m g h\n- Without friction, KE + PE is constant along the path\n- Friction and drag convert mechanical energy into heat, not loss\n- Power is the rate of energy transfer, measured in watts\n\n## How it works, step by step\n1. Identify the system and the start and end states\n2. List every form of energy present at each state\n3. Set total energy at the start equal to total energy at the end\n4. Include a heat term if friction or drag acts\n5. Solve for the unknown speed, height or energy\n\n## A worked example\nA 2 kg cart starts at rest 5 m up a frictionless ramp. Its potential energy m g h = 2 x 9.8 x 5 = 98 J converts entirely to kinetic energy at the bottom, so 1/2 x 2 x v^2 = 98, giving v ≈ 9.9 m/s.\n\n## Where people go wrong\n- Saying energy is 'lost' to friction — it becomes heat and sound\n- Forgetting potential energy depends on the chosen reference height\n- Applying KE + PE = constant when friction is significant\n\n## The takeaway\nTrack every form of energy from start to finish and the totals match — friction just relabels some of it as heat."
+  },
+  {
    "slug": "conservation-of-momentum",
    "title": "Conservation of Momentum",
    "subject": "Physics",
@@ -9002,12 +9099,15 @@
    "subject": "Physics",
    "category": "Science",
    "tags": [
-    "physics"
+    "kinematics",
+    "gravity",
+    "vectors",
+    "trajectory"
    ],
-   "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "level": "Intermediate",
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## Projectile Motion\n\nProjectile motion is the curved path of an object thrown near Earth's surface, moving under gravity alone once released.\n\nThe horizontal and vertical motions are independent: constant horizontal velocity, constant downward acceleration.\n\n## Why it matters\nThe same independence of motions governs satellites, ballistics, sports and any 'thrown' object — it is projectile motion all the way up.\n\n## The core ideas\n- Horizontal velocity stays constant (ignoring air resistance)\n- Vertical motion accelerates downward at g = 9.8 m/s^2\n- The two motions share only one thing: time\n- Maximum range on level ground occurs at a 45 degree launch angle\n\n## How it works, step by step\n1. Split the initial velocity into horizontal and vertical components\n2. Treat vertical motion with the constant-acceleration equations to find time of flight\n3. Use that time in the horizontal equation to find range\n4. Vertical velocity is zero at the peak — use that to find maximum height\n5. Combine components with Pythagoras for speed at any instant\n\n## A worked example\nA ball is kicked at 20 m/s, 30 degrees above horizontal. Vertical component 10 m/s, horizontal 17.3 m/s. It rises for 10/9.8 ≈ 1.0 s, so total flight ≈ 2.0 s, giving a range of about 17.3 x 2.0 ≈ 35 m.\n\n## Where people go wrong\n- Thinking horizontal velocity decreases during flight\n- Using the full launch speed in a vertical-only equation\n- Forgetting that time is the link between the two directions\n\n## The takeaway\nBreak the launch into two independent one-dimensional problems joined by time, then recombine."
   },
   {
    "slug": "quantum-tunnelling",
@@ -9080,12 +9180,15 @@
    "subject": "Physics",
    "category": "Science",
    "tags": [
-    "physics"
+    "waves",
+    "sound",
+    "frequency",
+    "Doppler"
    ],
-   "level": "Introductory",
+   "level": "Intermediate",
    "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "status": "outline",
+   "outline": "## Sound and the Doppler Effect\n\nThe Doppler effect is the change in observed frequency of a wave when the source and observer move relative to each other.\n\nApproaching compresses the waves to a higher pitch; receding stretches them to a lower pitch.\n\n## Why it matters\nIt is how radar guns, weather Doppler, ultrasound blood-flow scans and the expanding-universe evidence all work.\n\n## The core ideas\n- Sound is a longitudinal pressure wave needing a medium\n- Pitch is frequency; loudness is amplitude\n- Relative motion, not absolute motion, shifts the observed frequency\n- The shift is larger at higher relative speeds\n\n## How it works, step by step\n1. Decide whether the source, the observer or both are moving\n2. If they approach, each successive wavefront leaves from closer — wavelength shrinks, frequency rises\n3. If they recede, wavefronts spread out — wavelength grows, frequency falls\n4. Plug the speeds into the Doppler equation for the exact shifted frequency\n5. Check the direction of the shift matches the physical situation\n\n## A worked example\nAn ambulance siren sounds at 700 Hz. As it speeds toward you at 30 m/s, you hear roughly 700 x 340/(340 - 30) ≈ 768 Hz — higher. The instant it passes and recedes, the pitch drops to about 640 Hz.\n\n## Where people go wrong\n- Thinking the source's actual pitch changes — only the observed pitch does\n- Forgetting the effect works for light too (redshift and blueshift)\n- Assuming loudness and pitch change together\n\n## The takeaway\nMotion toward you packs wavefronts tighter (higher pitch); motion away spreads them (lower pitch)."
   },
   {
    "slug": "special-relativity",
@@ -11516,12 +11619,15 @@
    "subject": "Computer Science",
    "category": "Technology",
    "tags": [
-    "computer science"
+    "algorithms",
+    "search",
+    "logarithmic",
+    "arrays"
    ],
    "level": "Introductory",
    "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "status": "outline",
+   "outline": "## Binary Search\n\nBinary search finds a target in a sorted array by repeatedly halving the search range, running in O(log n) time.\n\nEach comparison eliminates half of what remains, so a million items take about 20 checks.\n\n## Why it matters\nIt is the reason databases, autocomplete and version-control 'bisect' can find things instantly in huge datasets.\n\n## The core ideas\n- The array must be sorted for binary search to work\n- It runs in O(log n) time and O(1) extra space (iterative)\n- Each step compares the target to the middle element\n- Off-by-one errors in the bounds are the classic bug\n\n## How it works, step by step\n1. Set low to the first index and high to the last\n2. While low <= high, compute mid = low + (high - low) / 2\n3. If the middle element equals the target, return mid\n4. If the middle element is less than the target, set low = mid + 1\n5. Otherwise set high = mid - 1; if the loop ends, the target is absent\n\n## A worked example\nSearching for 23 in [4, 8, 15, 16, 23, 42]: mid is index 2 (value 15), too small, so search the right half; new mid is index 4 (value 23) — found in 2 comparisons instead of 5.\n\n## Where people go wrong\n- Running it on an unsorted array\n- Computing mid as (low + high) / 2, which can overflow for huge indices\n- Looping forever by not moving low or high past mid\n\n## The takeaway\nHalve the range each comparison: sorted data turns a linear scan into a handful of steps."
   },
   {
    "slug": "binary-search-trees",
@@ -11961,12 +12067,15 @@
    "subject": "Computer Science",
    "category": "Technology",
    "tags": [
-    "computer science"
+    "recursion",
+    "call stack",
+    "base case",
+    "algorithms"
    ],
    "level": "Introductory",
    "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "status": "outline",
+   "outline": "## Recursion and the Call Stack\n\nRecursion is when a function solves a problem by calling itself on a smaller version, until it reaches a case simple enough to answer directly.\n\nEvery recursive call is pushed onto the call stack and popped when it returns, so a missing base case overflows the stack.\n\n## Why it matters\nIt is the natural way to process trees, file systems, parsers and any nested structure, and the basis of divide-and-conquer algorithms.\n\n## The core ideas\n- A recursive function needs a base case and a recursive case\n- Each call gets its own stack frame with its own local variables\n- The recursion must move toward the base case every call\n- Deep recursion can exhaust the stack; some languages optimise tail calls\n\n## How it works, step by step\n1. Identify the smallest input you can answer without recursing — the base case\n2. Assume the function already works for smaller inputs\n3. Express the answer for n in terms of the answer for something smaller\n4. Make sure every path reduces the problem toward the base case\n5. Trace a small example by hand, watching the stack grow then unwind\n\n## A worked example\nfactorial(3) calls factorial(2), which calls factorial(1), which calls factorial(0) — the base case returning 1. The stack then unwinds: 1, then 1x1, then 2x1, then 3x2 = 6.\n\n## Where people go wrong\n- Forgetting the base case, causing a stack overflow\n- Writing a recursive case that does not shrink the input\n- Recomputing the same subproblem many times instead of memoising\n\n## The takeaway\nTrust that the function handles the smaller case, define the base case, and make sure every call gets closer to it."
   },
   {
    "slug": "regular-expressions",
@@ -11987,12 +12096,15 @@
    "subject": "Computer Science",
    "category": "Technology",
    "tags": [
-    "computer science"
+    "databases",
+    "SQL",
+    "joins",
+    "keys"
    ],
    "level": "Introductory",
-   "minutes": 6,
-   "status": "index",
-   "outline": ""
+   "minutes": 7,
+   "status": "outline",
+   "outline": "## Relational Databases and SQL\n\nA relational database stores data in tables of rows and columns, linked by keys, and SQL is the language for querying and changing it.\n\nTables hold one kind of entity; a primary key identifies each row; a foreign key points to another table's primary key.\n\n## Why it matters\nRelational databases run banking, e-commerce, healthcare and government systems; SQL is one of the most widely used languages in tech.\n\n## The core ideas\n- Each table models one entity type (users, orders, products)\n- A primary key is unique per row; a foreign key references another table\n- A JOIN combines rows from two tables on a matching key\n- SELECT chooses columns, WHERE filters rows, GROUP BY aggregates\n\n## How it works, step by step\n1. Decide which tables hold the data you need\n2. Write SELECT with the columns you want\n3. Add FROM and JOIN to connect tables on their key columns\n4. Filter rows with WHERE and, for totals, GROUP BY plus an aggregate like COUNT or SUM\n5. Sort with ORDER BY and limit the result if needed\n\n## A worked example\nTo list each customer's total spend: SELECT c.name, SUM(o.amount) FROM customers c JOIN orders o ON o.customer_id = c.id GROUP BY c.name ORDER BY 2 DESC.\n\n## Where people go wrong\n- Forgetting the JOIN condition, producing every row-pair (a cross join)\n- Putting an aggregated column in SELECT without a GROUP BY\n- Storing repeated data in one table instead of splitting it (poor normalisation)\n\n## The takeaway\nModel each entity as a table, link them with keys, and let SQL join, filter and aggregate the pieces back together."
   },
   {
    "slug": "solid-principles",
