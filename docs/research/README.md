@@ -2,8 +2,10 @@
 
 | File | What it is |
 |---|---|
-| [`PSF_DESIGN.md`](PSF_DESIGN.md) | Full design: the PSF metric (math), the CLASS algorithm, evaluation plan, novelty statement |
-| [`paper_draft.md`](paper_draft.md) | Paper draft — abstract, sections, RQ table to fill after data collection |
+| [`LEARNOVA_PAPER.md`](LEARNOVA_PAPER.md) | **Umbrella paper.** The deterministic decision layer (content preservation, VMS, image/text policy — the *non-model* contribution) + PSF + CLASS + system, with guarantees and a pre-registered evaluation plan (E1–E8). |
+| [`PSF_DESIGN.md`](PSF_DESIGN.md) | Full design of the PSF metric (math) and the CLASS algorithm, with the novelty statement |
+| [`paper_draft.md`](paper_draft.md) | Narrower PSF/CLASS-only submission draft — abstract, sections, RQ table |
+| [`VISUAL_INTELLIGENCE.md`](VISUAL_INTELLIGENCE.md) | Design + status of the deterministic decision layer (VMS, text policy, image policy, progressive reveal) |
 
 ## Code
 
