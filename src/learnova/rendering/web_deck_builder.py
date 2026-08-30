@@ -288,6 +288,23 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         image_block = _image_html(orig, theme)
         slide_transition = sp.transition if sp else "slide"
         frag_map = _fragment_index_for(idx - 1, sp.animation if sp else None)
+
+        # Enumeration split: an overview slide always animates its steps in
+        # (even in flat reading mode); the per-item slides get a step badge and
+        # a distinctive transition so a "phases" run reads as one sequence.
+        ei = imp.get("enum_item") if isinstance(imp.get("enum_item"), dict) else None
+        force_build = bool(imp.get("force_build") or (ei and ei.get("overview")))
+        step_badge = ""
+        if ei and not ei.get("overview") and ei.get("total"):
+            step_badge = (
+                f'<span style="display:inline-block;margin-left:10px;padding:2px 10px;'
+                f'border:1px solid {theme.primary_hex}55;border-radius:999px;'
+                f'font-size:0.9rem;font-weight:600;color:{theme.primary_hex};'
+                f'vertical-align:middle;text-transform:none;">'
+                f'{html.escape(str(ei.get("kind","part")).rstrip("s").capitalize())} '
+                f'{ei["index"]} / {ei["total"]}</span>'
+            )
+            slide_transition = "slide-in convex-in"
         notes_html = (
             f'<aside class="notes">{html.escape(sp.speaker_notes)}</aside>' if sp and sp.speaker_notes else ""
         )
@@ -473,7 +490,9 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         # Body layout. A text slide that also has a figure puts the text in a
         # left column and the figure in a right rail, so neither is squashed and
         # the whole thing still fits (the auto-fit script does the final nudge).
-        _text_layout = layout_type in {"MINIMAL_TEXT", "", "CARD_GRID"} and not _fam_block
+        _text_layout = layout_type in {
+            "MINIMAL_TEXT", "", "CARD_GRID", "FLOWCHART", "PROCESS_DIAGRAM"
+        } and not _fam_block
         if _text_layout and image_block:
             body_inner = f"""
             <div style="display:flex; gap:26px; align-items:flex-start;">
@@ -492,11 +511,11 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             """
 
         slides_html_list.append(f"""
-        <section data-transition="{slide_transition}" style="text-align:left;">
+        <section data-transition="{slide_transition}"{' data-force-build="1"' if force_build else ''} style="text-align:left;">
             <div style="border-bottom:3px solid {theme.primary_hex}; padding-bottom:8px; margin-bottom:6px;">
-                <h2 style="color:{theme.primary_hex}; font-family:'{theme.heading_font}', sans-serif; font-size:2rem; margin:0; text-transform:uppercase;">{title_text}</h2>
+                <h2 style="color:{theme.primary_hex}; font-family:'{theme.heading_font}', sans-serif; font-size:2rem; margin:0; text-transform:uppercase;">{title_text}{step_badge}</h2>
             </div>
-            <div class="lv-body">
+            <div class="lv-body lv-anim">
             {body_inner}
             </div>
             {notes_html}
@@ -553,6 +572,44 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         .reveal .lv-textbody li.lv-blabel + li,
         .reveal .lv-textbody li.lv-bmain,
         .reveal .lv-textbody li.lv-bsub {{ }}
+
+        /* ── Entrance animations (teaching mode) ──────────────────────────── */
+        @keyframes lvFadeUp {{
+            from {{ opacity: 0; transform: translateY(16px); }}
+            to   {{ opacity: 1; transform: translateY(0); }}
+        }}
+        @keyframes lvPop {{
+            from {{ opacity: 0; transform: scale(.92); }}
+            to   {{ opacity: 1; transform: scale(1); }}
+        }}
+        .reveal .lv-anim.lv-run > * {{
+            animation: lvFadeUp .5s cubic-bezier(.22,1,.36,1) both;
+        }}
+        .reveal .lv-anim.lv-run > *:nth-child(2) {{ animation-delay: .09s; }}
+        .reveal .lv-anim.lv-run > *:nth-child(3) {{ animation-delay: .18s; }}
+        .reveal .lv-anim.lv-run > *:nth-child(4) {{ animation-delay: .27s; }}
+        .reveal .lv-anim.lv-run .lv-textbody li {{
+            animation: lvFadeUp .42s cubic-bezier(.22,1,.36,1) both;
+        }}
+        .reveal .lv-anim.lv-run .lv-textbody li:nth-child(n+2) {{ animation-delay: .05s; }}
+        .reveal .lv-anim.lv-run .lv-textbody li:nth-child(n+4) {{ animation-delay: .11s; }}
+        .reveal .lv-anim.lv-run .lv-textbody li:nth-child(n+7) {{ animation-delay: .17s; }}
+        .reveal .lv-anim.lv-run figure img {{
+            animation: lvPop .6s cubic-bezier(.22,1,.36,1) both;
+        }}
+        @media (prefers-reduced-motion: reduce) {{
+            .reveal .lv-anim.lv-run > *,
+            .reveal .lv-anim.lv-run .lv-textbody li,
+            .reveal .lv-anim.lv-run figure img {{ animation: none !important; }}
+        }}
+        /* Reveal fragments (staged flow / forced-build slides) fade + rise */
+        .reveal .slides section .fragment.lv-step {{
+            opacity: 0; transform: translateY(12px);
+            transition: opacity .4s ease, transform .4s cubic-bezier(.22,1,.36,1);
+        }}
+        .reveal .slides section .fragment.lv-step.visible {{
+            opacity: 1; transform: translateY(0);
+        }}
     </style>
 </head>
 <body>
@@ -582,15 +639,29 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         function lvApplyBuilds() {{
             var els = document.querySelectorAll('[data-build]');
             els.forEach(function (el) {{
-                if (LV_BUILD) {{
-                    el.classList.add('fragment');
+                // A [data-force-build] section always animates its steps in,
+                // even when the deck is in flat reading mode.
+                var forced = !!el.closest('[data-force-build]');
+                if (LV_BUILD || forced) {{
+                    el.classList.add('fragment', 'lv-step');
                     var i = parseInt(el.getAttribute('data-build'), 10);
                     if (!isNaN(i)) el.setAttribute('data-fragment-index', i);
                 }} else {{
-                    el.classList.remove('fragment');
+                    el.classList.remove('fragment', 'lv-step');
                     el.removeAttribute('data-fragment-index');
                 }}
             }});
+        }}
+
+        // Entrance animation: replay the fade-up whenever a slide becomes
+        // current (text, cards and images ease in).
+        function lvRunEntrance(slide) {{
+            if (!slide) return;
+            var b = slide.querySelector('.lv-anim');
+            if (!b) return;
+            b.classList.remove('lv-run');
+            void b.offsetWidth;            // force reflow so the animation restarts
+            b.classList.add('lv-run');
         }}
         // Callable from a parent frame (the presenter console) to switch on builds.
         window.__enableBuilds = function () {{
@@ -703,8 +774,19 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                 body.style.width = (100 / k).toFixed(1) + '%';
             }}
         }}
-        Reveal.on('ready', function (e) {{ lvAutoFit(e.currentSlide); }});
-        Reveal.on('slidechanged', function (e) {{ lvAutoFit(e.currentSlide); }});
+        function lvRefresh(slide) {{
+            slide = slide || (Reveal.getCurrentSlide && Reveal.getCurrentSlide());
+            lvAutoFit(slide);
+            lvRunEntrance(slide);
+            // one more pass after fonts / images settle
+            requestAnimationFrame(function () {{ lvAutoFit(slide); }});
+            setTimeout(function () {{ lvAutoFit(slide); }}, 250);
+        }}
+        Reveal.on('ready', function (e) {{ lvRefresh(e.currentSlide); }});
+        Reveal.on('slidechanged', function (e) {{ lvRefresh(e.currentSlide); }});
+        Reveal.on('slidetransitionend', function (e) {{ lvAutoFit(e.currentSlide); }});
+        Reveal.on('resize', function () {{ lvAutoFit(Reveal.getCurrentSlide()); }});
+        Reveal.on('fragmentshown', function (e) {{ lvAutoFit(e.fragment && e.fragment.closest('section')); }});
 
         Reveal.on('ready', lvUpdateStepHud);
         Reveal.on('slidechanged', lvUpdateStepHud);

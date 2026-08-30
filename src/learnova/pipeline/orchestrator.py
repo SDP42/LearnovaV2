@@ -297,7 +297,38 @@ def generate(
         # One section becomes one slide; the density stage decides how much
         # fits and paginates the rest. Without this, a 22-paragraph section
         # produced 22 near-empty slides sharing one title.
-        result.chunks = merge_chunks_by_section(chunk_parsed_data(result.parsed_units))
+        merged = merge_chunks_by_section(chunk_parsed_data(result.parsed_units))
+
+        # A section that enumerates phases / methods / types where each item has
+        # its own explanation teaches best as: one "overview" slide (the item
+        # names, animated in one by one) + one slide per item. Explode those.
+        from learnova.ai.enumeration import split_into_item_sections
+
+        exploded: list = []
+        for ch in merged:
+            parts = split_into_item_sections(ch.get("text") or "", ch.get("title") or "")
+            if not parts:
+                exploded.append(ch)
+                continue
+            logger.info("split %r into overview + %d item slide(s)",
+                        ch.get("title"), len(parts) - 1)
+            for p in parts:
+                child = dict(ch)
+                child["title"] = p["title"]
+                child["text"] = p["text"]
+                child["enum_item"] = {
+                    "index": p["index"], "total": p["total"],
+                    "kind": p["kind"], "overview": p.get("overview", False),
+                    "items": p.get("items"),
+                }
+                # The section's figure stays with the overview slide only.
+                if not p.get("overview"):
+                    child.pop("image", None)
+                exploded.append(child)
+
+        for i, ch in enumerate(exploded):
+            ch["id"] = i
+        result.chunks = exploded
         return len(result.chunks)
 
     runner.run("chunk", _chunk, critical=True)
@@ -360,6 +391,26 @@ def generate(
     # 5. Layout classification (LLM, with heuristic fallback inside)
     def _layout():
         result.improved = improve_chunks(result.chunks)
+
+        # Carry the enumeration-split metadata onto the improved slide, and turn
+        # an "overview" slide into an animated step list of the item names —
+        # each item reveals on its own click ("showing", explanation comes on
+        # the per-item slides that follow).
+        for entry in result.improved:
+            ei = (entry.get("original") or {}).get("enum_item")
+            if not ei:
+                continue
+            imp = entry.get("improved") or {}
+            imp["enum_item"] = ei
+            if ei.get("overview") and ei.get("items"):
+                items = [str(x) for x in ei["items"] if str(x).strip()]
+                imp["layout_type"] = "FLOWCHART"
+                imp["bullets"] = items
+                imp["flow_steps"] = items
+                imp["force_build"] = True          # animate even in flat view
+                imp.setdefault("takeaway",
+                               f"The {len(items)} {ei.get('kind', 'parts')}, in order.")
+            entry["improved"] = imp
         # A takeaway that repeats verbatim across slides (a filler line, or the
         # same sentence the heuristic lifted twice) is noise — keep the first,
         # blank the rest. Also drop a takeaway that just restates a bullet.

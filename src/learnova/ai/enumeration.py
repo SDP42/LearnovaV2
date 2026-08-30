@@ -239,6 +239,139 @@ def _kind_from(lead: str) -> str:
     return m.group(0).lower() if m else ""
 
 
+_ITEM_KINDS_TO_SPLIT = re.compile(
+    r"\b(phase|stage|step|level|method|technique|approach|type|kind|component|"
+    r"category|class|layer|model|algorithm)s?\b", re.IGNORECASE,
+)
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def split_into_item_sections(text: str, title: str = "") -> List[dict]:
+    """
+    Turn a "definitional enumeration" into one section per item.
+
+    A slide that lists *phases / methods / types* where each item is a short
+    heading followed by its own explanation teaches far better as one slide per
+    item ("Phase 2 — Syntactic Analysis") than as a single wall of bullets.
+
+    Returns ``[{"title": ..., "text": ..., "index": i, "total": n, "kind": ...},
+    ...]`` — the first entry may be the shared lead-in (index 0, no item name).
+    Returns ``[]`` when the text is not that shape (leave it alone).
+    """
+    if not text or not text.strip():
+        return []
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if len(lines) < 6:
+        return []
+
+    kind = _kind_from(title) or ""
+    # An enumeration claim in the body still helps ("There are five phases…").
+    for e in extract_enumerations(text):
+        if _ITEM_KINDS_TO_SPLIT.search(e.kind or e.lead or ""):
+            kind = kind or e.kind
+    if not (_ITEM_KINDS_TO_SPLIT.search(kind) or _ITEM_KINDS_TO_SPLIT.search(title)):
+        return []
+    kind = kind or (_ITEM_KINDS_TO_SPLIT.search(title).group(0) if
+                    _ITEM_KINDS_TO_SPLIT.search(title) else "part")
+
+    _num_prefix = re.compile(r"^\s*(?:\(?\d{1,2}[.)]|[ivx]+[.)]|[-*+•])\s+", re.IGNORECASE)
+
+    # A line that is really a sentence, not a heading.
+    _sentence_shape = re.compile(
+        r"\b(involves?|includes?|consists?|uses?|helps?|allows?|enables?|"
+        r"provides?|refers?|means|describes?|acts?|converts?|performs?|"
+        r"following|such as|for example|e\.?g\.?|there (?:is|are))\b", re.I)
+
+    def _looks_heading(ln: str, nxt: Optional[str]) -> bool:
+        s = _num_prefix.sub("", ln).strip().rstrip(":")
+        nwords = len(s.split())
+        if not (1 <= nwords <= 7) or len(s) > 60:
+            return False
+        if s.endswith((".", "!", "?")):
+            return False
+        # A heading names a thing; it doesn't predicate about it.
+        if nwords >= 4 and _sentence_shape.search(s):
+            return False
+        words = [w for w in s.split() if w[:1].isalpha()]
+        if not words:
+            return False
+        looks_label = (
+            bool(_num_prefix.match(ln))
+            or words[0][:1].isupper()
+            or _ITEM_KINDS_TO_SPLIT.search(s)
+            or re.search(r"\b(analysis|parsing|integration|translation|"
+                         r"recognition|retrieval|generation|understanding|"
+                         r"disambiguation|tokeniz\w+|embedding)\b", s, re.I)
+        )
+        if not looks_label:
+            return False
+        if nxt is not None and len(nxt.split()) >= 6:
+            return True
+        return bool(_num_prefix.match(ln)) and (nxt is not None and len(nxt.split()) >= 4)
+
+    pos: List[tuple[int, str]] = []
+    for li, ln in enumerate(lines):
+        nxt = lines[li + 1] if li + 1 < len(lines) else None
+        if _looks_heading(ln, nxt):
+            label = _num_prefix.sub("", ln).strip().rstrip(":.")
+            pos.append((li, label))
+
+    # Drop headings that repeat the section title, and near-duplicate headings
+    # (a slide-PDF shows "Semantic Analysis" twice — the concept, then an
+    # example page). Keep the first occurrence; its slice absorbs the rest.
+    tnorm = _norm(title)
+    seen_labels: set = set()
+    deduped: List[tuple[int, str]] = []
+    for li, lab in pos:
+        nl = _norm(lab)
+        if not nl or nl == tnorm:
+            continue
+        # subset match: "syntacticsyntaxparsinganalysis" vs "syntacticanalysis"
+        if any(nl in s or s in nl for s in seen_labels):
+            continue
+        seen_labels.add(nl)
+        deduped.append((li, lab))
+    pos = deduped
+
+    if len(pos) < 3:
+        return []
+    # spread out — each heading has explanation lines after it
+    spans = [pos[i + 1][0] - pos[i][0] for i in range(len(pos) - 1)]
+    if sum(1 for s in spans if s >= 2) < len(spans) * 0.6:
+        return []
+
+    n = len(pos)
+    kind_word = kind.rstrip("s").capitalize()
+    items = [lab for _, lab in pos]
+    sections: List[dict] = []
+
+    # 1. An OVERVIEW slide: just the item names, meant to animate in one by one
+    #    ("showing", not explaining). The lead-in paragraph rides along.
+    lead = lines[: pos[0][0]]
+    overview_text = "\n".join(lead + [f"- {it}" for it in items])
+    sections.append({
+        "title": f"{title} — the {n} {kind}".strip(),
+        "text": overview_text,
+        "index": 0, "total": n, "kind": kind, "lead_in": True, "overview": True,
+        "items": items,
+    })
+
+    # 2. One slide per item, with its full explanation.
+    for i, (li, item) in enumerate(pos):
+        end = pos[i + 1][0] if i + 1 < n else len(lines)
+        body = lines[li:end]
+        sections.append({
+            "title": f"{kind_word} {i + 1} of {n}: {item}",
+            "text": "\n".join(body),
+            "index": i + 1, "total": n, "kind": kind, "lead_in": False,
+            "overview": False, "item": item,
+        })
+    return sections if len(sections) >= 4 else []
+
+
 def missing_items(enum: Enumeration, covered_text: str) -> List[str]:
     """Enumeration items whose content words are not already in ``covered_text``."""
     blob = re.sub(r"[^a-z0-9 ]", " ", (covered_text or "").lower())
@@ -251,4 +384,7 @@ def missing_items(enum: Enumeration, covered_text: str) -> List[str]:
     return out
 
 
-__all__ = ["Enumeration", "extract_enumerations", "missing_items"]
+__all__ = [
+    "Enumeration", "extract_enumerations", "missing_items",
+    "split_into_item_sections",
+]
