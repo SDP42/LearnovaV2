@@ -642,3 +642,80 @@ def assistant_query(body: AssistantQuery, user_id: str = Depends(current_user)) 
 @app.get("/api/assistant/session/{session_id}")
 def assistant_session(session_id: str, user_id: str = Depends(current_user)) -> dict:
     return _session_store().get(session_id, user_id).to_dict()
+
+
+# ── Gallery — shared catalogue of ready-made presentations ────────────────────
+# See scripts/gallery/build_catalog.py + learnova.gallery. Decks live under a
+# synthetic user; "use" clones one into the caller's own library.
+from learnova.gallery import catalog as _gcat
+from learnova.gallery import store as _gstore
+
+
+@app.get("/api/gallery")
+def gallery_list(
+    subject: Optional[str] = None,
+    category: Optional[str] = None,
+    q: Optional[str] = None,
+    ready: bool = False,
+    limit: int = 120,
+    offset: int = 0,
+) -> dict:
+    entries = _gcat.list_entries(subject=subject, category=category, query=q, ready_only=ready)
+    rows = _gstore.catalog_with_decks(entries)
+    if ready:
+        rows = [r for r in rows if r["has_deck"]]
+    # ready decks first, then by title
+    rows.sort(key=lambda r: (not r["has_deck"], r["title"].lower()))
+    total = len(rows)
+    page = rows[offset:offset + max(1, min(limit, 500))]
+    return {
+        "entries": page,
+        "total": total,
+        "ready_total": sum(1 for r in rows if r["has_deck"]),
+        "subjects": _gcat.subjects(),
+    }
+
+
+@app.get("/api/gallery/{slug}")
+def gallery_entry(slug: str) -> dict:
+    entry = _gcat.get_entry(slug)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="unknown gallery topic")
+    return entry.to_dict(_gstore.get_deck_meta(slug))
+
+
+@app.get("/api/gallery/{slug}/deck")
+def gallery_deck(slug: str) -> JSONResponse:
+    entry = _gcat.get_entry(slug)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="unknown gallery topic")
+    meta = _gstore.get_deck_meta(slug)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="no pre-built deck for this topic yet")
+    stored = _gstore.read_slides(slug) or {}
+    return JSONResponse({
+        "job_id": slug,
+        "summary": {
+            "source_name": meta.get("title", entry.title),
+            "slide_count": meta.get("slide_count", 0),
+            "quiz_count": meta.get("quiz_count", 0),
+            "overall_score": meta.get("overall_score", 0),
+        },
+        "slides": stored.get("slides", []),
+        "quizzes": stored.get("quizzes", []),
+        "scores": stored.get("scores", {}),
+    })
+
+
+class GalleryUse(BaseModel):
+    slug: str
+
+
+@app.post("/api/gallery/{slug}/use", status_code=201)
+def gallery_use(slug: str, user_id: str = Depends(current_user)) -> dict:
+    if _gcat.get_entry(slug) is None:
+        raise HTTPException(status_code=404, detail="unknown gallery topic")
+    new_id = _gstore.clone_to_user(slug, user_id)
+    if new_id is None:
+        raise HTTPException(status_code=404, detail="no pre-built deck for this topic yet")
+    return {"deck_id": new_id}

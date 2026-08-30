@@ -6,6 +6,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   Library,
+  LayoutGrid,
   Presentation,
   Settings,
   Sparkles,
@@ -42,6 +43,7 @@ const GROUPS = [
   {
     label: "Resources",
     items: [
+      { title: "Gallery", to: "/app/gallery", icon: LayoutGrid },
       { title: "Library", to: "/app/library", icon: Library },
       { title: "Docs", to: "/app/docs", icon: BookOpen },
     ],

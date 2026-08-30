@@ -15,6 +15,7 @@ import Docs from "./pages/Docs.jsx";
 import Export from "./pages/Export.jsx";
 import Landing from "./pages/Landing.jsx";
 import Library from "./pages/Library.jsx";
+import Gallery from "./pages/Gallery.jsx";
 import Present from "./pages/Present.jsx";
 import Presentations from "./pages/Presentations.jsx";
 import Preview from "./pages/Preview.jsx";
@@ -96,6 +97,7 @@ export default function App() {
         <Route path="/app/quizzes" element={<Protected><Quizzes /></Protected>} />
         <Route path="/app/analytics" element={<Protected><Analytics /></Protected>} />
         <Route path="/app/library" element={<Protected><Library /></Protected>} />
+        <Route path="/app/gallery" element={<Protected><Gallery /></Protected>} />
         <Route path="/app/docs" element={<Protected><Docs /></Protected>} />
         <Route path="/app/settings" element={<Protected><Settings /></Protected>} />
 

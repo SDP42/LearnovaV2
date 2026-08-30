@@ -213,6 +213,36 @@ export async function assistantRegistry() {
   );
 }
 
+// ── Gallery ───────────────────────────────────────────────────────────────
+export async function galleryList({ subject, category, q, ready, limit = 120, offset = 0 } = {}) {
+  const p = new URLSearchParams();
+  if (subject) p.set("subject", subject);
+  if (category) p.set("category", category);
+  if (q) p.set("q", q);
+  if (ready) p.set("ready", "true");
+  p.set("limit", limit);
+  p.set("offset", offset);
+  return json(await fetch(`${BASE}/api/gallery?${p}`));
+}
+
+export async function galleryEntry(slug) {
+  return json(await fetch(`${BASE}/api/gallery/${slug}`));
+}
+
+export async function galleryDeck(slug) {
+  return json(await fetch(`${BASE}/api/gallery/${slug}/deck`));
+}
+
+export async function galleryUse(slug) {
+  return json(
+    await fetch(`${BASE}/api/gallery/${slug}/use`, {
+      method: "POST",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ slug }),
+    })
+  );
+}
+
 export const jobDownloadPath = (id, artifact) => `/api/jobs/${id}/download/${artifact}`;
 export const deckDownloadPath = (id, artifact) => `/api/decks/${id}/download/${artifact}`;
 

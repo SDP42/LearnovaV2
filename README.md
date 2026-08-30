@@ -105,6 +105,8 @@ learnova/
 │   │   └── jobs.py                # in-memory async job store for the API
 │   ├── auth/clerk.py              # ← Clerk JWT verification against JWKS
 │   ├── storage/deck_library.py    # ← per-user saved decks on disk
+│   ├── assistant/                 # ← chat + voice control: NLU, resolver, tools, orchestrator
+│   ├── gallery/                   # ← ready-made catalogue: loader, deck store, batch builder
 │   ├── ai/                        # improver, layout_router, quiz_gen, image_describer
 │   ├── intelligence/              # zero-LLM concept extraction & transformation planning
 │   ├── enhancement/               # pedagogical generators (examples, analogies, mnemonics)
@@ -125,10 +127,13 @@ learnova/
 │       ├── pages/                 # Landing · AuthPage · Studio · DeckLibrary
 │       └── components/            # Navbar · Footer · Marquee · PalettePicker · Cursor · …
 │
-├── scripts/                       # verify_day4.py, verify_day5.py, generate_sample.py
+├── scripts/                       # verify_*.py, generate_sample.py, gallery/build_catalog.py
+├── data/gallery/catalog.json      # ← the 1000+ topic catalogue
 ├── tests/                         # pytest suite + conftest.py + fixtures/
 └── docs/
     ├── PPT_RULES.md               # ← every rule applied, in execution order
+    ├── GALLERY.md                 # ← the ready-made catalogue + batch builder
+    ├── ASSISTANT_ARCHITECTURE.md  # ← the chat/voice assistant layer
     └── PROGRESS_README.md
 ```
 
@@ -239,6 +244,11 @@ python scripts/verify_day5.py
 | `GET` | `/api/jobs/{id}/deck` | Slides + quizzes + scores as JSON |
 | `GET` | `/api/jobs/{id}/download/pptx` | Download the PPTX |
 | `GET` | `/api/jobs/{id}/download/html` | Download the web deck |
+| `GET` | `/api/decks` | The signed-in user's saved deck library |
+| `GET` | `/api/gallery` | Browse the ready-made catalogue (subject / search / paging) |
+| `GET` | `/api/gallery/{slug}/deck` | Slides + quizzes for one pre-built gallery deck |
+| `POST` | `/api/gallery/{slug}/use` | Clone a gallery deck into the caller's library |
+| `POST` | `/api/assistant/query` | Natural-language / voice control → typed action |
 
 The pipeline outlives an HTTP request, so uploads return **202** immediately and the
 client polls. The 12 stages map directly onto a progress bar.
@@ -434,10 +444,37 @@ between raw input and finished deck, in execution order.
 
 ---
 
+## 🖼️ The Gallery
+
+A shared catalogue of **1000+ teaching topics** across 30+ subjects. A user
+browses by subject, previews a finished deck and clicks **Use** to drop an
+editable copy into their own projects — or clicks **Generate** on any topic to
+open Create pre-filled.
+
+Curated topics ship with a real structured brief and a pre-built deck; the rest
+are browsable and generate on demand. `scripts/gallery/build_catalog.py` builds
+the catalogue; `learnova.gallery.builder` batch-generates the decks. See
+[`docs/GALLERY.md`](docs/GALLERY.md).
+
+## 🗣️ The assistant
+
+A chat + voice assistant (`src/learnova/assistant/`, floating widget in the web
+app) that resolves natural language to typed actions — open a deck, jump to a
+slide, explain a concept from the deck's own text, search your presentations,
+run a quiz. Deterministic NLU (57-intent taxonomy) with an LLM fallback; every
+action is validated server-side before it runs. See
+[`docs/ASSISTANT_ARCHITECTURE.md`](docs/ASSISTANT_ARCHITECTURE.md).
+
 ## 🖥️ The web app
 
-A brutalist black-and-amber design system: ultra-condensed display type, hard
-offset shadows, a dotted grid ground and dual-direction marquees.
+The React app (`frontend/`) pairs a preserved brutalist landing page with a
+calm authenticated workspace: a shared page-container / header / empty-state
+design system, a Gallery, per-deck analytics, checkpoint-quiz runner and the
+assistant widget.
+
+The landing page keeps its brutalist black-and-amber design system:
+ultra-condensed display type, hard offset shadows, a dotted grid ground and
+dual-direction marquees.
 
 The accent lives in **four tokens** rather than one, because a single value
 cannot stay legible both as a fill and as text:
