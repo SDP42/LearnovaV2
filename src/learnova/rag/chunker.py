@@ -150,8 +150,28 @@ def _chunk_paragraph(para: str, title: str, source: int,
             chunk["image"] = image
         return [chunk]
 
-    for i in range(0, max(1, len(words)), MAX_CHUNK_WORDS):
-        segment = " ".join(words[i: i + MAX_CHUNK_WORDS])
+    # Over budget. A multi-line block (a long list run) is split on line
+    # boundaries so each item keeps its own line — word-window slicing here is
+    # what used to flatten "Lexical Analysis\nInvolves…" into one run-on.
+    lines = [ln for ln in para.splitlines() if ln.strip()]
+    if len(lines) > 1:
+        segments: list[str] = []
+        buf: list[str] = []
+        buf_words = 0
+        for ln in lines:
+            w = len(ln.split())
+            if buf and buf_words + w > MAX_CHUNK_WORDS:
+                segments.append("\n".join(buf))
+                buf, buf_words = [], 0
+            buf.append(ln)
+            buf_words += w
+        if buf:
+            segments.append("\n".join(buf))
+    else:
+        segments = [" ".join(words[i: i + MAX_CHUNK_WORDS])
+                    for i in range(0, len(words), MAX_CHUNK_WORDS)]
+
+    for segment in segments:
         chunk: dict = {
             "id": cid,
             "title": title,
@@ -166,18 +186,41 @@ def _chunk_paragraph(para: str, title: str, source: int,
     return chunks
 
 
+def _title_key(title: str) -> str:
+    """Normalised heading for same-topic comparison."""
+    t = re.sub(r"[^a-z0-9 ]", " ", (title or "").lower())
+    t = re.sub(r"\b(?:cont(?:inued|d)?|part|contd|\d+\s*/\s*\d+)\b", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _same_heading(a: str, b: str) -> bool:
+    ka, kb = _title_key(a), _title_key(b)
+    if not ka or not kb:
+        return False
+    if ka == kb or ka in kb or kb in ka:
+        return True
+    wa, wb = set(ka.split()), set(kb.split())
+    long = max(len(wa), len(wb))
+    return long >= 3 and len(wa & wb) >= 0.8 * long
+
+
 def merge_chunks_by_section(chunks: list[dict]) -> list[dict]:
     """
     Collapse the chunks of one source section back into a single chunk.
 
-    Chunking splits a section into paragraph-sized pieces for retrieval, but
-    the renderer makes **one slide per chunk** — so a section with 22
-    paragraphs became 22 near-empty slides all sharing the same title.
+    Two passes:
 
-    A section is one topic and should therefore be one slide. The density
-    stage then decides how much fits and paginates the remainder onto
-    numbered continuation slides, which is where that decision belongs.
+    1. **By source unit** — chunking splits a section into paragraph-sized
+       pieces for retrieval, but the renderer makes one slide per chunk, so a
+       22-paragraph section became 22 near-empty slides sharing one title.
+
+    2. **By repeated heading** — a slide-style PDF often carries the *same*
+       heading across several consecutive pages ("Stages in NLP" ×7, one phase
+       per page). Those are one topic, so they are merged too. The density
+       stage then paginates the combined text onto numbered continuation
+       slides ("Stages in NLP (2/4)") instead of shipping seven bare repeats.
     """
+    # ── Pass 1: by source unit ───────────────────────────────────────────────
     merged: dict = {}
     order: list = []
 
@@ -194,13 +237,29 @@ def merge_chunks_by_section(chunks: list[dict]) -> list[dict]:
         extra = (chunk.get("text") or "").strip()
         if extra:
             target["text"] = f"{(target.get('text') or '').rstrip()}\n{extra}"
-        # Keep the first image seen for the section.
         if "image" not in target and chunk.get("image"):
             target["image"] = chunk["image"]
 
+    by_source = [merged[key] for key in order]
+
+    # ── Pass 2: fold consecutive chunks that share a heading ─────────────────
+    folded: list = []
+    for chunk in by_source:
+        if folded and _same_heading(folded[-1].get("title", ""), chunk.get("title", "")):
+            prev = folded[-1]
+            extra = (chunk.get("text") or "").strip()
+            if extra:
+                prev["text"] = f"{(prev.get('text') or '').rstrip()}\n{extra}"
+            # Prefer the longer / more specific of the two headings.
+            if len((chunk.get("title") or "")) > len((prev.get("title") or "")):
+                prev["title"] = chunk["title"]
+            if "image" not in prev and chunk.get("image"):
+                prev["image"] = chunk["image"]
+            continue
+        folded.append(chunk)
+
     out = []
-    for index, key in enumerate(order):
-        item = merged[key]
+    for index, item in enumerate(folded):
         item["id"] = index
         out.append(item)
 

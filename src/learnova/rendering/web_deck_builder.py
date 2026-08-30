@@ -158,9 +158,9 @@ def _image_html(orig: dict, theme) -> str:
                     f'margin-top:6px;text-align:center;">{cap}</figcaption>') if cap else ""
         badge = ' · low-res, flagged for cleanup' if action.action == "ENHANCE" else ""
         return (
-            f'<figure style="margin:18px auto 0;max-width:70%;text-align:center;">'
+            f'<figure style="margin:6px auto 0;max-width:100%;text-align:center;">'
             f'<img src="data:image/{mime};base64,{b64}" '
-            f'style="max-width:100%;max-height:340px;border-radius:8px;'
+            f'style="max-width:100%;max-height:300px;border-radius:8px;'
             f'border:1px solid {theme.primary_hex}33;" alt="figure{badge}"/>'
             f'{cap_html}</figure>'
         )
@@ -298,10 +298,34 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             # promotes [data-build] to real Reveal fragments *only* in present
             # mode, so the Preview embed and a plain double-click never show a
             # slide of hidden text.
+            #
+            # Hierarchy: a short Title-Case label ("Semantic Analysis", "Rule-
+            # Based MT") acts as a sub-heading and the ordinary sentences after
+            # it are indented under it; a "↳ " prefix is an explicit sub-point.
+            def _is_label(s: str) -> bool:
+                s = s.strip().rstrip(":")
+                if not (1 <= len(s.split()) <= 6):
+                    return False
+                if s.endswith((".", "!", "?")):
+                    return False
+                letters = [c for c in s if c.isalpha()]
+                return bool(letters) and s[:1].isupper() and not s.islower()
+
             out = []
             for bi, b in enumerate(items):
+                raw = str(b)
                 db = f' data-build="{frag_map[bi]}"' if bi in frag_map else ""
-                out.append(f"<li{db} style='{li_style}'>{html.escape(str(b))}</li>")
+                sub = raw.lstrip().startswith(("↳", "-", "•"))
+                text = raw.lstrip("↳-• ").strip()
+                if _is_label(text):
+                    cls = "lv-blabel"
+                elif sub:
+                    cls = "lv-bsub"
+                else:
+                    cls = "lv-bmain"
+                out.append(
+                    f"<li{db} class='{cls}' style='{li_style}'>{html.escape(text)}</li>"
+                )
             return "".join(out)
 
         slide_body = ""
@@ -419,12 +443,23 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         else:
             bullets = imp.get("bullets", [])
             n = len(bullets)
-            fs = "1.05rem" if n <= 4 else ("0.95rem" if n <= 6 else "0.86rem")
-            lh = "1.55" if n <= 5 else "1.4"
-            b_items = _bullets_html(bullets, f"margin-bottom:{'10px' if n <= 5 else '7px'};")
+            total_chars = sum(len(str(b)) for b in bullets)
+            # A teaching slide adapts by *display*, not by cutting text. Pick a
+            # sensible base font from the load; the auto-fit script then nudges
+            # it to fill the stage (grow when light, shrink when it overflows).
+            if n <= 3 and total_chars < 360:
+                fs, lh, gap = "1.5rem", "1.6", "16px"
+            elif n <= 6 and total_chars < 1000:
+                fs, lh, gap = "1.15rem", "1.5", "11px"
+            elif total_chars < 2200:
+                fs, lh, gap = "0.98rem", "1.44", "8px"
+            else:
+                fs, lh, gap = "0.86rem", "1.34", "6px"
+            b_items = _bullets_html(bullets, f"margin-bottom:{gap};")
             slide_body = f"""
-            <div style="text-align:left; margin-top:14px; font-size:{fs}; line-height:{lh};">
-                <ul style="padding-left:22px; list-style:disc;">{b_items}</ul>
+            <div class="lv-textbody" style="text-align:left; margin-top:12px;
+                 font-size:{fs}; line-height:{lh};">
+                <ul style="padding-left:20px; list-style:disc;">{b_items}</ul>
             </div>
             """
 
@@ -435,18 +470,34 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         </div>
         """ if takeaway_text else ""
 
-        # Slide wrapper. The body is a single .lv-body block so the auto-fit
-        # script can scale it down when a dense slide would overflow.
+        # Body layout. A text slide that also has a figure puts the text in a
+        # left column and the figure in a right rail, so neither is squashed and
+        # the whole thing still fits (the auto-fit script does the final nudge).
+        _text_layout = layout_type in {"MINIMAL_TEXT", "", "CARD_GRID"} and not _fam_block
+        if _text_layout and image_block:
+            body_inner = f"""
+            <div style="display:flex; gap:26px; align-items:flex-start;">
+              <div style="flex:1 1 60%; min-width:0;">{slide_body}</div>
+              <div style="flex:0 0 34%; max-width:34%;">{image_block}</div>
+            </div>
+            {_inline_quiz_html(imp.get("inline_quiz"), theme)}
+            {takeaway_html}
+            """
+        else:
+            body_inner = f"""
+            {slide_body}
+            {image_block}
+            {_inline_quiz_html(imp.get("inline_quiz"), theme)}
+            {takeaway_html}
+            """
+
         slides_html_list.append(f"""
         <section data-transition="{slide_transition}" style="text-align:left;">
             <div style="border-bottom:3px solid {theme.primary_hex}; padding-bottom:8px; margin-bottom:6px;">
                 <h2 style="color:{theme.primary_hex}; font-family:'{theme.heading_font}', sans-serif; font-size:2rem; margin:0; text-transform:uppercase;">{title_text}</h2>
             </div>
             <div class="lv-body">
-            {slide_body}
-            {image_block}
-            {_inline_quiz_html(imp.get("inline_quiz"), theme)}
-            {takeaway_html}
+            {body_inner}
             </div>
             {notes_html}
         </section>
@@ -472,6 +523,39 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         .reveal .slides {{
             text-align: left;
         }}
+        /* Every slide fills the stage so a light slide isn't a small block
+           floating in the middle of a big empty canvas. */
+        .reveal .slides > section {{
+            min-height: 690px;
+            box-sizing: border-box;
+        }}
+        .reveal .slides > section > .lv-body {{
+            min-height: 600px;
+        }}
+        /* Teaching-slide bullet hierarchy + indentation */
+        .reveal .lv-textbody ul {{ margin: 0; }}
+        .reveal .lv-textbody li {{ padding-left: 2px; }}
+        .reveal .lv-textbody li.lv-blabel {{
+            list-style: none;
+            margin-left: -20px;
+            margin-top: 12px;
+            font-weight: 700;
+            color: {theme.primary_hex};
+            text-transform: none;
+        }}
+        .reveal .lv-textbody li.lv-blabel::before {{
+            content: "▸ ";
+            color: {theme.accent_hex};
+        }}
+        .reveal .lv-textbody li.lv-bmain {{ margin-left: 4px; }}
+        .reveal .lv-textbody li.lv-bsub {{
+            margin-left: 22px;
+            list-style: circle;
+            opacity: .92;
+        }}
+        .reveal .lv-textbody li.lv-blabel + li,
+        .reveal .lv-textbody li.lv-bmain,
+        .reveal .lv-textbody li.lv-bsub {{ }}
     </style>
 </head>
 <body>
@@ -484,19 +568,18 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     <!-- Reveal.js + notes plugin: bundled inline (offline-safe). Mermaid on CDN. -->
     {_body_scripts()}
     <script>
-        // Progressive reveal (one idea per click) is ON by default whenever the
-        // deck is opened directly — a teacher double-clicking the .html gets the
-        // phase-by-phase build, not a wall of text. It is OFF only when the deck
-        // is embedded in a frame (the in-app Preview pane, which wants a flat
-        // view) unless that frame calls __enableBuilds(), or when ?flat is set.
+        // Progressive reveal (one idea per click) is OFF by default: a study
+        // deck opened directly should show the WHOLE slide so it can be read.
+        // It turns ON only when actually presenting — ?build / ?present in the
+        // URL, window.__learnovaBuild set by an embedder, or the presenter
+        // console calling __enableBuilds().
         var LV_BUILD = (function () {{
             try {{
                 var s = (location.search + location.hash);
-                if (/[?#&]flat\\b/.test(s)) return false;
+                if (/[?#&](build|present)\\b/.test(s)) return true;
                 if (window.__learnovaBuild) return true;
-                if (/[?#&]build\\b/.test(s)) return true;
-                return window.top === window.self;   // not embedded → build
-            }} catch (e) {{ return true; }}
+                return false;
+            }} catch (e) {{ return false; }}
         }})();
 
         function lvApplyBuilds() {{
@@ -589,18 +672,35 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
         mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
 
-        // Auto-fit: if a slide's content is taller than the stage, scale its
-        // body down so nothing is clipped (a dense lecture slide with 8 points
-        // + a figure would otherwise overflow off the bottom).
+        // Auto-fit: keep every slide's content on screen and filling the stage.
+        //  - taller than the stage  -> scale the body DOWN (nothing clipped)
+        //  - much shorter            -> scale it UP (a light slide isn't a
+        //                               postage stamp in the middle of the canvas)
+        // Text is never cut; only the display adapts.
         function lvAutoFit(slide) {{
             if (!slide) return;
             var body = slide.querySelector('.lv-body');
             if (!body) return;
             body.style.transform = '';
-            var avail = slide.clientHeight - (slide.querySelector('h2') ? slide.querySelector('h2').offsetHeight : 0) - 30;
+            body.style.width = '';
+            var h2 = slide.querySelector('h2');
+            // Measure against the STAGE, not the section — a section that
+            // overflows reports its own (too-large) height, so auto-fit would
+            // never trigger. Reveal's configured stage is 740 tall.
+            var stage = (Reveal.getConfig && Reveal.getConfig().height) || 740;
+            var avail = stage - (h2 ? h2.offsetHeight : 40) - 34;
+            if (avail < 120) return;
+            var prevT = body.style.transform;
+            body.style.transform = 'none';
             var need = body.scrollHeight;
-            if (need > avail && avail > 120) {{
-                var k = Math.max(0.62, avail / need);
+            body.style.transform = prevT;
+            var k = 1;
+            if (need > avail) {{
+                k = Math.max(0.5, avail / need);
+            }} else if (need < avail * 0.72) {{
+                k = Math.min(1.5, (avail * 0.9) / Math.max(need, 1));
+            }}
+            if (Math.abs(k - 1) > 0.015) {{
                 body.style.transform = 'scale(' + k.toFixed(3) + ')';
                 body.style.transformOrigin = 'top left';
                 body.style.width = (100 / k).toFixed(1) + '%';

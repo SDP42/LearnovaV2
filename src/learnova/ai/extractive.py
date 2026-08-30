@@ -83,10 +83,16 @@ _ORDINAL = re.compile(
 
 
 def _clean_chunk(text: str, title: str) -> str:
-    """Strip a leading line that just repeats the heading, then normalise."""
+    """Strip a leading line that just repeats the heading, then normalise.
+
+    Source lines that read as list items (short, no terminal punctuation) are
+    joined with ". " so the sentence splitter keeps them as separate points —
+    otherwise "Lexical Analysis\\nInvolves breaking text into tokens" collapses
+    into one run-on bullet and the enumeration structure is lost.
+    """
     t = (text or "").strip()
     title_norm = re.sub(r"[^a-z0-9 ]", "", (title or "").lower()).strip()
-    lines = t.splitlines()
+    lines = [ln.strip() for ln in t.splitlines()]
     while lines:
         first = re.sub(r"[^a-z0-9 ]", "", lines[0].lower()).strip()
         if first and title_norm and (first == title_norm or first in title_norm):
@@ -95,11 +101,21 @@ def _clean_chunk(text: str, title: str) -> str:
             lines.pop(0)
         else:
             break
-    t = " ".join(lines)
-    # A markdown list survives as newlines; keep those as sentence breaks.
-    t = re.sub(r"\s*\n\s*[-*+]\s+", ". ", "\n".join(lines))
+
+    pieces: List[str] = []
+    for ln in lines:
+        ln = re.sub(r"^\s*(?:[-*+•]|\d+[.)])\s+", "", ln).strip()
+        if not ln:
+            continue
+        pieces.append(ln)
+        # Force a sentence break after a short line with no terminal
+        # punctuation (a bare label / list item). A long unterminated line is
+        # probably wrapped prose — leave it to join with the next.
+        if not ln.endswith((".", "!", "?", ";")) and len(ln.split()) <= 14:
+            pieces.append("․")  # sentinel → ". " below, keeps the split
+
+    t = " ".join(pieces).replace(" ․", ". ").replace("․", ". ")
     t = re.sub(r"\s+", " ", t).strip()
-    # OCR blocks the pipeline appends in [brackets] — drop the wrapper noise.
     t = re.sub(r"\[(?:Extracted OCR|OCR Transcription)[^\]]*\]", "", t)
     return t.strip()
 
@@ -194,26 +210,39 @@ def _should_summarise(sentences: List[str], text: str) -> bool:
 
 
 def heuristic_layout(text: str, bullets: List[str]) -> str:
-    """Conservative: only route to a structure when the text really has one."""
+    """Conservative: only route to a structure when the text really has one.
+
+    A structural layout (flowchart / table / metric) *replaces* the bullet list,
+    so it is only safe when the slide is genuinely that structure. A content-
+    heavy slide — many bullets, or long explanatory sentences — stays
+    MINIMAL_TEXT and a supporting visual is attached alongside it instead.
+    """
     joined = " ".join(bullets) if bullets else text
     lower = joined.lower()
+    avg_words = (sum(len(b.split()) for b in bullets) / len(bullets)) if bullets else 0
+    content_heavy = len(bullets) > 7 or avg_words > 14
+
     ordinals = len(_ORDINAL.findall(lower))
-    if ordinals >= 3 or re.search(r"step\s*1\b.*step\s*2\b", lower, re.S):
+    steps_like = (
+        not content_heavy
+        and (ordinals >= 3 or re.search(r"step\s*1\b.*step\s*2\b", lower, re.S))
+    )
+    if steps_like:
         return "FLOWCHART"
     # TABLE only for a genuine two-thing comparison — several "A vs B" cues AND
     # roughly parallel bullets. One stray "whereas" in a narrative is not a table.
     vs_cues = len(re.findall(r"\bvs\.?\b|\bversus\b|\bwhereas\b|on the other hand", lower))
-    if vs_cues >= 2 and 3 <= len(bullets) <= 10:
+    if not content_heavy and vs_cues >= 2 and 3 <= len(bullets) <= 8:
         return "TABLE"
     pcts = len(re.findall(r"\b\d{1,3}(?:\.\d+)?\s?%|\b\d+\s?percent\b", lower))
-    if pcts >= 3 and pcts >= 0.5 * max(1, len(bullets)):
+    if not content_heavy and pcts >= 3 and pcts >= 0.5 * max(1, len(bullets)):
         return "TABLE"
     if len(re.findall(r"\b\d{1,3}(?:\.\d+)?\s?%", lower)) == 1 and len(joined.split()) < 40:
         return "METRIC"
     # A card grid is for 3-6 *parallel pillars*. A long flat list of "Label:
     # detail" items (20 NLP applications) is a bullet slide, not 5 card grids.
     labelled = sum(1 for b in bullets if re.match(r"^[A-Z][\w /&.\-]{1,32}:\s", b))
-    if 3 <= labelled <= 6 and len(bullets) <= 7:
+    if not content_heavy and 3 <= labelled <= 6 and len(bullets) <= 7:
         return "CARD_GRID"
     return "MINIMAL_TEXT"
 
@@ -240,7 +269,9 @@ def _list_items(text: str, title: str) -> List[str]:
     # not a flowing paragraph).
     def _one_statement(ln: str) -> bool:
         core = re.sub(r"^\s*(?:[-*+•]|\d+[.)])\s+", "", ln)
-        return len(re.findall(r"[.!?](?:\s|$)", core)) <= 1 and 3 <= len(core.split()) <= 40
+        # a 2-word Title-Case label ("Machine Translation") is a valid item
+        return (len(re.findall(r"[.!?](?:\s|$)", core)) <= 1
+                and 2 <= len(core.split()) <= 40)
 
     implicit = sum(_one_statement(ln) for ln in lines) >= max(3, 0.7 * len(lines))
 
@@ -251,25 +282,47 @@ def _list_items(text: str, title: str) -> List[str]:
     for ln in lines:
         it = re.sub(r"^\s*(?:[-*+•]|\d+[.)])\s+", "", ln).strip(" .;:")
         it_norm = re.sub(r"[^a-z0-9 ]", "", it.lower()).strip()
-        if it and it_norm != title_norm and len(it.split()) >= 3:
+        # Keep 2-word items too — enumerations are full of them
+        # ("Semantic Analysis", "Text Summarization").
+        if it and it_norm != title_norm and len(it.split()) >= 2:
             items.append(it)
     return items
 
 
 def structure_chunk(text: str, title: str = "", *,
-                    max_bullets: int = 40, target_words: int = 34) -> dict:
+                    max_bullets: int = 40, target_words: int = 50) -> dict:
     """
     The no-LLM replacement for a layout-router result.
 
-    Philosophy: **restructure, never summarise.** Every sentence in the source
-    becomes a bullet (the density stage paginates any overflow onto numbered
-    continuation slides — nothing is dropped). Only an individual sentence
-    longer than ~30 words is lightly compressed, and to ~26 words, so a
-    100-word paragraph lands at roughly 70-80, not 30.
+    Philosophy: **full retention.** Every sentence in the source becomes a
+    bullet, near-verbatim. Only a genuine 55-word-plus run-on is tightened,
+    and only to ~50 words — a trim of a few percent, never a rewrite or a
+    dropped point. Overflow is a display concern the density stage and the
+    web deck's auto-fit font handle; content is never removed here.
     """
+    from learnova.ai.enumeration import extract_enumerations, missing_items
     from learnova.textutils import strip_ocr_block
 
     text = strip_ocr_block(text)
+
+    # Enumerations ("the five phases …", "seven applications …") are atomic:
+    # every item must survive, regardless of length or score. Pull them now and
+    # enforce completeness at the end.
+    enums = [e for e in extract_enumerations(text) if e.is_reliable()]
+
+    def _enforce_enums(bullets: List[str]) -> List[str]:
+        """Append any enumeration item the bullets do not already cover, so a
+        '5 phases' slide never ships with 2 of them."""
+        if not enums:
+            return bullets
+        covered = " ".join(bullets)
+        for e in enums:
+            for item in missing_items(e, covered):
+                cap = item[:1].upper() + item[1:]
+                bullets.append(cap)
+                covered += " " + cap
+        return bullets
+
     # A chunk that is already a bulleted list is kept whole — the pipeline's
     # "content is never dropped" contract. We only lightly tidy each item.
     listed = _list_items(text, title)
@@ -279,10 +332,11 @@ def structure_chunk(text: str, title: str = "", *,
         for it in listed:
             b = _LEAD_MARKERS.sub("", it, count=1).strip(" .;:") or it
             b = (b[:1].upper() + b[1:]) if b else b
-            k = re.sub(r"[^a-z0-9 ]", "", b.lower())[:55]
-            if k not in seen:
+            k = re.sub(r"[^a-z0-9]", "", b.lower())
+            if k and k not in seen:
                 seen.add(k)
                 bullets.append(b)
+        bullets = _enforce_enums(bullets)
         layout = heuristic_layout(" ".join(bullets), bullets)
         out = {
             "layout_type": layout,
@@ -314,30 +368,31 @@ def structure_chunk(text: str, title: str = "", *,
 
     top = max(range(len(sentences)), key=lambda i: scores[i])
 
-    # Keep EVERY sentence, in original order. A pathologically long section
-    # (a whole merged chapter) is the only case we trim, and only to the
-    # highest-scoring 30 — the density stage then paginates those.
-    if len(sentences) > 44:
-        keep = sorted(sorted(range(len(sentences)),
-                             key=lambda i: scores[i], reverse=True)[:44])
-    else:
-        keep = list(range(len(sentences)))
+    # Keep EVERY sentence, in original order. "Restructure, never summarise" —
+    # the density stage paginates overflow onto numbered continuation slides,
+    # so there is no reason to drop a sentence here. (The old top-44 cut is
+    # exactly the "removing, not summarising" failure users reported.)
+    keep = list(range(len(sentences)))
 
     seen: set = set()
     bullets: List[str] = []
     for i in keep:
         raw = sentences[i].rstrip(".")
-        # Only touch a sentence that is genuinely unwieldy; otherwise keep it
-        # whole so the explanation survives.
-        if light_compress and len(raw.split()) > 42:
+        # Only touch a genuine 55-word-plus run-on, and only trim it to ~50 —
+        # everything else is kept exactly as written.
+        if light_compress and len(raw.split()) > 55:
             b = compress_bullet(raw, target_words)
         else:
             b = _LEAD_MARKERS.sub("", raw, count=1).strip() or raw
             b = (b[:1].upper() + b[1:]) if b else b
-        key = re.sub(r"[^a-z0-9 ]", "", b.lower())[:55]
-        if b and key not in seen and len(b.split()) >= 3:
+        # Dedupe on the WHOLE normalised bullet, not a 55-char prefix — two
+        # sentences that share an "X: Aspects: …" lead-in are different points.
+        key = re.sub(r"[^a-z0-9]", "", b.lower())
+        if b and key not in seen and len(b.split()) >= 2:
             seen.add(key)
             bullets.append(b)
+
+    bullets = _enforce_enums(bullets)
 
     # Always distil a one-line takeaway when the slide has real content: it is
     # the slide's "so what", it anchors the presenter view, and the scorer

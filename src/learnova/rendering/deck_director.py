@@ -333,13 +333,34 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         vms_has_payload = bool(vd.data) and vd.confidence >= 0.55
         hard_layout = existing_layout in {"QUIZ"} or (existing_layout == "TABLE" and imp.get("table_rows"))
 
+        # Full-retention guard: a diagram family (process / cycle / mind-map /
+        # comparison) *replaces* the bullet list with a handful of node labels.
+        # Never do that to a content-heavy teaching slide — its sentences would
+        # be lost. Such a slide stays TEXT; the enrich stage can still hang a
+        # supporting visual beside it. Chart/table families that carry the data
+        # themselves (KPI, real table) are exempt.
+        _bwords = sum(len(b.split()) for b in bullets)
+        _content_heavy = len(bullets) > 7 or _bwords > 110
+        _lossy_family = str(vd.family or "").upper() in {
+            "PROCESS_LINEAR", "PROCESS_CYCLIC", "DECISION", "STATE_MACHINE",
+            "MIND_MAP", "HIERARCHY_TREE", "HIERARCHY_NEST", "TIMELINE",
+            "COMPARE_VISUAL", "SET_DIAGRAM", "LIST_STRUCTURED",
+        }
+        force_text = (
+            _content_heavy and _lossy_family
+            and existing_layout in {"MINIMAL_TEXT", "", "CARD_GRID"}
+            and not (vdata and vdata.get("forced"))
+        )
+
         override_bar = 0.75 if _has_real_data else 0.6
-        keep_existing = (
+        keep_existing = force_text or (
             existing_layout not in {"MINIMAL_TEXT", "", "CARD_GRID"}
             and vd.confidence < override_bar
             and not (vms_has_payload and not hard_layout)
         )
-        if keep_existing:
+        if force_text:
+            treatment, family, variant, data = "MINIMAL_TEXT", "TEXT", "standard", {}
+        elif keep_existing:
             treatment = existing_layout
             family, variant = TREATMENT_TO_FAMILY.get(existing_layout, (vd.family, vd.variant))
             data = {}

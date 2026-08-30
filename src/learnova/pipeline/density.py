@@ -93,23 +93,24 @@ PROFILES: Dict[str, DensityProfile] = {
     ),
     "medium": DensityProfile(
         id="medium",
-        label="Medium — balanced (default)",
-        description="About five points per slide, each a full teaching sentence — "
-                    "a real lecture slide, not a headline. Overflow moves to a "
-                    "numbered continuation. Teaching and self-study.",
-        # 5 points per slide keeps each screen inside working-memory limits and
-        # lets the deck breathe — overflow moves to a numbered continuation
-        # rather than piling a 9-bullet wall onto one slide. Full coverage is
-        # preserved by the continuation, not by cramming.
-        max_bullets=5,
-        # A complete teaching point keeps its reasoning ("... because ...",
-        # "... so that ..."). 30 words holds one clause pair without clipping;
-        # a reasoning bullet gets 1.5x that before a split is worthwhile.
-        max_words_per_bullet=30,
-        max_chars_per_bullet=240,
-        max_table_rows=7,
-        max_flow_steps=4,
-        max_grid_cards=4,
+        label="Medium — teaching (default)",
+        description="A study/lecture slide, not a keynote slide: every source "
+                    "point kept near-verbatim as a full teaching sentence. The "
+                    "web deck auto-fits the font and reveals one point per "
+                    "click; a slide only splits past ~16 points / ~300 words.",
+        # Research note: the '6x6' / 'few words' rules are for *narrated* talks
+        # (Mayer's redundancy principle). A read-at-your-own-pace teaching deck
+        # is governed by the coherence principle (cut extraneous, keep
+        # essential) and by SEGMENTING + progressive disclosure — not deletion.
+        # A teaching bullet is a whole sentence (~20-45 words); a slide holds as
+        # many as the topic needs. So the budget is generous and the real
+        # density lever is presentation (font fit, reveal, columns, a visual).
+        max_bullets=16,
+        max_words_per_bullet=55,     # only a genuine run-on is tightened
+        max_chars_per_bullet=440,
+        max_table_rows=14,
+        max_flow_steps=10,
+        max_grid_cards=8,
         include_enhancement=True,
         enhancement_items=1,
     ),
@@ -119,26 +120,26 @@ PROFILES: Dict[str, DensityProfile] = {
         description="Every point kept as a full sentence with its reasoning. "
                     "One idea revealed per click. Best for typed lesson notes "
                     "and worked examples.",
-        max_bullets=6,
-        max_words_per_bullet=40,
-        max_chars_per_bullet=280,
-        max_table_rows=8,
-        max_flow_steps=6,
-        max_grid_cards=4,
+        max_bullets=14,
+        max_words_per_bullet=60,
+        max_chars_per_bullet=480,
+        max_table_rows=12,
+        max_flow_steps=12,
+        max_grid_cards=8,
         include_enhancement=True,
         enhancement_items=2,
     ),
     "heavy": DensityProfile(
         id="heavy",
         label="Heavy — study notes",
-        description="Ten full bullets plus examples, analogies and revision "
-                    "points. Handouts meant to be read alone.",
-        max_bullets=10,
-        max_words_per_bullet=38,
-        max_chars_per_bullet=280,
-        max_table_rows=12,
-        max_flow_steps=7,
-        max_grid_cards=4,
+        description="Full study handout: every sentence, plus examples, "
+                    "analogies and revision points. Meant to be read alone.",
+        max_bullets=22,
+        max_words_per_bullet=70,
+        max_chars_per_bullet=520,
+        max_table_rows=18,
+        max_flow_steps=14,
+        max_grid_cards=8,
         include_enhancement=True,
         enhancement_items=3,
     ),
@@ -313,12 +314,37 @@ def _restates(bullet: str, title: str) -> bool:
     return bool(a) and bool(b) and (a == b or (len(a) >= 8 and a in b))
 
 
+def _base_title(title: str) -> str:
+    return re.sub(r"\s*\(\d+/\d+\)\s*$", "", title or "").strip()
+
+
 def _title_for_part(title: str, index: int, total: int) -> str:
     """Number continuation slides so the run reads as one continuous topic."""
     if total <= 1:
         return title
-    base = re.sub(r"\s*\(\d+/\d+\)\s*$", "", title or "").strip()
-    return f"{base} ({index + 1}/{total})"
+    return f"{_base_title(title)} ({index + 1}/{total})"
+
+
+def _renumber_runs(deck: List[dict]) -> List[dict]:
+    """After drops/folds/dedupe, re-number each run of consecutive same-base
+    slides so the labels are contiguous ('(2/15)' with no '(1/15)' looks
+    broken). A run of one loses its counter entirely."""
+    i = 0
+    n = len(deck)
+    while i < n:
+        base = _base_title(str((deck[i].get("improved") or {}).get("title", "")))
+        j = i
+        while j < n and _base_title(
+            str((deck[j].get("improved") or {}).get("title", ""))
+        ) == base and (j == i or (deck[j].get("improved") or {}).get("continued")):
+            j += 1
+        run = j - i
+        for k in range(i, j):
+            im = dict(deck[k].get("improved") or {})
+            im["title"] = base if run == 1 else f"{base} ({k - i + 1}/{run})"
+            deck[k] = {**deck[k], "improved": im}
+        i = j
+    return deck
 
 
 # ── Enhancement folding ───────────────────────────────────────────────────────
@@ -544,8 +570,10 @@ def _fold_thin_slides(deck: List[dict]) -> List[dict]:
             or im.get("mermaid_code") or im.get("flowchart_spec") or im.get("question")
         )
         is_last = i == len(deck) - 1
-        if not is_last and len(rb) <= 1 and not has_visual:
-            pending.extend(rb)
+        # Fold forward only a genuinely empty fragment. A real one-point slide
+        # is kept — the web deck grows its font and gives it a visual.
+        if not is_last and not rb and not has_visual:
+            pending.extend(str(b) for b in (im.get("bullets") or []))
             continue
         if pending:
             merged_bullets = pending + [str(b) for b in (im.get("bullets") or [])]
@@ -558,6 +586,51 @@ def _fold_thin_slides(deck: List[dict]) -> List[dict]:
         last = {**last, "bullets": [str(b) for b in (last.get("bullets") or [])] + pending}
         out[-1] = {**out[-1], "improved": last}
     return out or deck
+
+
+def _bullet_key_set(im: dict) -> set:
+    out = set()
+    for b in (im.get("bullets") or []):
+        k = re.sub(r"[^a-z0-9]", "", str(b).lower())[:60]
+        if len(k) >= 6:
+            out.add(k)
+    return out
+
+
+def _dedupe_slides(deck: List[dict]) -> List[dict]:
+    """Drop a slide whose content is already shown on an earlier one.
+
+    The chunker merges same-heading source sections, but the LLM can still
+    re-title two different sections identically, or a figure-only page can echo
+    the slide before it. A slide is a duplicate when >=70% of its bullet set is
+    already covered by an earlier slide. Continuation parts ("(2/4)") are never
+    treated as duplicates of each other — they share a title by design.
+    """
+    kept: List[dict] = []
+    seen: List[tuple[str, set]] = []  # (title_key, bullet_key_set) of non-continuation slides
+    dropped = 0
+    for entry in deck:
+        im = entry.get("improved") or {}
+        if im.get("continued"):
+            kept.append(entry)
+            continue
+        bk = _bullet_key_set(im)
+        tk = re.sub(r"[^a-z0-9 ]", " ", str(im.get("title", "")).lower())
+        tk = re.sub(r"\s+", " ", tk).strip()
+        is_dup = False
+        if bk:
+            for _, prev_bk in seen:
+                if prev_bk and len(bk & prev_bk) >= 0.7 * len(bk):
+                    is_dup = True
+                    break
+        if is_dup and not (im.get("table_rows") or im.get("mermaid_code") or im.get("question")):
+            dropped += 1
+            continue
+        seen.append((tk, bk))
+        kept.append(entry)
+    if dropped:
+        logger.info("density: dropped %d duplicate slide(s)", dropped)
+    return kept
 
 
 def _drop_empty_and_fold_titles(deck: List[dict]) -> List[dict]:
@@ -596,6 +669,10 @@ def apply_density(deck: List[dict], density: str,
     profile = get_profile(density)
     enhanced_by_index = enhanced_by_index or {}
 
+    # Drop whole-slide duplicates *before* pagination, so a re-titled repeat
+    # can't spawn its own "(1/3)…(3/3)" run.
+    deck = _dedupe_slides(deck)
+
     out: List[dict] = []
     for index, entry in enumerate(deck):
         out.extend(paginate_slide(entry, profile, enhanced_by_index.get(index)))
@@ -609,6 +686,8 @@ def apply_density(deck: List[dict], density: str,
     out = _fold_thin_slides(out)
     if before_fold != len(out):
         logger.info("density: folded %d lone-point slide(s) forward", before_fold - len(out))
+
+    out = _renumber_runs(out)
 
     if len(out) != len(deck):
         logger.info(

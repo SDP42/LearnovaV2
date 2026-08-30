@@ -58,21 +58,22 @@ Your job is to transform raw presentation text, lecture notes, and OCR diagram \
 descriptions into structured, visually engaging teaching material.
 
 CRITICAL INSTRUCTIONS FOR CONTENT IMPROVEMENT:
-1. KEEP EVERY TEACHABLE POINT. You are RESTRUCTURING, not summarising. Each distinct
-   fact, definition, figure, step or example in the input MUST survive as its own
-   bullet. Do NOT cap the list — emit as many bullets as the input has points.
-   A later stage decides how many fit on a slide and moves the rest onto a
-   continuation slide, so anything you drop here is lost from the deck entirely.
-   You may only remove: exact repetition, filler words, and the slide's own title.
-2. WRITE FULL TEACHING SENTENCES, NOT HEADLINES. Each bullet is one complete
-   thought a teacher would say out loud — typically 15 to 30 words — and it KEEPS
-   ITS REASONING: the "because ...", "so that ...", "which means ..." clause that
-   explains WHY, and connectives like "first / then / next / finally" that show
-   order. Do not strip a sentence down to a noun phrase. For a worked example or
-   a derivation, keep every intermediate step as its own bullet in order — never
-   jump from step 1 to the final answer.
-   Preserve concrete numbers, currency amounts, formulas and proper nouns VERBATIM.
-   Keep any "Label: detail" prefix intact — it becomes the card heading.
+1. FULL RETENTION — THIS IS THE HARD RULE. You are RE-ORGANISING, not summarising.
+   Reproduce EVERY sentence of the input as its own bullet, in the original order,
+   in near-verbatim wording. You may only:
+     - fix obvious OCR typos and broken spacing,
+     - drop an exact duplicate sentence or the slide's own title line,
+     - tighten a single run-on sentence by AT MOST ~5% of its words.
+   You may NOT merge two points into one, paraphrase a point away, cut examples,
+   cut a list short, or "keep the key ones". If the input lists five phases, your
+   output has five phase bullets. A later stage handles how it fits on screen —
+   anything you omit here is gone from the deck forever. Emit as many bullets as
+   the input has sentences/items; there is no maximum.
+2. KEEP THE WORDING. Do not turn a sentence into a headline or a noun phrase.
+   Keep its reasoning clause ("because…", "so that…", "which means…") and its
+   order words ("first / then / next / finally"). Keep every worked-example step.
+   Preserve numbers, currency, dates, formulas and proper nouns VERBATIM.
+   Keep any "Label: detail" prefix intact — it becomes a card heading.
 3. HIGH-YIELD TAKEAWAY: Formulate a single, high-yield summary sentence ("takeaway")
    that captures the core lesson. Leave it "" if the content has no single lesson.
 4. DIAGRAM SYNTHESIS: If the input text contains visual diagram OCR (e.g., arrows, steps, flowcharts, architectures), extract the step-by-step node sequence accurately.
@@ -432,21 +433,15 @@ def _restore_dropped_points(bullets: list[str], source: str) -> list[str]:
             # Either this sentence is mostly covered by an existing bullet, or
             # an existing bullet is mostly a subset of this sentence (the model
             # paraphrased it shorter). Both mean "no new point here".
-            if len(cw & other) >= 0.5 * len(cw):
-                return True
-            if len(cw & other) >= 0.6 * len(other):
+            # Only skip a source sentence when an existing bullet already says
+            # essentially the same thing (near-verbatim). A loose paraphrase no
+            # longer suppresses it — full retention beats terseness.
+            if len(cw & other) >= 0.8 * len(cw) and len(cw & other) >= 0.8 * len(other):
                 return True
         return False
 
-    # Don't let restoration balloon a slide — past this the model clearly kept
-    # the gist and the extras are mostly re-statements the density stage would
-    # just paginate into filler.
-    cap = max(len(bullets) + 6, 14)
-
     restored = list(bullets)
     for sentence in candidates:
-        if len(restored) >= cap:
-            break
         cleaned = clean_bullet(sentence)
         if not cleaned or is_redundant(cleaned, restored):
             continue
@@ -595,6 +590,21 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
     stage = "layout_router"
     text = strip_ocr_block(text)
 
+    # Enumerations are atomic — the model must keep every item, and anything it
+    # still drops is force-restored afterwards.
+    from learnova.ai.enumeration import extract_enumerations, missing_items
+    _enums = [e for e in extract_enumerations(text) if e.is_reliable()]
+    _enum_hint = ""
+    if _enums:
+        _lines = []
+        for e in _enums[:3]:
+            label = (e.lead or e.kind or "list").strip().rstrip(":")
+            _lines.append(f"{label}: " + "; ".join(e.items))
+        _enum_hint = (
+            "\n\nThese enumerations MUST appear complete — every item as its own "
+            "bullet, none merged or omitted:\n" + "\n".join(_lines)
+        )
+
     try:
         # ── Circuit breaker ───────────────────────────────────────────────────
         if _groq_rate_limited:
@@ -602,7 +612,7 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
 
         # ── Attempt 1: full prompt ────────────────────────────────────────────
         logger.info("[%s] START — title=%r", stage, current_title[:40] if current_title else "")
-        user_prompt = f"Title: {current_title}\nText:\n{text[:3500]}"
+        user_prompt = f"Title: {current_title}\nText:\n{text[:3500]}{_enum_hint}"
         if ocr_hint:
             user_prompt += f"\n\n(A figure on this slide reads: {ocr_hint[:300]})"
         raw1: Optional[str] = None
@@ -667,6 +677,16 @@ def classify_and_structure_chunk(text: str, current_title: str = "") -> dict:
         bullets = dedupe_bullets([str(b) for b in data.get("bullets", [])])
         _llm_bullets_raw = list(bullets)  # before restoration inflates the count
         bullets = _restore_dropped_points(bullets, text)
+
+        # Non-negotiable: every enumeration item present, even if the model
+        # collapsed "the five phases" into one sentence.
+        if _enums:
+            covered = " ".join(bullets)
+            for e in _enums:
+                for item in missing_items(e, covered):
+                    cap = item[:1].upper() + item[1:]
+                    bullets.append(cap)
+                    covered += " " + cap
 
         result: dict = {
             "layout_type": layout_type,

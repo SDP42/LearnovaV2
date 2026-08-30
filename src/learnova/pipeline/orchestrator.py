@@ -511,14 +511,21 @@ def generate(
             bl = [str(b) for b in (imp.get("bullets") or []) if str(b).strip()]
             if len(bl) < 2:
                 continue
-            # Shortest substantive bullet reads best as a one-line "so what".
-            cand = min(
-                (b for b in bl if 4 <= len(b.split()) <= 26),
-                key=lambda b: len(b.split()), default="",
-            )
+            # A takeaway is the slide's "so what" — a full statement, not a bare
+            # label. Prefer a mid-length sentence that actually asserts
+            # something (has a verb), scanning from the top of the slide.
+            def _verby(s: str) -> bool:
+                return bool(re.search(
+                    r"\b(is|are|was|were|has|have|involves?|enables?|allows?|"
+                    r"provides?|helps?|uses?|refers?|means|consists?|converts?|"
+                    r"focuses?|deals?|works?|represents?|makes?|requires?)\b",
+                    s, re.I))
+            cand = next(
+                (b for b in bl if 8 <= len(b.split()) <= 28 and _verby(b)), "")
             if not cand:
                 sents = split_sentences(" ".join(bl))
-                cand = next((s for s in sents if 4 <= len(s.split()) <= 24), "")
+                cand = next(
+                    (s for s in sents if 8 <= len(s.split()) <= 26 and _verby(s)), "")
             cand = clean_bullet(cand).rstrip(".")
             if cand:
                 imp["takeaway"] = cand[:1].upper() + cand[1:]

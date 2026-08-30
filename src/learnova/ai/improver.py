@@ -20,7 +20,7 @@ MAX_CHUNKS = 80
 # When its bullets carry less than this fraction of the extractive baseline's
 # word count we keep the LLM's layout/title/visual decisions but swap in the
 # extractive bullets, which keep every sentence with only light compression.
-_MIN_RETENTION_VS_EXTRACTIVE = float(os.getenv("LEARNOVA_MIN_RETENTION", "0.72"))
+_MIN_RETENTION_VS_EXTRACTIVE = float(os.getenv("LEARNOVA_MIN_RETENTION", "0.9"))
 
 
 def _wc(bullets) -> int:
