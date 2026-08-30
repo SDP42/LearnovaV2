@@ -1,0 +1,253 @@
+[
+  { "intent": "OPEN_PRESENTATION", "expand": 90, "templates": [
+    "open presentation {num}", "show presentation {num}", "show me presentation {num}",
+    "launch presentation {num}", "start the {ordinal} presentation",
+    "take me to presentation {num}", "can I see presentation {num}",
+    "could you open presentation {num}", "bring up the {ordinal} deck",
+    "open the {ordinal} presentation", "open deck number {num}",
+    "give me presentation number {num}", "open number {num}", "let's open number {num}",
+    "open the {topic} presentation", "open the {topic} deck",
+    "pull up the deck about {topic}", "open the presentation about {topic}",
+    "take me to the {topic} deck", "show me the {topic} slides",
+    "open LRN-PRES-000{num}", "load presentation {num}", "view presentation {num}",
+    "i want to see the {topic} presentation", "open my {topic} deck",
+    "open the presentation on {subject}", "show the {subject} presentation" ] },
+
+  { "intent": "GET_WEB_DECK", "expand": 75, "templates": [
+    "give me the web deck of presentation {num}", "open the web deck for presentation {num}",
+    "show me presentation {num} as a web deck", "give me presentation {num} as a web deck",
+    "open the interactive version of presentation {num}",
+    "i want the interactive deck for the {topic} presentation",
+    "open the interactive {topic} presentation", "launch the web presentation for {topic}",
+    "show me the html version of presentation {num}",
+    "open the web version of the {ordinal} presentation",
+    "can you launch the interactive presentation {num}",
+    "give me the interactive version of the {topic} deck" ] },
+
+  { "intent": "START_PRESENTATION", "expand": 60, "templates": [
+    "start presentation {num}", "play presentation {num}", "present presentation {num}",
+    "run the {ordinal} presentation", "start presenting the {topic} deck",
+    "begin presentation {num}", "start the slideshow for presentation {num}",
+    "present the {topic} deck", "let's present presentation {num}",
+    "kick off presentation {num}", "start the presentation about {topic}" ] },
+
+  { "intent": "STOP_PRESENTATION", "expand": 20, "templates": [
+    "stop the presentation", "end the presentation", "close the presentation",
+    "exit the slideshow", "quit the presentation", "stop presenting" ] },
+
+  { "intent": "RESUME_PRESENTATION", "expand": 15, "templates": [
+    "resume the presentation", "continue the presentation",
+    "go back to where we left off", "continue where I was",
+    "resume the {topic} deck", "pick up the presentation again" ] },
+
+  { "intent": "RESTART_PRESENTATION", "expand": 15, "templates": [
+    "restart the presentation", "start the presentation over",
+    "start the deck from the beginning", "restart from slide 1",
+    "begin the presentation again from the start" ] },
+
+  { "intent": "SEARCH_PRESENTATION", "expand": 90, "templates": [
+    "find presentations about {topic}", "search for {topic} presentations",
+    "list my presentations", "show me all my decks", "show all presentations",
+    "which presentations do I have", "find my {subject} decks",
+    "search for decks about {topic}", "show me presentations related to {subject}",
+    "do I have a presentation on {topic}", "list all {subject} presentations",
+    "find the deck that covers {topic}", "search my decks for {concept}" ] },
+
+  { "intent": "SUMMARIZE_PRESENTATION", "expand": 40, "templates": [
+    "summarize presentation {num}", "give me a summary of the {topic} presentation",
+    "tldr of presentation {num}", "give me the short version of this presentation",
+    "summarize the {topic} deck for me", "quick summary of presentation {num}" ] },
+
+  { "intent": "EXPLAIN_PRESENTATION", "expand": 40, "templates": [
+    "explain presentation {num}", "walk me through the {topic} presentation",
+    "what's in presentation {num}", "explain the {topic} deck",
+    "give me an overview of presentation {num}", "what does presentation {num} cover" ] },
+
+  { "intent": "DOWNLOAD_PRESENTATION", "expand": 30, "templates": [
+    "download presentation {num} as pptx", "export the {topic} deck as powerpoint",
+    "save presentation {num} as a pdf", "get me the powerpoint file for presentation {num}",
+    "download the {topic} presentation", "give me the pptx for presentation {num}" ] },
+
+  { "intent": "NEXT_SLIDE", "expand": 45, "templates": [
+    "next slide", "next", "go to the next slide", "move on", "forward",
+    "go forward", "advance", "advance the slide", "show the next one",
+    "next one", "okay next", "and next", "continue to the next slide" ] },
+
+  { "intent": "PREVIOUS_SLIDE", "expand": 45, "templates": [
+    "previous slide", "go back", "back", "go to the previous slide",
+    "last slide please", "one slide back", "go back one", "previous one",
+    "back a slide", "return to the previous slide", "back up one slide" ] },
+
+  { "intent": "FIRST_SLIDE", "expand": 25, "templates": [
+    "first slide", "go to the first slide", "go to the beginning",
+    "back to the start", "take me to slide one", "start from the beginning",
+    "jump to the first slide" ] },
+
+  { "intent": "LAST_SLIDE", "expand": 25, "templates": [
+    "last slide", "go to the last slide", "final slide", "go to the end",
+    "jump to the end", "take me to the final slide", "show the last slide" ] },
+
+  { "intent": "GO_TO_SLIDE", "expand": 90, "templates": [
+    "go to slide {slide_no}", "show slide {slide_no}", "jump to slide {slide_no}",
+    "take me to slide {slide_no}", "open slide {slide_no}", "go to slide number {slide_no}",
+    "start from slide {slide_no}", "navigate to slide {slide_no}",
+    "slide {slide_no} please", "bring up slide {slide_no}", "show me slide {slide_no}" ] },
+
+  { "intent": "GO_TO_SECTION", "expand": 55, "templates": [
+    "go to the {section} section", "jump to the {section} part",
+    "take me to the {section} slide", "show me the {section} section",
+    "open the {section} part of the deck", "go to the {section} slides" ] },
+
+  { "intent": "REPEAT_SLIDE", "expand": 15, "templates": [
+    "repeat this slide", "show this slide again", "stay on this slide",
+    "go over this slide again", "repeat the current slide" ] },
+
+  { "intent": "READ_SLIDE", "expand": 20, "templates": [
+    "read this slide", "read this slide out loud", "read the slide to me",
+    "read this aloud", "can you read this slide", "read out the current slide" ] },
+
+  { "intent": "EXPLAIN_SLIDE", "expand": 40, "templates": [
+    "explain this slide", "what's on this slide", "what does this slide say",
+    "explain the current slide", "break down this slide for me",
+    "what is this slide about", "help me understand this slide" ] },
+
+  { "intent": "EXPLAIN_VISUAL", "expand": 60, "templates": [
+    "explain this diagram", "what does this diagram mean", "what is this chart showing",
+    "explain this figure", "what does this image represent", "what is happening here",
+    "why is this arrow going there", "what does this box mean", "explain the process shown here",
+    "what is this", "explain the flowchart on this slide", "what does this graph tell me" ] },
+
+  { "intent": "EXPLAIN_CONCEPT", "expand": 170, "templates": [
+    "explain {concept}", "what is {concept}", "what are {concept}", "tell me about {concept}",
+    "how does {concept} work", "describe {concept}", "what does {concept} mean",
+    "can you explain {concept}", "help me understand {concept}", "what's {concept}",
+    "give me an explanation of {concept}", "how is {concept} used", "why do we need {concept}",
+    "what is {concept} in {subject}", "explain {concept} in the context of {topic}" ] },
+
+  { "intent": "COMPARE_CONCEPTS", "expand": 65, "templates": [
+    "compare {concept} and {concept_b}", "what's the difference between {concept} and {concept_b}",
+    "{concept} vs {concept_b}", "{concept} versus {concept_b}",
+    "how does {concept} differ from {concept_b}", "compare {concept} with {concept_b}",
+    "show me the differences between {concept} and {concept_b}",
+    "which is better {concept} or {concept_b}" ] },
+
+  { "intent": "GIVE_EXAMPLE", "expand": 70, "templates": [
+    "give me an example", "give me an example of {concept}", "show me an example of {concept}",
+    "can you give an example", "an example please", "give me a concrete example of {concept}",
+    "show me how {concept} works with an example" ] },
+
+  { "intent": "REAL_WORLD_EXAMPLE", "expand": 45, "templates": [
+    "give me a real-world example", "give me a real world example of {concept}",
+    "explain {concept} with an everyday example", "where is {concept} used in real life",
+    "show me a practical example of {concept}", "a real-world use of {concept}" ] },
+
+  { "intent": "SIMPLIFY", "expand": 55, "templates": [
+    "explain this simply", "explain it in simple terms", "explain like I'm a beginner",
+    "make this easier", "I don't understand this", "explain in plain english",
+    "dumb it down", "explain {concept} simply", "explain this in very easy language",
+    "explain like I'm five" ] },
+
+  { "intent": "STEP_BY_STEP", "expand": 40, "templates": [
+    "explain this step by step", "walk me through it step by step",
+    "break {concept} down step by step", "explain {concept} one step at a time",
+    "go through this step-by-step", "take it step by step" ] },
+
+  { "intent": "WHY_QUESTION", "expand": 60, "templates": [
+    "why does this happen", "why is {concept} important", "why do we use {concept}",
+    "why does {concept} work", "why is this the case", "why do we need public and private keys",
+    "why is {concept} better than {concept_b}" ] },
+
+  { "intent": "WHAT_NEXT", "expand": 20, "templates": [
+    "what happens next", "then what", "and then", "what comes next",
+    "what's the next step", "what happens after this" ] },
+
+  { "intent": "DEFINE_TERM", "expand": 40, "templates": [
+    "define {concept}", "what does {concept} stand for", "meaning of {concept}",
+    "what does {concept} mean", "give me the definition of {concept}" ] },
+
+  { "intent": "TEACH_TOPIC", "expand": 90, "templates": [
+    "teach me {topic}", "teach me {concept}", "help me learn {topic}",
+    "explain {topic} from the beginning", "I want to learn {concept}",
+    "teach {concept} step by step", "help me understand {topic}",
+    "start teaching me {subject}", "teach me about {concept}" ] },
+
+  { "intent": "EXAM_PREP", "expand": 40, "templates": [
+    "help me prepare for my exam", "exam prep for {topic}", "prepare me for the {subject} test",
+    "help me revise {topic}", "I have an exam on {topic}", "revision for {subject}" ] },
+
+  { "intent": "START_QUIZ", "expand": 80, "templates": [
+    "quiz me", "quiz me on {topic}", "quiz me on this presentation", "test me",
+    "test me on {topic}", "give me {count} questions", "give me a quiz on {topic}",
+    "ask me some questions", "give me practice questions", "practice questions on {topic}",
+    "give me MCQs", "ask me one question at a time", "start a quiz", "test me on this chapter" ] },
+
+  { "intent": "NEXT_QUIZ_QUESTION", "expand": 15, "templates": [
+    "next question", "another question", "ask me the next one", "continue the quiz",
+    "give me the next question" ] },
+
+  { "intent": "SUBMIT_QUIZ_ANSWER", "expand": 15, "templates": [
+    "the answer is {concept}", "I think it's {concept}", "my answer is {concept}",
+    "it's {concept}", "answer: {concept}" ] },
+
+  { "intent": "EXPLAIN_MISTAKE", "expand": 15, "templates": [
+    "why is my answer wrong", "explain my mistake", "why did I get that wrong",
+    "why was that incorrect", "what did I do wrong" ] },
+
+  { "intent": "EASIER_EXAMPLE", "expand": 15, "templates": [
+    "give me an easier example", "a simpler example please", "this is too hard",
+    "give me something easier", "I still don't get it" ] },
+
+  { "intent": "HARDER_EXAMPLE", "expand": 15, "templates": [
+    "give me a harder example", "something more advanced", "a tougher question",
+    "make it more challenging", "this is too easy" ] },
+
+  { "intent": "SEARCH_CONTENT", "expand": 60, "templates": [
+    "search for {concept}", "find {topic} in my content", "search my decks for {concept}",
+    "look up {concept}", "find everything about {topic}" ] },
+
+  { "intent": "WHERE_IS_TOPIC", "expand": 60, "templates": [
+    "where is {concept} explained", "which presentation covers {topic}",
+    "where do you explain {concept}", "which deck talks about {topic}",
+    "where can I find {concept}", "which slide explains {concept}" ] },
+
+  { "intent": "FIND_PRESENTATIONS_ABOUT", "expand": 40, "templates": [
+    "show me all presentations related to {subject}", "find presentations about {topic}",
+    "which decks are about {subject}", "list decks covering {topic}" ] },
+
+  { "intent": "MAKE_VISUAL", "expand": 50, "templates": [
+    "make this more visual", "turn this into a diagram", "show this as a flowchart",
+    "visualize this", "turn this paragraph into a visual", "make {concept} visual",
+    "create a visual explanation of this" ] },
+
+  { "intent": "ADD_ANIMATION", "expand": 25, "templates": [
+    "add an animation", "animate this", "make this animated",
+    "add animations to this slide", "animate the process on this slide" ] },
+
+  { "intent": "MAKE_INTERACTIVE", "expand": 25, "templates": [
+    "make this interactive", "add interactivity", "add an interactive flowchart",
+    "make this slide interactive", "let me interact with this diagram" ] },
+
+  { "intent": "CREATE_PRESENTATION", "expand": 80, "templates": [
+    "create a presentation about {topic}", "make me a deck on {concept}",
+    "build an interactive presentation on {topic}", "create a web presentation about {topic}",
+    "make a presentation from this document", "turn this document into a Learnova presentation",
+    "generate a deck about {subject}", "create slides on {concept}",
+    "make a presentation about {concept} in {subject}" ] },
+
+  { "intent": "TRANSLATE", "expand": 30, "templates": [
+    "explain this in {lang}", "translate this to {lang}", "say that in {lang}",
+    "can you explain {concept} in {lang}", "explain this slide in {lang}" ] },
+
+  { "intent": "STOP_SPEAKING", "expand": 10, "templates": [
+    "stop", "shut up", "be quiet", "quiet", "enough" ] },
+  { "intent": "PAUSE", "expand": 8, "templates": [ "pause", "hold on", "wait" ] },
+  { "intent": "RESUME", "expand": 8, "templates": [ "resume", "continue", "carry on", "go on", "keep going" ] },
+  { "intent": "REPEAT_LAST", "expand": 10, "templates": [
+    "repeat that", "say that again", "come again", "repeat" ] },
+  { "intent": "CANCEL", "expand": 8, "templates": [ "cancel", "never mind", "forget it", "abort" ] },
+
+  { "intent": "HELP", "expand": 12, "templates": [
+    "help", "what can you do", "how do you work", "commands", "how do I use this" ] },
+  { "intent": "GREETING", "expand": 10, "templates": [
+    "hi", "hello", "hey", "good morning", "what's up" ] }
+]

@@ -1,0 +1,454 @@
+[
+  {
+    "id": "GOLD-0001",
+    "category": "presentation_navigation",
+    "intent": "OPEN_PRESENTATION",
+    "question": "hey learnova, open the second presentation",
+    "variants": [
+      "okay, open the second one",
+      "let's open number two"
+    ],
+    "entities": {
+      "presentation_reference": "the second presentation"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0002",
+    "category": "web_deck",
+    "intent": "GET_WEB_DECK",
+    "question": "give me the web deck for presentation 2",
+    "entities": {
+      "presentation_reference": "presentation 2"
+    },
+    "expected_action": "OPEN_WEB_DECK",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0003",
+    "category": "presentation_navigation",
+    "intent": "OPEN_PRESENTATION",
+    "question": "opn presntation 2",
+    "entities": {
+      "presentation_reference": "2"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0004",
+    "category": "presentation_navigation",
+    "intent": "OPEN_PRESENTATION",
+    "question": "open the RSA presentation",
+    "entities": {
+      "presentation_reference": "rsa presentation"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0005",
+    "category": "slide_navigation",
+    "intent": "GO_TO_SLIDE",
+    "question": "go to slide five",
+    "entities": {
+      "slide_number": 5
+    },
+    "expected_action": "NAVIGATE_SLIDE",
+    "requires_context": false,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0006",
+    "category": "slide_navigation",
+    "intent": "NEXT_SLIDE",
+    "question": "and next",
+    "entities": {},
+    "expected_action": "NAVIGATE_SLIDE",
+    "requires_context": false,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0007",
+    "category": "explanation_request",
+    "intent": "EXPLAIN_SLIDE",
+    "question": "explain this",
+    "entities": {},
+    "expected_action": "EXPLAIN_CONTENT",
+    "requires_context": true,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0008",
+    "category": "visual_diagram_question",
+    "intent": "EXPLAIN_VISUAL",
+    "question": "what does this diagram mean",
+    "entities": {},
+    "expected_action": "EXPLAIN_CONTENT",
+    "requires_context": true,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0009",
+    "category": "comparison_question",
+    "intent": "COMPARE_CONCEPTS",
+    "question": "what's the difference between RSA and AES",
+    "entities": {
+      "concept": "rsa",
+      "concept_b": "aes"
+    },
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0010",
+    "category": "educational_question",
+    "intent": "WHY_QUESTION",
+    "question": "why do we use public and private keys",
+    "entities": {},
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0011",
+    "category": "examples_analogies",
+    "intent": "GIVE_EXAMPLE",
+    "question": "give me a real-world example",
+    "entities": {},
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0012",
+    "category": "explanation_request",
+    "intent": "SIMPLIFY",
+    "question": "explain this like I'm a beginner",
+    "entities": {},
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0013",
+    "category": "quizzes_practice",
+    "intent": "START_QUIZ",
+    "question": "quiz me on this presentation",
+    "entities": {},
+    "expected_action": "START_QUIZ",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0014",
+    "category": "presentation_creation",
+    "intent": "CREATE_PRESENTATION",
+    "question": "turn this document into a Learnova presentation",
+    "entities": {
+      "source_ref": "this"
+    },
+    "expected_action": "CREATE_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0015",
+    "category": "voice_command",
+    "intent": "STOP_SPEAKING",
+    "question": "stop",
+    "entities": {},
+    "expected_action": "VOICE_CONTROL",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0016",
+    "category": "voice_command",
+    "intent": "REPEAT_LAST",
+    "question": "say that again",
+    "entities": {},
+    "expected_action": "VOICE_CONTROL",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0017",
+    "category": "content_search",
+    "intent": "WHERE_IS_TOPIC",
+    "question": "where is phishing explained",
+    "entities": {
+      "topic": "phishing"
+    },
+    "expected_action": "SHOW_SEARCH_RESULTS",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0018",
+    "category": "presentation_search",
+    "intent": "SEARCH_PRESENTATION",
+    "question": "which presentation covers social engineering",
+    "entities": {
+      "query": "social engineering"
+    },
+    "expected_action": "SHOW_SEARCH_RESULTS",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0019",
+    "category": "ambiguous_request",
+    "intent": "OPEN_PRESENTATION",
+    "question": "open the security presentation",
+    "entities": {
+      "presentation_reference": "security presentation"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false,
+    "note": "orchestrator should ASK_CLARIFICATION when >1 security deck exists"
+  },
+  {
+    "id": "GOLD-0020",
+    "category": "ambiguous_request",
+    "intent": "OPEN_PRESENTATION",
+    "question": "show me the second one",
+    "entities": {
+      "presentation_reference": "the second one"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": true,
+    "requires_presentation": false,
+    "note": "resolve against the last result list"
+  },
+  {
+    "id": "GOLD-0021",
+    "category": "slide_navigation",
+    "intent": "GO_TO_SECTION",
+    "question": "jump to the examples section",
+    "entities": {
+      "section_name": "examples"
+    },
+    "expected_action": "NAVIGATE_SLIDE",
+    "requires_context": false,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0022",
+    "category": "system_platform",
+    "intent": "TRANSLATE",
+    "question": "explain this in Hindi",
+    "entities": {
+      "target_language": "hindi"
+    },
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": true,
+    "requires_presentation": false,
+    "note": "reply language changes; stored content untouched"
+  },
+  {
+    "id": "GOLD-0023",
+    "category": "presentation_navigation",
+    "intent": "DOWNLOAD_PRESENTATION",
+    "question": "download presentation 2 as powerpoint",
+    "entities": {
+      "presentation_reference": "presentation 2",
+      "format": "pptx"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0024",
+    "category": "slide_navigation",
+    "intent": "GO_TO_SLIDE",
+    "question": "slide 10",
+    "entities": {
+      "slide_number": 10
+    },
+    "expected_action": "NAVIGATE_SLIDE",
+    "requires_context": false,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0025",
+    "category": "educational_question",
+    "intent": "DEFINE_TERM",
+    "question": "what does RSA stand for",
+    "entities": {
+      "term": "rsa"
+    },
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0026",
+    "category": "learning_assistance",
+    "intent": "TEACH_TOPIC",
+    "question": "teach me RSA from the beginning",
+    "entities": {
+      "topic": "rsa"
+    },
+    "expected_action": "EXPLAIN_CONTENT",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0027",
+    "category": "voice_command",
+    "intent": "PREVIOUS_SLIDE",
+    "question": "go back",
+    "entities": {},
+    "expected_action": "NAVIGATE_SLIDE",
+    "requires_context": false,
+    "requires_presentation": true,
+    "note": "ambiguous with 'open previous presentation'; slide context wins when presenting"
+  },
+  {
+    "id": "GOLD-0028",
+    "category": "system_platform",
+    "intent": "MAKE_VISUAL",
+    "question": "make this more visual",
+    "entities": {},
+    "expected_action": "CREATE_VISUAL",
+    "requires_context": true,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0029",
+    "category": "explanation_request",
+    "intent": "STEP_BY_STEP",
+    "question": "explain it step by step",
+    "entities": {},
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0030",
+    "category": "educational_question",
+    "intent": "WHAT_NEXT",
+    "question": "what happens next",
+    "entities": {},
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0031",
+    "category": "presentation_navigation",
+    "intent": "OPEN_PRESENTATION",
+    "question": "give me presentation number two",
+    "entities": {
+      "presentation_reference": "presentation number two"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0032",
+    "category": "slide_navigation",
+    "intent": "FIRST_SLIDE",
+    "question": "back to the start",
+    "entities": {},
+    "expected_action": "NAVIGATE_SLIDE",
+    "requires_context": false,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0033",
+    "category": "quizzes_practice",
+    "intent": "EXPLAIN_MISTAKE",
+    "question": "why was my answer wrong",
+    "entities": {},
+    "expected_action": "QUIZ_TURN",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0034",
+    "category": "presentation_navigation",
+    "intent": "START_PRESENTATION",
+    "question": "start presentation 5",
+    "entities": {
+      "presentation_reference": "5"
+    },
+    "expected_action": "START_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0035",
+    "category": "web_deck",
+    "intent": "GET_WEB_DECK",
+    "question": "I want the interactive version",
+    "entities": {},
+    "expected_action": "OPEN_WEB_DECK",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0036",
+    "category": "educational_question",
+    "intent": "EXPLAIN_CONCEPT",
+    "question": "what is a digital signature",
+    "entities": {
+      "concept": "a digital signature"
+    },
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0037",
+    "category": "slide_navigation",
+    "intent": "READ_SLIDE",
+    "question": "read this slide out loud",
+    "entities": {},
+    "expected_action": "EXPLAIN_CONTENT",
+    "requires_context": false,
+    "requires_presentation": true
+  },
+  {
+    "id": "GOLD-0038",
+    "category": "personalised_learning",
+    "intent": "EASIER_EXAMPLE",
+    "question": "I don't understand this, give me an easier example",
+    "entities": {},
+    "expected_action": "ANSWER_FROM_CONTENT",
+    "requires_context": true,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0039",
+    "category": "system_platform",
+    "intent": "HELP",
+    "question": "what can you do",
+    "entities": {},
+    "expected_action": "SYSTEM_INFO",
+    "requires_context": false,
+    "requires_presentation": false
+  },
+  {
+    "id": "GOLD-0040",
+    "category": "presentation_navigation",
+    "intent": "OPEN_PRESENTATION",
+    "question": "open LRN-PRES-0002",
+    "entities": {
+      "presentation_reference": "LRN-PRES-0002"
+    },
+    "expected_action": "OPEN_PRESENTATION",
+    "requires_context": false,
+    "requires_presentation": false
+  }
+]

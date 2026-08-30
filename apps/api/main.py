@@ -601,3 +601,44 @@ async def put_slide_image(
     if not deck_library.save_one_image(user_id, deck_id, slide, body, ext):
         raise HTTPException(status_code=500, detail="could not save image")
     return {"deck_id": deck_id, "slide": slide, "bytes": len(body)}
+
+
+# ── AI Assistant layer ───────────────────────────────────────────────────────
+# See docs/ASSISTANT_MASTER_PROMPT.md. The orchestrator is transport-agnostic
+# and returns a typed action for the frontend to execute; the backend only
+# validates + resolves references, never fabricates results.
+from learnova.assistant.orchestrator import handle as _assistant_handle
+from learnova.assistant.registry import registry_payload as _registry_payload
+from learnova.assistant.session import get_session_store as _session_store
+
+
+class AssistantQuery(BaseModel):
+    text: str
+    session_id: str = "default"
+
+
+@app.get("/api/assistant/registry")
+def assistant_registry(user_id: str = Depends(current_user)) -> dict:
+    """The presentation registry (stable ids, display numbers, aliases)."""
+    return _registry_payload(user_id)
+
+
+@app.get("/api/assistant/intents")
+def assistant_intents() -> dict:
+    from learnova.assistant.intents import dump_intents_json
+
+    return {"intents": dump_intents_json()}
+
+
+@app.post("/api/assistant/query")
+def assistant_query(body: AssistantQuery, user_id: str = Depends(current_user)) -> dict:
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="text must not be empty")
+    session = _session_store().get(body.session_id, user_id)
+    resp = _assistant_handle(body.text, session)
+    return {"response": resp.to_dict(), "context": session.to_dict()}
+
+
+@app.get("/api/assistant/session/{session_id}")
+def assistant_session(session_id: str, user_id: str = Depends(current_user)) -> dict:
+    return _session_store().get(session_id, user_id).to_dict()

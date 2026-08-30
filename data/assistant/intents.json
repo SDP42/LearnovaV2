@@ -1,0 +1,647 @@
+[
+ {
+  "intent": "CREATE_PRESENTATION",
+  "category": "presentation_creation",
+  "action": "CREATE_PRESENTATION",
+  "entities": [
+   "topic",
+   "subject",
+   "source_ref",
+   "format"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": "Generate a new Learnova deck. Routes to the pipeline; content preservation applies (never auto-summarise)."
+ },
+ {
+  "intent": "OPEN_PRESENTATION",
+  "category": "presentation_navigation",
+  "action": "OPEN_PRESENTATION",
+  "entities": [
+   "presentation_reference"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "GET_WEB_DECK",
+  "category": "web_deck",
+  "action": "OPEN_WEB_DECK",
+  "entities": [
+   "presentation_reference"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "START_PRESENTATION",
+  "category": "presentation_navigation",
+  "action": "START_PRESENTATION",
+  "entities": [
+   "presentation_reference"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "STOP_PRESENTATION",
+  "category": "presentation_navigation",
+  "action": "CONTROL_PRESENTATION",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "RESUME_PRESENTATION",
+  "category": "presentation_navigation",
+  "action": "CONTROL_PRESENTATION",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "RESTART_PRESENTATION",
+  "category": "presentation_navigation",
+  "action": "CONTROL_PRESENTATION",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "SEARCH_PRESENTATION",
+  "category": "presentation_search",
+  "action": "SHOW_SEARCH_RESULTS",
+  "entities": [
+   "query",
+   "subject",
+   "topic"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "SUMMARIZE_PRESENTATION",
+  "category": "explanation_request",
+  "action": "EXPLAIN_CONTENT",
+  "entities": [
+   "presentation_reference"
+  ],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": true,
+  "description": "Summarise only because the USER asked; source deck content is untouched."
+ },
+ {
+  "intent": "EXPLAIN_PRESENTATION",
+  "category": "explanation_request",
+  "action": "EXPLAIN_CONTENT",
+  "entities": [
+   "presentation_reference"
+  ],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "DOWNLOAD_PRESENTATION",
+  "category": "presentation_navigation",
+  "action": "OPEN_PRESENTATION",
+  "entities": [
+   "presentation_reference",
+   "format"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "DELETE_PRESENTATION",
+  "category": "presentation_navigation",
+  "action": "CONTROL_PRESENTATION",
+  "entities": [
+   "presentation_reference"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": "Destructive \u2014 always confirm before executing."
+ },
+ {
+  "intent": "NEXT_SLIDE",
+  "category": "slide_navigation",
+  "action": "NAVIGATE_SLIDE",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "PREVIOUS_SLIDE",
+  "category": "slide_navigation",
+  "action": "NAVIGATE_SLIDE",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "GO_TO_SLIDE",
+  "category": "slide_navigation",
+  "action": "NAVIGATE_SLIDE",
+  "entities": [
+   "slide_number"
+  ],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "FIRST_SLIDE",
+  "category": "slide_navigation",
+  "action": "NAVIGATE_SLIDE",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "LAST_SLIDE",
+  "category": "slide_navigation",
+  "action": "NAVIGATE_SLIDE",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "GO_TO_SECTION",
+  "category": "slide_navigation",
+  "action": "NAVIGATE_SLIDE",
+  "entities": [
+   "section_name",
+   "topic"
+  ],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "REPEAT_SLIDE",
+  "category": "slide_navigation",
+  "action": "NAVIGATE_SLIDE",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "READ_SLIDE",
+  "category": "slide_navigation",
+  "action": "EXPLAIN_CONTENT",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "EXPLAIN_SLIDE",
+  "category": "explanation_request",
+  "action": "EXPLAIN_CONTENT",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "EXPLAIN_VISUAL",
+  "category": "visual_diagram_question",
+  "action": "EXPLAIN_CONTENT",
+  "entities": [
+   "visual_reference"
+  ],
+  "requires_context": false,
+  "requires_presentation": true,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "EXPLAIN_CONCEPT",
+  "category": "educational_question",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "concept"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "COMPARE_CONCEPTS",
+  "category": "comparison_question",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "concept",
+   "concept_b"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "GIVE_EXAMPLE",
+  "category": "examples_analogies",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "concept"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "REAL_WORLD_EXAMPLE",
+  "category": "examples_analogies",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "concept"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "SIMPLIFY",
+  "category": "explanation_request",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "concept"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": "Simplify the REPLY, not the stored content."
+ },
+ {
+  "intent": "STEP_BY_STEP",
+  "category": "explanation_request",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "concept"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "WHY_QUESTION",
+  "category": "educational_question",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "concept"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "WHAT_NEXT",
+  "category": "educational_question",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "DEFINE_TERM",
+  "category": "educational_question",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "term"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "TEACH_TOPIC",
+  "category": "learning_assistance",
+  "action": "EXPLAIN_CONTENT",
+  "entities": [
+   "topic"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "START_QUIZ",
+  "category": "quizzes_practice",
+  "action": "START_QUIZ",
+  "entities": [
+   "topic",
+   "presentation_reference",
+   "count"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "NEXT_QUIZ_QUESTION",
+  "category": "quizzes_practice",
+  "action": "QUIZ_TURN",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "SUBMIT_QUIZ_ANSWER",
+  "category": "quizzes_practice",
+  "action": "QUIZ_TURN",
+  "entities": [
+   "answer"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "EXPLAIN_MISTAKE",
+  "category": "quizzes_practice",
+  "action": "QUIZ_TURN",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "EASIER_EXAMPLE",
+  "category": "personalised_learning",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "HARDER_EXAMPLE",
+  "category": "personalised_learning",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "EXAM_PREP",
+  "category": "personalised_learning",
+  "action": "EXPLAIN_CONTENT",
+  "entities": [
+   "topic",
+   "subject"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "SEARCH_CONTENT",
+  "category": "content_search",
+  "action": "SHOW_SEARCH_RESULTS",
+  "entities": [
+   "query"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "WHERE_IS_TOPIC",
+  "category": "content_search",
+  "action": "SHOW_SEARCH_RESULTS",
+  "entities": [
+   "topic"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "FIND_PRESENTATIONS_ABOUT",
+  "category": "content_search",
+  "action": "SHOW_SEARCH_RESULTS",
+  "entities": [
+   "subject",
+   "topic"
+  ],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "MAKE_VISUAL",
+  "category": "system_platform",
+  "action": "CREATE_VISUAL",
+  "entities": [
+   "concept",
+   "slide_number"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "ADD_ANIMATION",
+  "category": "system_platform",
+  "action": "CREATE_VISUAL",
+  "entities": [
+   "slide_number"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "MAKE_INTERACTIVE",
+  "category": "system_platform",
+  "action": "CREATE_VISUAL",
+  "entities": [
+   "slide_number"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "STOP_SPEAKING",
+  "category": "voice_command",
+  "action": "VOICE_CONTROL",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "PAUSE",
+  "category": "voice_command",
+  "action": "VOICE_CONTROL",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "RESUME",
+  "category": "voice_command",
+  "action": "VOICE_CONTROL",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "REPEAT_LAST",
+  "category": "voice_command",
+  "action": "VOICE_CONTROL",
+  "entities": [],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "CANCEL",
+  "category": "voice_command",
+  "action": "VOICE_CONTROL",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "HELP",
+  "category": "system_platform",
+  "action": "SYSTEM_INFO",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "CAPABILITIES",
+  "category": "system_platform",
+  "action": "SYSTEM_INFO",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "SETTINGS",
+  "category": "system_platform",
+  "action": "SYSTEM_INFO",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "TRANSLATE",
+  "category": "system_platform",
+  "action": "ANSWER_FROM_CONTENT",
+  "entities": [
+   "target_language"
+  ],
+  "requires_context": true,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "GREETING",
+  "category": "system_platform",
+  "action": "SYSTEM_INFO",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "AMBIGUOUS",
+  "category": "ambiguous_request",
+  "action": "ASK_CLARIFICATION",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ },
+ {
+  "intent": "UNKNOWN",
+  "category": "ambiguous_request",
+  "action": "ANSWER_GENERAL",
+  "entities": [],
+  "requires_context": false,
+  "requires_presentation": false,
+  "summary_only_on_request": false,
+  "description": ""
+ }
+]
