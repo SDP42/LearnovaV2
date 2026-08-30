@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, LayoutGrid, Loader2, Search, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, Download, FileDown, LayoutGrid, Loader2, Search, Sparkles, Wand2 } from "lucide-react";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ export default function Gallery() {
   const [preview, setPreview] = useState(null); // {slug,title,...}
   const [previewDeck, setPreviewDeck] = useState(null);
   const [using, setUsing] = useState("");
+  const [dl, setDl] = useState("");
 
   const debounce = useRef();
 
@@ -109,6 +110,21 @@ export default function Gallery() {
     } catch (e) {
       setError(e.message);
       setUsing("");
+    }
+  }
+
+  async function downloadDeck(entry, artifact) {
+    setDl(artifact);
+    try {
+      const ext = artifact === "pptx" ? "pptx" : "html";
+      await api.downloadArtifact(
+        api.galleryDownloadPath(entry.slug, artifact),
+        `${entry.title}.${ext}`
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setDl("");
     }
   }
 
@@ -322,7 +338,7 @@ export default function Gallery() {
             )}
           </div>
 
-          <div className="border-t pt-4">
+          <div className="space-y-2 border-t pt-4">
             <Button
               className="w-full"
               disabled={using === preview?.slug}
@@ -336,8 +352,28 @@ export default function Gallery() {
                 </>
               )}
             </Button>
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              Adds an editable copy to your projects.
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={!!dl}
+                onClick={() => preview && downloadDeck(preview, "html")}
+              >
+                {dl === "html" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Web deck
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={!!dl}
+                onClick={() => preview && downloadDeck(preview, "pptx")}
+              >
+                {dl === "pptx" ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
+                PowerPoint
+              </Button>
+            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              Use adds an editable copy · downloads reveal one point at a time.
             </p>
           </div>
         </SheetContent>

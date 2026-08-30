@@ -707,6 +707,20 @@ def gallery_deck(slug: str) -> JSONResponse:
     })
 
 
+@app.get("/api/gallery/{slug}/download/{artifact}")
+def gallery_download(slug: str, artifact: str) -> Response:
+    if artifact not in {"pptx", "html"}:
+        raise HTTPException(status_code=400, detail="artifact must be 'pptx' or 'html'")
+    from learnova.gallery.catalog import GALLERY_USER
+
+    data = deck_library.read_artifact(GALLERY_USER, slug, artifact)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"no {artifact} for this topic yet")
+    entry = _gcat.get_entry(slug)
+    stem = pathlib.Path((entry.title if entry else slug)).stem or slug
+    return _artifact_response(data, artifact, stem)
+
+
 class GalleryUse(BaseModel):
     slug: str
 

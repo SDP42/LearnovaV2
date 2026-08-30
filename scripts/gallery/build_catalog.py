@@ -35,14 +35,19 @@ def slugify(text: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def brief(defn: str, ideas: list[str], steps: list[str], example: str,
-          pitfalls: list[str], summary: str) -> str:
-    return "\n".join([
-        defn.strip(),
-        "",
+          pitfalls: list[str], summary: str, matters: str = "", terms: list | None = None) -> str:
+    """A structured teaching brief → ~8 slides. The web deck reveals each
+    numbered step and bullet one click at a time."""
+    parts: list[str] = [defn.strip(), ""]
+    if matters:
+        parts += ["## Why it matters", matters.strip(), ""]
+    if terms:
+        parts += ["## Key terms", *[f"- {t}" for t in terms], ""]
+    parts += [
         "## The core ideas",
         *[f"- {i}" for i in ideas],
         "",
-        "## Step by step",
+        "## How it works, step by step",
         *[f"{n}. {s}" for n, s in enumerate(steps, 1)],
         "",
         "## A worked example",
@@ -53,7 +58,8 @@ def brief(defn: str, ideas: list[str], steps: list[str], example: str,
         "",
         "## The takeaway",
         summary.strip(),
-    ])
+    ]
+    return "\n".join(parts)
 
 
 CURATED: list[dict] = [
@@ -78,6 +84,7 @@ CURATED: list[dict] = [
              "Thinking the Calvin cycle does not need light — it needs the products of the light reactions",
              "Assuming plants only respire at night; they respire continuously"],
             "Photosynthesis turns light, water and CO2 into sugar and oxygen in two linked stages: energy capture, then carbon fixation.",
+            matters='Almost every food chain on Earth starts here, and photosynthesis is what keeps atmospheric oxygen and carbon dioxide in balance.',
         ),
     ),
     dict(
@@ -100,6 +107,7 @@ CURATED: list[dict] = [
              "Forgetting that primers are RNA, not DNA",
              "Confusing helicase (unwinds) with polymerase (builds)"],
             "Replication unzips the helix and builds a matching partner for each strand, one continuously and one in pieces.",
+            matters='Every time a cell divides it must copy three billion base pairs almost perfectly; the same machinery is the target of many cancer drugs and antibiotics.',
         ),
     ),
     dict(
@@ -122,6 +130,7 @@ CURATED: list[dict] = [
              "Assuming selection produces perfect or 'advanced' organisms",
              "Confusing natural selection (a mechanism) with evolution (the outcome)"],
             "Natural selection is heredity plus variation plus differential survival, compounding over generations.",
+            matters='It explains the fit between living things and their environment without appealing to design, and it is why antibiotic and pesticide resistance evolve.',
         ),
     ),
     # ── Chemistry ────────────────────────────────────────────────────────────
@@ -145,6 +154,7 @@ CURATED: list[dict] = [
              "Assuming radius grows with atomic number in a straight line",
              "Forgetting that transition metals can show several oxidation states"],
             "The table is a map: an element's row and column tell you how it will react.",
+            matters='It lets you predict how an unfamiliar element behaves from its position alone, which is the starting point for all of chemistry.',
         ),
     ),
     dict(
@@ -167,6 +177,7 @@ CURATED: list[dict] = [
              "Forgetting pH is logarithmic — pH 3 is 100× more acidic than pH 5",
              "Assuming a neutral solution is always pH 7 regardless of temperature"],
             "pH is a log scale of proton concentration; strong species dissociate fully, weak ones sit at equilibrium.",
+            matters='Blood, soil, oceans, medicines and food all depend on pH staying in a narrow range, and one unit is a tenfold change in acidity.',
         ),
     ),
     # ── Physics ──────────────────────────────────────────────────────────────
@@ -190,6 +201,7 @@ CURATED: list[dict] = [
              "Pairing the wrong forces as 'action–reaction' (they act on different bodies)",
              "Confusing mass and weight"],
             "Net force equals mass times acceleration; no net force means no change in motion.",
+            matters='They predict the motion of everything from a thrown ball to a spacecraft, and every later mechanics course builds on them.',
         ),
     ),
     dict(
@@ -212,6 +224,7 @@ CURATED: list[dict] = [
              "Adding parallel resistances directly instead of reciprocals",
              "Mixing up which quantity stays constant in series vs parallel"],
             "Voltage pushes, resistance limits, current flows; series shares current, parallel shares voltage.",
+            matters='Every device you use is a circuit, and understanding series and parallel behaviour is what lets you design, debug or stay safe around one.',
         ),
     ),
     # ── Mathematics ──────────────────────────────────────────────────────────
@@ -235,6 +248,7 @@ CURATED: list[dict] = [
              "Applying the power rule to the whole expression as if the inside were just x",
              "Confusing the chain rule with the product rule"],
             "To differentiate a composition, differentiate the outside, keep the inside, then multiply by the inside's derivative.",
+            matters='Rates of change appear everywhere, and the chain rule is the tool that makes almost every real-world derivative computable.',
         ),
     ),
     dict(
@@ -257,6 +271,7 @@ CURATED: list[dict] = [
              "Swapping P(E|H) and P(H|E)",
              "Forgetting to include the false-positive path in P(E)"],
             "Bayes' theorem rescales your prior by how well the hypothesis predicted the evidence.",
+            matters='It is how you should update beliefs from evidence, and ignoring it is why people badly misjudge medical tests and rare-event risks.',
         ),
     ),
     # ── Computer Science ─────────────────────────────────────────────────────
@@ -280,6 +295,7 @@ CURATED: list[dict] = [
              "Assuming a lower Big-O always wins for small inputs",
              "Confusing time complexity with actual wall-clock time"],
             "Big-O names the shape of the growth curve, not the exact cost.",
+            matters='It tells you whether a program will still work when the data gets 100 times bigger, which is the difference between a prototype and a product.',
         ),
     ),
     dict(
@@ -302,6 +318,7 @@ CURATED: list[dict] = [
              "Believing a padlock means the site is trustworthy, only that the channel is encrypted",
              "Confusing hashing with encryption"],
             "HTTPS authenticates the server with a certificate, then encrypts the session with a freshly negotiated shared key.",
+            matters='It is what makes online banking, logins and private messaging possible, and it tells you exactly what a padlock does and does not promise.',
         ),
     ),
     # ── History ──────────────────────────────────────────────────────────────
@@ -325,6 +342,7 @@ CURATED: list[dict] = [
              "Ignoring the social costs: child labour, pollution, unsafe factories",
              "Assuming every country industrialised the same way or at the same time"],
             "Machines, coal and the factory turned scarce, slow handcraft into cheap mass production — and moved life into the city.",
+            matters='It created the modern world: cities, factories, wage labour, mass production and the fossil-fuel economy we still live with.',
         ),
     ),
     dict(
@@ -347,6 +365,7 @@ CURATED: list[dict] = [
              "Treating every regional conflict as purely a superpower puppet show",
              "Assuming the outcome was inevitable"],
             "Two nuclear superpowers competed everywhere except the battlefield, until one side's system gave out.",
+            matters='It shaped nearly every border, alliance and proxy conflict of the late twentieth century, and its nuclear standoff still exists.',
         ),
     ),
     # ── Economics & Business ─────────────────────────────────────────────────
@@ -370,6 +389,7 @@ CURATED: list[dict] = [
              "Shifting demand when the real cause was a price change",
              "Assuming price controls make shortages or surpluses disappear"],
             "Price settles where quantity demanded meets quantity supplied; outside shocks shift a curve and move that point.",
+            matters='It is the most useful model in economics: it explains prices, shortages, surpluses and why price controls often backfire.',
         ),
     ),
     dict(
@@ -392,6 +412,7 @@ CURATED: list[dict] = [
              "Underestimating how much the last decade contributes",
              "Ignoring fees and inflation, which compound against you"],
             "Compounding pays interest on your interest, so starting early beats saving more later.",
+            matters='It is why starting to save at 25 beats saving twice as much at 45, and why credit-card debt grows so fast.',
         ),
     ),
     # ── Psychology ───────────────────────────────────────────────────────────
@@ -415,6 +436,7 @@ CURATED: list[dict] = [
              "Assuming punishment teaches the right behaviour rather than just suppressing one",
              "Mixing up which type applies to reflexes versus choices"],
             "Classical conditioning trains a trigger; operant conditioning trains a habit through its consequences.",
+            matters='These two mechanisms explain phobias, habits, advertising and training from a handful of simple rules.',
         ),
     ),
     # ── Earth & Environment ──────────────────────────────────────────────────
@@ -438,6 +460,7 @@ CURATED: list[dict] = [
              "Ignoring the timescale difference between the fast and slow cycles",
              "Assuming forests can absorb all human emissions"],
             "Carbon shuttles quickly among air, life and ocean, and slowly into rock — and we are moving buried carbon back up fast.",
+            matters='Understanding it is what lets you see why burning fossil fuels changes the climate: it moves carbon from the slow cycle into the fast one.',
         ),
     ),
     # ── Language & Writing ───────────────────────────────────────────────────
@@ -461,6 +484,7 @@ CURATED: list[dict] = [
              "Listing evidence without explaining what it shows",
              "Letting one paragraph drift across two or three ideas"],
             "Say the point first, prove it, explain the proof, then connect — one idea per paragraph.",
+            matters='Clear paragraphs are the unit of every essay, report and email, and fixing them is the fastest way to write more persuasively.',
         ),
     ),
     # ── Art & Music ──────────────────────────────────────────────────────────
@@ -484,6 +508,7 @@ CURATED: list[dict] = [
              "Ignoring value — a design can fail in greyscale even with 'nice' colours",
              "Treating the colour wheel as rules rather than starting points"],
             "Pick one dominant hue, control value and saturation, and let a single accent do the shouting.",
+            matters='It is the difference between a design that looks intentional and one that looks accidental, and it takes only a few rules.',
         ),
     ),
 ]

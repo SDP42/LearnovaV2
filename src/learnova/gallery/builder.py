@@ -13,10 +13,33 @@ re-run: existing decks are skipped unless ``--force``.
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 import time
 import traceback
 from dataclasses import replace
 from typing import Iterable, List
+
+
+_LLM_ENV = ("GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "NVIDIA_API_KEY",
+            "NVIDIA_NIM_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEYS")
+
+
+def _force_deterministic() -> None:
+    """Gallery builds are reproducible and quota-free by default: blank the
+    provider keys so every stage takes its deterministic path. Pass --llm to
+    let the pipeline use whatever keys are configured."""
+    # Blank (not pop): the many module-level ``load_dotenv()`` calls and
+    # ``config.apply_runtime_env()`` (setdefault) would otherwise re-seed a
+    # missing key from .env. An empty value already "exists", so it stays.
+    for var in _LLM_ENV:
+        os.environ[var] = ""
+    os.environ["LEARNOVA_NO_LLM"] = "1"
+
+
+# Run before any learnova import: the provider modules read keys at import time.
+if "--llm" not in sys.argv:
+    _force_deterministic()
 
 from learnova.gallery.catalog import GALLERY_USER, CatalogEntry, list_entries
 from learnova.gallery.store import has_deck
@@ -37,10 +60,26 @@ def _config() -> PipelineConfig:
     )
 
 
+_BUILD_ON = "var LV_BUILD = (function () {"
+
+
+def _bake_progressive_reveal(html: bytes | None) -> bytes | None:
+    """Gallery decks are made to be downloaded and taught from, so the web deck
+    reveals bullets one click at a time by default (the built-in 'show all'
+    toggle still turns it off)."""
+    if not html:
+        return html
+    text = html.decode("utf-8", "replace")
+    if _BUILD_ON in text and "window.__learnovaBuild = true" not in text:
+        text = text.replace(_BUILD_ON, "window.__learnovaBuild = true;\n        " + _BUILD_ON, 1)
+    return text.encode("utf-8")
+
+
 def build_one(entry: CatalogEntry, config: PipelineConfig | None = None) -> dict:
     config = config or _config()
     doc = from_typed_text(entry.outline, source_name=entry.title)
     result = generate(doc, config)
+    result.html_bytes = _bake_progressive_reveal(getattr(result, "html_bytes", None))
 
     payload = slides_payload(result.final_deck)
     editable = payload_to_editable(payload) if payload else None
@@ -95,7 +134,11 @@ def main() -> None:
     p.add_argument("--limit", type=int, help="stop after N new decks")
     p.add_argument("--all", action="store_true", help="build everything (no limit)")
     p.add_argument("--force", action="store_true", help="rebuild existing decks")
+    p.add_argument("--llm", action="store_true", help="allow the pipeline to use configured LLM keys")
     args = p.parse_args()
+
+    if not args.llm:
+        _force_deterministic()
 
     entries = _select(args)
     limit = None if args.all else (args.limit or 10)

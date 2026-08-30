@@ -233,6 +233,8 @@ export async function galleryDeck(slug) {
   return json(await fetch(`${BASE}/api/gallery/${slug}/deck`));
 }
 
+export const galleryDownloadPath = (slug, artifact) => `/api/gallery/${slug}/download/${artifact}`;
+
 export async function galleryUse(slug) {
   return json(
     await fetch(`${BASE}/api/gallery/${slug}/use`, {

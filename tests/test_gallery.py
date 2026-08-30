@@ -78,6 +78,26 @@ def test_gallery_entry_and_missing(api_client):
     assert r.status_code == 404
 
 
+def test_curated_briefs_have_teaching_structure():
+    for e in gcat.list_entries(ready_only=True):
+        heads = [ln for ln in e.outline.splitlines() if ln.startswith("## ")]
+        assert "## The core ideas" in heads
+        assert "## How it works, step by step" in heads
+        assert "## The takeaway" in heads
+        assert "## Why it matters" in heads  # every curated topic explains its relevance
+
+
+def test_bake_progressive_reveal_flips_the_default():
+    from learnova.gallery.builder import _bake_progressive_reveal
+
+    src = b"<script>\n        var LV_BUILD = (function () { return false; })();\n</script>"
+    out = _bake_progressive_reveal(src).decode()
+    assert "window.__learnovaBuild = true" in out
+    # idempotent
+    assert _bake_progressive_reveal(out.encode()).decode().count("window.__learnovaBuild = true") == 1
+    assert _bake_progressive_reveal(None) is None
+
+
 def test_clone_to_user_roundtrip(tmp_path, monkeypatch):
     # a fake gallery deck on disk
     from learnova.storage import deck_library as dl
