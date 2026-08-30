@@ -25,6 +25,8 @@ import AppLayout from "@/components/app/AppLayout";
 import StatCard from "@/components/app/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer, PageHeader } from "@/components/app/Page";
+import { ErrorNote } from "@/components/app/states";
 import {
   ChartContainer,
   ChartTooltip,
@@ -117,15 +119,13 @@ export default function Analytics() {
 
   return (
     <AppLayout title="Analytics">
-      <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Learning analytics</h2>
-          <p className="text-sm text-muted-foreground">
-            Engagement (Pedagogical Slide Fitness) and deck composition across your projects.
-          </p>
-        </div>
+      <PageContainer>
+        <PageHeader
+          title="Learning analytics"
+          subtitle="Engagement (Pedagogical Slide Fitness) and deck composition across your projects."
+        />
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <ErrorNote error={error} />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {decks === null ? (
@@ -313,7 +313,7 @@ export default function Analytics() {
             your slides (CLASS), so the metric and the builder agree.
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </AppLayout>
   );
 }

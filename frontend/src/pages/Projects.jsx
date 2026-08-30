@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer, PageHeader } from "@/components/app/Page";
+import { EmptyState, ErrorNote } from "@/components/app/states";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,22 +40,20 @@ export default function Projects() {
 
   return (
     <AppLayout title="Projects">
-      <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">Projects</h2>
-            <p className="text-sm text-muted-foreground">
-              {decks ? `${decks.length} deck${decks.length === 1 ? "" : "s"}` : "…"} in your library.
-            </p>
-          </div>
-          <Button asChild>
-            <Link to="/app/create">
-              <Sparkles /> New
-            </Link>
-          </Button>
-        </div>
+      <PageContainer>
+        <PageHeader
+          title="Projects"
+          subtitle={`${decks ? `${decks.length} deck${decks.length === 1 ? "" : "s"}` : "…"} in your library.`}
+          actions={
+            <Button asChild>
+              <Link to="/app/create">
+                <Sparkles /> New
+              </Link>
+            </Button>
+          }
+        />
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <ErrorNote error={error} />
 
         {decks && decks.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -86,24 +86,13 @@ export default function Projects() {
                 {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
               </div>
             ) : decks.length === 0 ? (
-              <div className="mx-auto flex max-w-sm flex-col items-center gap-3 p-12 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Sparkles className="size-6" />
-                </div>
-                <p className="text-sm font-medium">No projects yet</p>
-                <p className="text-sm text-muted-foreground">
-                  Every deck you generate is saved here — with its slide count,
-                  engagement score, and one-click open, present, and export.
-                </p>
-                <div className="flex gap-2">
-                  <Button asChild size="sm">
-                    <Link to="/app/create">Create your first</Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link to="/app/library">Browse templates</Link>
-                  </Button>
-                </div>
-              </div>
+              <EmptyState
+                className="border-0"
+                icon={Sparkles}
+                title="No projects yet"
+                description="Every deck you generate is saved here — with its slide count, engagement score, and one-click open, present, and export."
+                action={{ to: "/app/create", label: "Create your first" }}
+              />
             ) : (
               <table className="w-full text-sm">
                 <thead>
@@ -175,7 +164,7 @@ export default function Projects() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </AppLayout>
   );
 }

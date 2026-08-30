@@ -4,38 +4,36 @@ import AppLayout from "@/components/app/AppLayout";
 import { deckId, deckTitle, useDecks } from "@/lib/useDecks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer, PageHeader } from "@/components/app/Page";
+import { EmptyState, ErrorNote, LoadingGrid } from "@/components/app/states";
 
 export default function Presentations() {
   const { decks, error } = useDecks();
 
   return (
     <AppLayout title="Presentations">
-      <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">Presentations</h2>
-            <p className="text-sm text-muted-foreground">Open a deck in the editor or start presenting.</p>
-          </div>
-          <Button asChild>
-            <Link to="/app/create"><Sparkles /> New</Link>
-          </Button>
-        </div>
+      <PageContainer>
+        <PageHeader
+          title="Presentations"
+          subtitle="Open a deck in the editor or start presenting."
+          actions={
+            <Button asChild>
+              <Link to="/app/create"><Sparkles /> New</Link>
+            </Button>
+          }
+        />
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <ErrorNote error={error} />
 
         {decks === null ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
-          </div>
+          <LoadingGrid count={6} />
         ) : decks.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
-              <Presentation className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No presentations yet.</p>
-              <Button asChild size="sm"><Link to="/app/create">Create one</Link></Button>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Presentation}
+            title="No presentations yet"
+            description="Generate your first deck from a syllabus, a chapter or a set of notes."
+            action={{ to: "/app/create", label: "Create one" }}
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {decks.map((d, idx) => {
@@ -145,7 +143,7 @@ export default function Presentations() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </PageContainer>
     </AppLayout>
   );
 }

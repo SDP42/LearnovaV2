@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer, PageHeader } from "@/components/app/Page";
 
 export default function Quizzes() {
   const [params, setParams] = useSearchParams();
@@ -53,32 +54,30 @@ export default function Quizzes() {
 
   return (
     <AppLayout title="Quizzes">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">Checkpoint quizzes</h2>
-            <p className="text-sm text-muted-foreground">
-              Run the inline questions generated for one of your decks.
-            </p>
-          </div>
-          {decks && decks.length > 0 ? (
-            <Select
-              value={jobId}
-              onValueChange={(v) => setParams(v ? { job: v } : {})}
-            >
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Choose a deck" />
-              </SelectTrigger>
-              <SelectContent>
-                {decks.map((d) => (
-                  <SelectItem key={d.id ?? d.deck_id} value={String(d.id ?? d.deck_id)}>
-                    {d.title ?? d.source_name ?? "Untitled"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-        </div>
+      <PageContainer width="prose">
+        <PageHeader
+          title="Checkpoint quizzes"
+          subtitle="Run the inline questions generated for one of your decks."
+          actions={
+            decks && decks.length > 0 ? (
+              <Select
+                value={jobId}
+                onValueChange={(v) => setParams(v ? { job: v } : {})}
+              >
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Choose a deck" />
+                </SelectTrigger>
+                <SelectContent>
+                  {decks.map((d) => (
+                    <SelectItem key={d.id ?? d.deck_id} value={String(d.id ?? d.deck_id)}>
+                      {d.title ?? d.source_name ?? "Untitled"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null
+          }
+        />
 
         {error ? (
           <Alert variant="destructive">
@@ -191,7 +190,7 @@ export default function Quizzes() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </AppLayout>
   );
 }

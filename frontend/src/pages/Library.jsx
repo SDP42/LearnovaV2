@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { PageContainer } from "@/components/app/Page";
 
 const KIND_META = {
   process: { icon: GitBranch, ring: "text-chart-1" },
@@ -52,7 +53,7 @@ export default function Library() {
 
   return (
     <AppLayout title="Library">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <PageContainer>
         {/* header */}
         <div className="relative overflow-hidden rounded-2xl border p-6 sm:p-8">
           <div className="lv-aurora" />
@@ -180,7 +181,7 @@ export default function Library() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </AppLayout>
   );
 }

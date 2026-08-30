@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer } from "@/components/app/Page";
 
 function statusVariant(status) {
   if (/ready|done|complete/i.test(status)) return "success";
@@ -57,7 +58,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout title="Dashboard">
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
+      <PageContainer className="gap-5">
         {/* hero */}
         <div className="relative overflow-hidden rounded-2xl border p-6 sm:p-8">
           <div className="lv-aurora" />
@@ -258,7 +259,7 @@ export default function Dashboard() {
             </Card>
           </div>
         </div>
-      </div>
+      </PageContainer>
     </AppLayout>
   );
 }
