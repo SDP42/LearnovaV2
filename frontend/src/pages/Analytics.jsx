@@ -11,6 +11,7 @@ import {
 import {
   ArrowDownRight,
   ArrowUpRight,
+  BarChart3,
   Gauge,
   Layers,
   PieChart,
@@ -26,7 +27,7 @@ import StatCard from "@/components/app/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageContainer, PageHeader } from "@/components/app/Page";
-import { ErrorNote } from "@/components/app/states";
+import { EmptyState, ErrorNote } from "@/components/app/states";
 import {
   ChartContainer,
   ChartTooltip,
@@ -127,6 +128,15 @@ export default function Analytics() {
 
         <ErrorNote error={error} />
 
+        {decks && decks.length === 0 ? (
+          <EmptyState
+            icon={BarChart3}
+            title="No analytics yet"
+            description="Generate a deck — its engagement score, slide mix and quiz coverage will show up here."
+            action={{ to: "/app/create", label: "Create a presentation" }}
+          />
+        ) : (
+        <>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {decks === null ? (
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[104px]" />)
@@ -289,6 +299,8 @@ export default function Analytics() {
             ) : null}
           </>
         ) : null}
+        </>
+        )}
 
         <Card className="lv-card">
           <CardHeader className="flex flex-row items-center gap-2">
