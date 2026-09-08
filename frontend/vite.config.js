@@ -25,9 +25,10 @@ export default defineConfig({
   server: {
     port: 5173,
     // Proxy keeps the browser on one origin in dev, so CORS never bites.
+    // VITE_API_TARGET overrides the API origin (e.g. when :8000 is taken).
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8000",
+        target: process.env.VITE_API_TARGET || "http://127.0.0.1:8000",
         changeOrigin: true,
       },
     },
