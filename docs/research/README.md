@@ -3,6 +3,7 @@
 | File | What it is |
 |---|---|
 | [`LEARNOVA_PAPER.md`](LEARNOVA_PAPER.md) | **Umbrella paper.** The deterministic decision layer (content preservation, VMS, image/text policy — the *non-model* contribution) + PSF + CLASS + system, with guarantees and a pre-registered evaluation plan (E1–E8). |
+| [`MATH_EXPLAINED.md`](MATH_EXPLAINED.md) | **5-page cheat sheet.** Every symbol in PSF and CLASS in plain English, why multiplicative not additive, a worked numeric example, and answers to the questions a reviewer is likely to ask. |
 | [`PSF_DESIGN.md`](PSF_DESIGN.md) | Full design of the PSF metric (math) and the CLASS algorithm, with the novelty statement |
 | [`paper_draft.md`](paper_draft.md) | Narrower PSF/CLASS-only submission draft — abstract, sections, RQ table |
 | [`VISUAL_INTELLIGENCE.md`](VISUAL_INTELLIGENCE.md) | Design + status of the deterministic decision layer (VMS, text policy, image policy, progressive reveal) |
