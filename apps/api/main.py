@@ -74,8 +74,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if os.getenv("LEARNOVA_RATE_LIMIT", "on") != "off":
-    app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RateLimitMiddleware)  # toggled per request via LEARNOVA_RATE_LIMIT=off
 
 ALLOWED_SUFFIXES = {".pptx", ".pdf"}
 ANONYMOUS_USER = "anonymous"
@@ -456,6 +455,13 @@ def start_generate(
         except Exception:
             payload = None
         editable = payload_to_editable(payload) if payload else None
+        try:
+            from learnova.analysis import build_analysis
+
+            analysis = build_analysis(finished.result)
+        except Exception:
+            logger.exception("analysis failed")
+            analysis = None
         record = deck_library.save_deck(
             user_id=finished.user_id or ANONYMOUS_USER,
             result=finished.result,
@@ -464,6 +470,7 @@ def start_generate(
             title=finished.source_name,
             slides_payload=payload,
             editable_slides=editable,
+            analysis=analysis,
             # Reuse the job id so /api/decks/{id}/* (editor, history, figures)
             # resolve with the same id the client already has.
             deck_id=finished.id,
@@ -554,6 +561,27 @@ def get_my_deck(deck_id: str, user_id: str = Depends(current_user)) -> dict:
     if record is None:
         raise HTTPException(status_code=404, detail="deck not found")
     return record
+
+
+@app.get("/api/decks/{deck_id}/analysis")
+def get_my_deck_analysis(deck_id: str, user_id: str = Depends(current_user)) -> JSONResponse:
+    """Before/after comparison against the source, written when the deck was generated."""
+    if deck_library.get_deck(user_id, deck_id) is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    data = deck_library.read_analysis(user_id, deck_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="No analysis for this deck — regenerate it to create one.")
+    return JSONResponse(data, headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.get("/api/jobs/{job_id}/analysis")
+def get_job_analysis(job_id: str, user_id: str = Depends(current_user)) -> JSONResponse:
+    job = _require_own_job(job_id, user_id)
+    if job.result is None:
+        raise HTTPException(status_code=409, detail="deck not generated yet")
+    from learnova.analysis import build_analysis
+
+    return JSONResponse(build_analysis(job.result))
 
 
 @app.get("/api/decks/{deck_id}/markdown")

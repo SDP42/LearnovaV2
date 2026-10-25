@@ -10,6 +10,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("LEARNOVA_DB_PATH", str(tmp_path / "t.db"))
     monkeypatch.setenv("LEARNOVA_AUTH", "on")
     monkeypatch.setenv("OTP_DEV_MODE", "1")
+    monkeypatch.setenv("LEARNOVA_RATE_LIMIT", "off")
     monkeypatch.delenv("VITE_CLERK_PUBLISHABLE_KEY", raising=False)
     monkeypatch.delenv("CLERK_PUBLISHABLE_KEY", raising=False)
     from learnova.auth import phone
@@ -105,8 +106,32 @@ def test_decks_are_isolated_between_users(tmp_path, monkeypatch):
 
 def test_rate_limit_and_security_headers(client, monkeypatch):
     c, _ = client
+    monkeypatch.setenv("LEARNOVA_RATE_LIMIT", "on")
     r = c.get("/api/health")
     assert r.headers["x-content-type-options"] == "nosniff"
     for i in range(12):
         last = c.post("/api/auth/otp/request", json={"phone": "123"})
     assert last.status_code == 429
+
+
+def test_analysis_endpoint_roundtrip(client, tmp_path, monkeypatch):
+    """A saved deck exposes its before/after analysis, and only to its owner."""
+    from learnova.parsers.markdown_converter import from_typed_text
+    from learnova.pipeline.orchestrator import PipelineConfig, generate
+    from learnova.analysis import build_analysis
+    from learnova.storage import deck_library as dl
+
+    monkeypatch.setattr(dl, "DATA_DIR", tmp_path)
+    c, _ = client
+    data = _login(c)
+    uid = data["user"]["id"]
+    doc = from_typed_text("## Layers of the Earth\nThe Earth has four main layers. The crust is the thin outer shell. "
+                          "Beneath it lies the mantle. The outer core is liquid iron. The inner core is solid.", "t")
+    res = generate(doc, PipelineConfig(build_pptx=False, build_html=False, enable_enhancement=False, enable_vision_ocr=False))
+    a = build_analysis(res)
+    assert a["summary"]["visual_coverage_after_pct"] == 100 and a["summary"]["fact_retention_pct"] >= 90
+    dl.save_deck(uid, res, deck_id="abc123", analysis=a)
+    h = {"Authorization": f"Bearer {data['token']}"}
+    r = c.get("/api/decks/abc123/analysis", headers=h)
+    assert r.status_code == 200 and r.json()["summary"]["slides_after"] >= 1
+    assert c.get("/api/decks/abc123/analysis").status_code == 401

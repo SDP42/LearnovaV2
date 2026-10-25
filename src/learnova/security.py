@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -31,7 +32,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         ip = request.client.host if request.client else "?"
         now = time.time()
-        for prefix, cap, window in self.limits:
+        enabled = os.getenv("LEARNOVA_RATE_LIMIT", "on").lower() != "off"
+        for prefix, cap, window in (self.limits if enabled else ()):
             if not path.startswith(prefix):
                 continue
             with self.lock:

@@ -30,6 +30,7 @@ PPTX_FILE = "deck.pptx"
 HTML_FILE = "deck.html"
 META_FILE = "meta.json"
 SLIDES_FILE = "deck.json"   # the slides payload, so a saved deck opens without a live job
+ANALYSIS_FILE = "analysis.json"  # before/after comparison, written at generation time
 EDIT_FILE = "deck_edit.json"  # the editable improved-slide list (title/bullets/family), for re-renders
 VERSIONS_DIR = "versions"
 IMAGES_DIR = "images"         # per-slide figure bytes, so edits/crops survive a re-render
@@ -84,6 +85,7 @@ def save_deck(
     slides_payload: Optional[list] = None,
     editable_slides: Optional[list] = None,
     deck_id: Optional[str] = None,
+    analysis: Optional[dict] = None,
 ) -> DeckRecord:
     """Persist a ``PipelineResult`` for one user and return its record.
 
@@ -113,6 +115,8 @@ def save_deck(
             ),
             encoding="utf-8",
         )
+    if analysis is not None:
+        (target / ANALYSIS_FILE).write_text(json.dumps(analysis, ensure_ascii=False, default=str), encoding="utf-8")
     if editable_slides is not None:
         (target / EDIT_FILE).write_text(
             json.dumps({"slides": editable_slides}, ensure_ascii=False), encoding="utf-8"
@@ -170,6 +174,16 @@ def get_deck(user_id: str, deck_id: str) -> Optional[dict]:
     try:
         return json.loads(meta.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        return None
+
+
+def read_analysis(user_id: str, deck_id: str) -> Optional[dict]:
+    path = _deck_dir(user_id, deck_id) / ANALYSIS_FILE
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return None
 
 
