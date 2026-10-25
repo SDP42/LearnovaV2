@@ -95,6 +95,8 @@ class PipelineConfig:
     # "preserve" (default): keep every word, then split long sections / enrich short ones — nothing is summarised.
     # "compress" is the legacy summarising path; "expand" teaches a short typed outline step by step.
     content_mode: str = "preserve"
+    # How much text a slide carries in preserve mode: compact (fewer, denser) | balanced | detailed (more, lighter, more visuals).
+    slide_detail: str = "balanced"
 
 
 @dataclass
@@ -403,7 +405,7 @@ def generate(
 
             result.improved = preserve_chunks(result.chunks)
             paginate_tables(result.improved)
-            plan_slides(result.improved)
+            plan_slides(result.improved, {"compact": 120, "balanced": 90, "detailed": 65}.get(config.slide_detail, 90))
             stats = _enrich_deck(result.improved)
             try:
                 from learnova.ai import assist

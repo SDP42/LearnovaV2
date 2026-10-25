@@ -32,9 +32,9 @@ The Earth has four main layers. The crust is the thin outer shell. Beneath it li
 
 const AUDIENCES = ["Grade 6", "High school", "University", "Professionals", "Executives"];
 const LENGTHS = [
-  { v: "6-10", label: "6–10 slides", density: "low" },
-  { v: "10-15", label: "10–15 slides", density: "medium" },
-  { v: "15-25", label: "15–25 slides", density: "teaching" },
+  { v: "compact", label: "Compact", detail: "compact" },
+  { v: "balanced", label: "Balanced", detail: "balanced" },
+  { v: "detailed", label: "Detailed", detail: "detailed" },
 ];
 const TONES = ["Friendly", "Formal", "Concise", "Storytelling"];
 const OK_EXT = /\.(pdf|pptx|docx|md|txt)$/i;
@@ -69,7 +69,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
   const [file, setFile] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [audience, setAudience] = useState("University");
-  const [length, setLength] = useState("10-15");
+  const [length, setLength] = useState("balanced");
   const [tone, setTone] = useState("Friendly");
   const [hints, setHints] = useState([]);
   const [improving, setImproving] = useState(false);
@@ -130,8 +130,8 @@ export default function Composer({ value, onChange, textareaRef, className }) {
     setBusy(true);
     const len = LENGTHS.find((l) => l.v === length);
     const options = defaultGenerateOptions({
-      text_density: len?.density || "medium",
-      audience: `${audience}, ${tone.toLowerCase()} tone, ${len?.label || ""}`.trim(),
+      slide_detail: len?.detail || "balanced",
+      audience: `${audience}, ${tone.toLowerCase()} tone, ${len?.label ? len.label + " detail" : ""}`.trim(),
     });
     try {
       if (file) {
@@ -241,7 +241,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
             <Paperclip className="size-4" />
           </button>
           <Opt label="Audience" value={audience} onChange={setAudience} items={AUDIENCES} />
-          <Opt label="Slides" value={length} onChange={setLength} items={LENGTHS} />
+          <Opt label="Detail" value={length} onChange={setLength} items={LENGTHS} />
           <Opt label="Tone" value={tone} onChange={setTone} items={TONES} />
 
           <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">

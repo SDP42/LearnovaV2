@@ -253,6 +253,7 @@ class GenerateRequest(BaseModel):
     build_pptx: bool = True
     build_html: bool = True
     content_mode: str = "preserve"
+    slide_detail: str = "balanced"
     text_density: str = "medium"
     enable_enhancement: bool = True
     markdown: Optional[str] = None
@@ -277,6 +278,7 @@ def _config_from(request: GenerateRequest, textbook_mode: bool = False) -> Pipel
         build_pptx=request.build_pptx,
         build_html=request.build_html,
         content_mode=request.content_mode,
+        slide_detail=request.slide_detail,
         text_density=request.text_density,
         enable_enhancement=request.enable_enhancement,
     )

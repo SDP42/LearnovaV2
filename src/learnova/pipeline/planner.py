@@ -65,7 +65,8 @@ def _jaccard(a: set, b: set) -> float:
     return len(a & b) / max(1, len(a | b))
 
 
-def _group(sents: List[str]) -> List[List[str]]:
+def _group(sents: List[str], max_words: int = MAX_WORDS) -> List[List[str]]:
+    min_part = max(30, int(max_words * 0.4))
     groups: List[List[str]] = []
     cur: List[str] = []
     cw = 0
@@ -75,13 +76,13 @@ def _group(sents: List[str]) -> List[List[str]]:
         if cur and cw >= 45:
             recent = set(_content_words(" ".join(cur[-3:])))
             shift = _jaccard(recent, set(_content_words(s))) < 0.06
-        if cur and (cw + w > MAX_WORDS or shift):
+        if cur and (cw + w > max_words or shift):
             groups.append(cur)
             cur, cw = [], 0
         cur.append(s)
         cw += w
     if cur:
-        if groups and cw < MIN_PART:
+        if groups and cw < min_part:
             groups[-1].extend(cur)
         else:
             groups.append(cur)
@@ -98,7 +99,7 @@ def _unique(title: str, used: Dict[str, int]) -> str:
     return title if n == 0 else f"{title} ({n + 1})"
 
 
-def plan_slides(entries: List[dict]) -> int:
+def plan_slides(entries: List[dict], max_words: int = MAX_WORDS) -> int:
     """In-place. Split long slides, add overviews, flag short ones. Returns the change in slide count."""
     out: List[dict] = []
     used: Dict[str, int] = {}
@@ -110,7 +111,7 @@ def plan_slides(entries: List[dict]) -> int:
         base = str(imp.get("title") or "Overview")
         sents = [str(b) for b in (imp.get("bullets") or []) if str(b).strip()]
         words = sum(_wc(s) for s in sents)
-        groups = _group(sents) if words > MAX_WORDS else [sents]
+        groups = _group(sents, max_words) if words > max_words else [sents]
         if len(groups) == 1:
             imp["short"] = words < SHORT_WORDS
             imp["title"] = _unique(base, used)
