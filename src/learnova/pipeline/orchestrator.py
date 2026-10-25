@@ -51,6 +51,7 @@ STAGES: List[str] = [
     "enhance",
     "density",
     "quiz",
+    "illustrate",
     "score",
     "build_pptx",
     "build_html",
@@ -77,6 +78,8 @@ class PipelineConfig:
     textbook_mode: bool = False
     enable_vision_ocr: bool = True
     enable_quizzes: bool = True
+    # Draw concept illustrations where the policy says an image adds meaning (offline vector engine).
+    enable_illustrations: bool = True
     build_pptx: bool = True
     build_html: bool = True
     prefer_anydoc: bool = True
@@ -608,6 +611,16 @@ def generate(
     # A quiz failure must not cost us the deck.
     if not result.final_deck:
         result.final_deck = list(result.improved)
+
+    # 6c. Illustrations — only where the policy says an image adds meaning.
+    def _illustrate():
+        from learnova.ai.image_gen import illustrate_deck
+        from learnova.rendering.theme_engine import resolve_theme
+
+        theme = resolve_theme(result.source_name, config.theme_id, config.theme_spec)
+        return f"{illustrate_deck(result.final_deck, theme)} illustration(s)"
+
+    runner.run("illustrate", _illustrate, skip=not config.enable_illustrations, skip_reason="disabled")
 
     # 7. Engagement scoring
     def _score():

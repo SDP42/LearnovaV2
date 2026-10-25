@@ -151,7 +151,7 @@ def vector_illustration(icons: List[str], primary: str, accent: str, seed: str, 
         col = _mix(r.choice([primary, accent]), 0.25)
         parts.append(f'<path d="M{x - s:.1f} {y:.1f}H{x + s:.1f}M{x:.1f} {y - s:.1f}V{y + s:.1f}" stroke="{col}" stroke-width="{u * 0.006:.1f}" stroke-linecap="round"/>')
     parts.append("</svg>")
-    return svg_to_png("".join(parts), W, H, alpha=False)
+    return svg_to_png("".join(parts), W, H, alpha=True)
 
 
 def _cache_path(key: str) -> pathlib.Path:

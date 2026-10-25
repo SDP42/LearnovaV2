@@ -21,6 +21,8 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
 from learnova.logging_config import logger
+from learnova.rendering import layout as L
+from learnova.visuals.icons import icon_png, pick_icons
 
 
 def _blend(rgb: RGBColor, t: float) -> RGBColor:
@@ -90,6 +92,68 @@ class _Canvas:
             r.font.color.rgb = color
         return shp
 
+    def fit(self, texts, w, h, mx=24.0, mn=10.0, spacing=6.0) -> float:
+        """Largest point size at which ``texts`` fill a w×h box without overflowing (then the type scale ``k`` is NOT applied)."""
+        return L.fit_font_size([t for t in texts if t], max(0.3, w), max(0.2, h), max_pt=mx, min_pt=mn, spacing_pt=spacing)
+
+    def runs_fit(self, x, y, w, h, head, body, hmax=26, bmax=19, anchor=MSO_ANCHOR.TOP, align=PP_ALIGN.LEFT,
+                 head_color=None, body_color=None):
+        """Heading + body sized so the pair fills the box (heading ≈ 1.35× body)."""
+        iw, ih = (w - 0.2) * 0.9, (h - 0.12) * 0.94   # safety margin: real glyphs run wider than the estimate
+        bsz = self.fit([body], iw, ih * (0.62 if head else 1.0), bmax, 10.5) if body else 0
+        hsz = min(hmax, max(13.0, (bsz * 1.35) if body else self.fit([head], iw, ih, hmax, 13)))
+        hsz = min(hsz, self.fit([head], iw, ih * 0.45 if body else ih, hmax, 12)) if head else 0
+        shp = self.s.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
+        tf = shp.text_frame
+        tf.word_wrap = True
+        tf.vertical_anchor = anchor
+        tf.margin_left = tf.margin_right = Inches(0.1)
+        tf.margin_top = tf.margin_bottom = Inches(0.05)
+        first = True
+        for txt, size, bold, color in ((head, hsz, True, head_color or self.t.primary_rgb), (body, bsz, False, body_color or self.t.text_rgb)):
+            if not txt:
+                continue
+            para = tf.paragraphs[0] if first else tf.add_paragraph()
+            if not first:
+                para.space_before = Pt(5)
+            first = False
+            para.alignment = align
+            r = para.add_run()
+            r.text = str(txt)
+            r.font.size = Pt(size)
+            r.font.bold = bold
+            r.font.color.rgb = color
+        return shp
+
+    def icon_circle(self, x, y, d, name, fill=None, color=None):
+        """A tinted disc with a concept icon (PNG) centred in it."""
+        fill = fill or _blend(self.t.primary_rgb, 0.86)
+        self.shape(MSO_SHAPE.OVAL, x, y, d, d, fill)
+        hexc = "#%02x%02x%02x" % tuple((color or self.t.primary_rgb)[i] for i in range(3))
+        try:
+            self.s.shapes.add_picture(__import__("io").BytesIO(icon_png(name, hexc, 192)), Inches(x + d * 0.2), Inches(y + d * 0.2),
+                                      Inches(d * 0.6), Inches(d * 0.6))
+        except Exception:
+            pass
+
+    def picture(self, png: bytes, x, y, w, h):
+        """Place a PNG so it covers the (x, y, w, h) box without distortion (centre-cropped)."""
+        import io
+
+        from PIL import Image
+
+        im = Image.open(io.BytesIO(png))
+        iw, ih = im.size
+        box_ratio, img_ratio = w / h, iw / ih
+        if img_ratio > box_ratio:   # too wide → crop sides
+            nw = int(ih * box_ratio); l = (iw - nw) // 2
+            im = im.crop((l, 0, l + nw, ih))
+        else:
+            nh = int(iw / box_ratio); t = (ih - nh) // 2
+            im = im.crop((0, t, iw, t + nh))
+        buf = io.BytesIO(); im.save(buf, "PNG"); buf.seek(0)
+        return self.s.shapes.add_picture(buf, Inches(x), Inches(y), Inches(w), Inches(h))
+
     def badge(self, x, y, n, d=0.42, fill=None):
         fill = fill or self.t.primary_rgb
         shp = self.shape(MSO_SHAPE.OVAL, x, y, d, d, fill)
@@ -120,26 +184,35 @@ def _flatten(data: Any, out: List[str]) -> None:
             _flatten(v, out)
 
 
-def _grid(c: _Canvas, items: List[Tuple[str, str]], numbered: bool = True, cols: int = 0) -> None:
+def _grid(c: _Canvas, items: List[Tuple[str, str]], numbered: bool = False, cols: int = 0, icons: bool = True) -> None:
+    """Cards that tile the whole canvas (no leftover whitespace); each carries an icon and fitted text."""
     n = len(items)
-    cols = cols or (2 if n in (2, 4) else 3)
+    cols = cols or (1 if n == 1 else 2 if n in (2, 4) else 3)
     rows = math.ceil(n / cols)
-    gap = 0.22
+    gap = 0.24
     cw = (c.w - gap * (cols - 1)) / cols
-    ch = min(2.6, (c.h - gap * (rows - 1)) / rows)
-    top = c.y + (c.h - (ch * rows + gap * (rows - 1))) / 2
+    ch = (c.h - gap * (rows - 1)) / rows
+    names = pick_icons(" ".join(h + " " + b for h, b in items), n + 3)
+    used: List[str] = []
     for i, (head, body) in enumerate(items):
+        if body and body.lower().rstrip('. ').startswith(head.lower().rstrip('. ')):
+            head, body = body, ""   # the heading was just the opening words — show the sentence once, large
         r, k = divmod(i, cols)
-        x, y = c.x + k * (cw + gap), top + r * (ch + gap)
-        c.card(x, y, cw, ch)
-        off = 0.0
-        if numbered:
-            c.badge(x + 0.18, y + 0.18, i + 1)
-            off = 0.55
-        runs = [(head, 16 if body else 18, True, c.t.primary_rgb)]
-        if body and body.strip().lower() != head.strip().lower():
-            runs.append((body, _pt(len(body), 13, 10), False, c.t.text_rgb))
-        c.text(x + 0.12, y + 0.12 + off, cw - 0.24, ch - 0.24 - off, runs, anchor=MSO_ANCHOR.TOP if numbered else MSO_ANCHOR.MIDDLE)
+        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
+        c.card(x, y, cw, ch, radius=0.08)
+        horiz = cw > 3.4 and ch < 2.2
+        d = min(0.78, ch * 0.34, cw * 0.28)
+        if icons:
+            mine = pick_icons(head + " " + body, 6)
+            name = next((m for m in mine if m not in used), mine[0])
+            used.append(name)
+            c.icon_circle(x + 0.2, y + 0.2, d, name)
+        elif numbered:
+            c.badge(x + 0.2, y + 0.2, i + 1, d=d)
+        top_off = 0.0 if horiz else (d + 0.3 if (icons or numbered) else 0.1)
+        left_off = (d + 0.4) if horiz and (icons or numbered) else 0.1
+        c.runs_fit(x + left_off, y + (0.15 if horiz else top_off), cw - left_off - 0.1, ch - (0.3 if horiz else top_off) - 0.1, head, body,
+                   anchor=MSO_ANCHOR.MIDDLE if horiz or not (icons or numbered) else MSO_ANCHOR.TOP)
 
 
 # ── family drawers ────────────────────────────────────────────────────────────
@@ -157,22 +230,22 @@ def _process(c: _Canvas, data, cyclic: bool) -> bool:
     per = n if n <= 4 else math.ceil(n / 2)
     rows = math.ceil(n / per)
     gap = 0.42
+    foot = 0.5 if cyclic else 0.0
     cw = (c.w - gap * (per - 1)) / per
-    ch = min(2.8, (c.h - 0.5 - 0.3 * (rows - 1)) / rows)
-    top = c.y + (c.h - 0.45 - (ch * rows + 0.3 * (rows - 1))) / 2
+    ch = (c.h - foot - 0.3 * (rows - 1)) / rows
     for i, (lab, det) in enumerate(items):
         r, k = divmod(i, per)
-        x, y = c.x + k * (cw + gap), top + r * (ch + 0.3)
-        c.card(x, y, cw, ch)
-        c.badge(x + 0.15, y + 0.15, i + 1)
-        runs = [(lab, 15, True, c.t.primary_rgb)]
-        if det and det.strip().lower() != lab.strip().lower():
-            runs.append((det, _pt(len(det), 12, 9.5), False, c.t.text_rgb))
-        c.text(x + 0.1, y + 0.65, cw - 0.2, ch - 0.75, runs)
+        x, y = c.x + k * (cw + gap), c.y + r * (ch + 0.3)
+        c.card(x, y, cw, ch, radius=0.08)
+        d = min(0.62, ch * 0.28)
+        c.badge(x + 0.2, y + 0.2, i + 1, d=d)
+        if det and det.strip().lower() == lab.strip().lower():
+            det = ""
+        c.runs_fit(x + 0.05, y + d + 0.3, cw - 0.1, ch - d - 0.4, lab, det, hmax=22, bmax=16)
         if k < per - 1 and i < n - 1:
-            c.shape(MSO_SHAPE.RIGHT_ARROW, x + cw + 0.05, y + ch / 2 - 0.15, gap - 0.1, 0.3, c.t.accent_rgb)
+            c.shape(MSO_SHAPE.RIGHT_ARROW, x + cw + 0.04, y + ch / 2 - 0.17, gap - 0.08, 0.34, c.t.accent_rgb)
     if cyclic:
-        c.text(c.x, c.y + c.h - 0.42, c.w, 0.4, [("↻  and the cycle repeats", 13, True, c.t.primary_rgb)], PP_ALIGN.CENTER)
+        c.text(c.x, c.y + c.h - 0.46, c.w, 0.42, [("↻  and the cycle repeats", 15, True, c.t.primary_rgb)], PP_ALIGN.CENTER)
     return True
 
 
@@ -219,8 +292,8 @@ def _compare_table(c: _Canvas, data) -> bool:
     if len(heads) < 2 or len(rows) < 2:
         return False
     rows = rows[:7]
-    gf = c.s.shapes.add_table(len(rows) + 1, len(heads), Inches(c.x), Inches(c.y + 0.2), Inches(c.w),
-                              Inches(min(c.h - 0.4, 0.95 * (len(rows) + 1))))
+    gf = c.s.shapes.add_table(len(rows) + 1, len(heads), Inches(c.x), Inches(c.y + 0.05), Inches(c.w),
+                              Inches(c.h - 0.1))
     tbl = gf.table
     for j, h in enumerate(heads):
         cell = tbl.cell(0, j)
@@ -228,7 +301,7 @@ def _compare_table(c: _Canvas, data) -> bool:
         cell.text = str(h)
         for p in cell.text_frame.paragraphs:
             for r in p.runs:
-                r.font.size = Pt(20); r.font.bold = True; r.font.color.rgb = _on(c.t.primary_rgb)
+                r.font.size = Pt(22); r.font.bold = True; r.font.color.rgb = _on(c.t.primary_rgb)
     for i, row in enumerate(rows, start=1):
         for j in range(len(heads)):
             cell = tbl.cell(i, j)
@@ -236,7 +309,7 @@ def _compare_table(c: _Canvas, data) -> bool:
             cell.text = str((list(row) + [""] * len(heads))[j])
             for p in cell.text_frame.paragraphs:
                 for r in p.runs:
-                    r.font.size = Pt(16); r.font.color.rgb = c.t.text_rgb
+                    r.font.size = Pt(c.fit([str(x) for x in (list(rows[0]) if rows else [])], c.w / len(heads) - 0.4, c.h / (len(rows) + 1) - 0.2, 20, 12)); r.font.color.rgb = c.t.text_rgb; cell.vertical_anchor = MSO_ANCHOR.MIDDLE
     return True
 
 
@@ -274,19 +347,22 @@ def _layers(c: _Canvas, data) -> bool:
     if len(lv) < 3:
         return False
     n = len(lv)
-    rh = min(1.0, c.h / n - 0.1)
+    gap = 0.12
+    rh = (c.h - gap * (n - 1)) / n
     for i, it in enumerate(lv):
         label, detail = (it.get("label", ""), it.get("detail", "")) if isinstance(it, dict) else (str(it), "")
-        frac = 1.0 - i * (0.28 / max(1, n - 1))
+        frac = 1.0 - i * (0.22 / max(1, n - 1))
         w = c.w * frac
-        fill = _blend(c.t.primary_rgb, 0.78 - 0.78 * (i / max(1, n - 1)))
-        y = c.y + (c.h - (rh + 0.1) * n) / 2 + i * (rh + 0.1)
-        shp = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x + (c.w - w) / 2, y, w, rh, fill)
+        fill = _blend(c.t.primary_rgb, 0.8 - 0.8 * (i / max(1, n - 1)))
+        y = c.y + i * (rh + gap)
+        shp = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x + (c.w - w) / 2, y, w, rh, fill, radius=0.18)
         fg = _on(fill)
-        runs = [(label, 15, True, fg)]
-        if detail and detail.strip().lower() != label.strip().lower():
-            runs.append((detail, 11, False, fg))
-        c.text(0, 0, 0, 0, runs, PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=shp)
+        if detail and detail.strip().lower() == label.strip().lower():
+            detail = ""
+        lw = min(3.0, w * 0.28)
+        c.runs_fit(c.x + (c.w - w) / 2 + 0.1, y, lw, rh, label, "", hmax=24, head_color=fg, anchor=MSO_ANCHOR.MIDDLE)
+        if detail:
+            c.runs_fit(c.x + (c.w - w) / 2 + lw + 0.1, y, w - lw - 0.3, rh, "", detail, bmax=17, body_color=fg, anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -307,17 +383,30 @@ def _stat_tiles(c: _Canvas, data) -> bool:
     if not tiles:
         return False
     n = len(tiles)
+    cols = n if n <= 2 else 2 if n == 4 and c.w < 8 else n
+    rows = math.ceil(n / cols)
     gap = 0.25
-    cw = (c.w - gap * (n - 1)) / n
-    ch = min(3.4, c.h - 0.3)
-    top = c.y + (c.h - ch) / 2
+    cw = (c.w - gap * (cols - 1)) / cols
+    ch = (c.h - gap * (rows - 1)) / rows
+    names = pick_icons(" ".join(str(t.get("label", "")) for t in tiles), n + 2)
     for i, t in enumerate(tiles):
-        x = c.x + i * (cw + gap)
-        c.card(x, top, cw, ch)
+        r, k = divmod(i, cols)
+        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
+        c.card(x, y, cw, ch, radius=0.08)
+        d = min(0.6, ch * 0.2)
+        c.icon_circle(x + 0.2, y + 0.18, d, names[i % len(names)], fill=_blend(c.t.accent_rgb, 0.7), color=_readable_accent(c.t))
         val = str(t.get("value", ""))
-        c.text(x, top + 0.2, cw, ch - 0.3, [(val, 48 if len(val) < 8 else 34, True, c.t.primary_rgb),
-                                           (str(t.get("label", "")).upper(), 14, True, _readable_accent(c.t)),
-                                           (str(t.get("detail", "")), 13, False, c.t.text_rgb)], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+        vsz = c.fit([val], cw - 0.3, ch * 0.34, 54, 24)
+        det = str(t.get("detail", ""))
+        runs = [(val, vsz, True, c.t.primary_rgb), (str(t.get("label", "")).upper(), 13, True, _readable_accent(c.t))]
+        if det and det.lower() != str(t.get("label", "")).lower():
+            runs.append((det, c.fit([det], cw - 0.3, ch * 0.28, 15, 10), False, c.t.text_rgb))
+        tb = c.s.shapes.add_textbox(Inches(x + 0.1), Inches(y + d + 0.25), Inches(cw - 0.2), Inches(ch - d - 0.35))
+        tf = tb.text_frame; tf.word_wrap = True; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        for j, (txt, sz, bold, col) in enumerate(runs):
+            para = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
+            para.alignment = PP_ALIGN.LEFT
+            rr = para.add_run(); rr.text = txt; rr.font.size = Pt(sz); rr.font.bold = bold; rr.font.color.rgb = col
     return True
 
 
@@ -326,21 +415,22 @@ def _cause_effect(c: _Canvas, data) -> bool:
     if len(nodes) < 3:
         return False
     n = len(nodes)
-    arrow_h = 0.22
-    nh = (c.h - arrow_h * (n - 1) - (0.35 if data.get("loop") else 0)) / n
+    arrow_h = 0.24
+    foot = 0.4 if data.get("loop") else 0.0
+    nh = (c.h - arrow_h * (n - 1) - foot) / n
     for i, nd in enumerate(nodes):
         y = c.y + i * (nh + arrow_h)
-        c.card(c.x, y, c.w, nh)
-        c.badge(c.x + 0.15, y + nh / 2 - 0.21, i + 1)
-        runs = [(nd.get("label", ""), 14, True, c.t.primary_rgb)]
+        c.card(c.x, y, c.w, nh, radius=0.12)
+        d = min(0.6, nh * 0.6)
+        c.badge(c.x + 0.2, y + (nh - d) / 2, i + 1, d=d)
         det = str(nd.get("detail", ""))
-        if det and det.strip().lower() != str(nd.get("label", "")).strip().lower():
-            runs.append((det, 11, False, c.t.text_rgb))
-        c.text(c.x + 0.7, y, c.w - 0.8, nh, runs, anchor=MSO_ANCHOR.MIDDLE)
+        if det.strip().lower() == str(nd.get("label", "")).strip().lower():
+            det = ""
+        c.runs_fit(c.x + d + 0.35, y + 0.04, c.w - d - 0.5, nh - 0.08, nd.get("label", ""), det, hmax=20, bmax=15, anchor=MSO_ANCHOR.MIDDLE)
         if i < n - 1:
-            c.shape(MSO_SHAPE.DOWN_ARROW, c.x + c.w / 2 - 0.12, y + nh, 0.24, arrow_h, c.t.accent_rgb)
+            c.shape(MSO_SHAPE.DOWN_ARROW, c.x + c.w / 2 - 0.13, y + nh + 0.01, 0.26, arrow_h - 0.02, c.t.accent_rgb)
     if data.get("loop"):
-        c.text(c.x, c.y + c.h - 0.34, c.w, 0.32, [("↺  and the effect feeds back into the cause", 12, True, c.t.accent_rgb)], PP_ALIGN.CENTER)
+        c.text(c.x, c.y + c.h - 0.4, c.w, 0.38, [("↺  and the effect feeds back into the cause", 13, True, _readable_accent(c.t))], PP_ALIGN.CENTER)
     return True
 
 
@@ -540,12 +630,12 @@ def draw_family(slide, sp, theme, band) -> bool:
             cards = [(str(x.get("heading", "")), str(x.get("body", ""))) for x in (data.get("cards") or [])[:6] if isinstance(x, dict)]
             ok = len(cards) >= 2
             if ok:
-                _grid(c, cards)
+                _grid(c, cards, icons=True)
         elif family == "CHECKLIST":
             items = [(str(x.get("text", x)) if isinstance(x, dict) else str(x), "") for x in (data.get("items") or [])[:8]]
             ok = len(items) >= 2
             if ok:
-                _grid(c, [("✓  " + t, "") for t, _ in items], numbered=False, cols=2 if len(items) > 5 else 1)
+                _grid(c, [(t, "") for t, _ in items], numbered=False, cols=2 if len(items) > 4 else 1, icons=True)
         else:
             ok = False
         if not ok:  # any other family: a card grid from its text — still a visual, never bullets
@@ -554,10 +644,10 @@ def draw_family(slide, sp, theme, band) -> bool:
             flat = flat[:6]
             if len(flat) < 2:
                 return False
-            _grid(c, [(t[:60], t if len(t) > 60 else "") for t in flat])
+            _grid(c, [(t[:60], t if len(t) > 60 else "") for t in flat], icons=True)
         if notes:
             box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, band.top + band.height - 0.85, c.w, 0.7, _blend(theme.accent_rgb, 0.85), None)
-            c.text(0, 0, 0, 0, [(" ".join(notes)[:420], 12.5, False, theme.text_rgb)], PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=box)
+            c.text(0, 0, 0, 0, [(" ".join(notes)[:420], 14, False, theme.text_rgb)], PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=box)
         return True
     except Exception as exc:  # best-effort: never break deck export
         logger.warning("pptx visual %s failed: %s", family, exc)

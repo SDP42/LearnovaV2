@@ -16,7 +16,8 @@ const PHASES = [
   { label: "Choosing visuals & data", stages: ["visual_data"] },
   { label: "Explaining every step", stages: ["expand", "enhance"] },
   { label: "Laying out slides", stages: ["density"] },
-  { label: "Writing checkpoint quizzes", stages: ["quiz", "score"] },
+  { label: "Writing checkpoint quizzes", stages: ["quiz"] },
+  { label: "Drawing illustrations & scoring", stages: ["illustrate", "score"] },
   { label: "Building your two decks", stages: ["build_pptx", "build_html"] },
 ];
 

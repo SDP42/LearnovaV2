@@ -250,6 +250,7 @@ class GenerateRequest(BaseModel):
     quiz_style: str = "slide"
     enable_vision_ocr: bool = True
     enable_quizzes: bool = True
+    enable_illustrations: bool = True
     build_pptx: bool = True
     build_html: bool = True
     content_mode: str = "compress"
@@ -270,6 +271,7 @@ def _config_from(request: GenerateRequest, textbook_mode: bool = False) -> Pipel
         quiz_frequency=request.quiz_frequency,
         quiz_positions=request.quiz_positions or None,
         quiz_style=request.quiz_style,
+        enable_illustrations=request.enable_illustrations,
         textbook_mode=textbook_mode,
         enable_vision_ocr=request.enable_vision_ocr,
         enable_quizzes=request.enable_quizzes,

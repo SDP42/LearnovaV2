@@ -549,6 +549,16 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         o = title_slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(d), Inches(d))
         o.fill.solid(); o.fill.fore_color.rgb = col
         o.line.fill.background()
+    try:
+        from learnova.ai.image_gen import vector_illustration
+        from learnova.rendering.pptx_visuals import _Canvas
+        from learnova.visuals.icons import pick_icons
+
+        _seed_text = topic_title + " " + " ".join(str((d.get("improved") or {}).get("title", "")) for d in slides_data[:6])
+        _hero = vector_illustration(pick_icons(_seed_text, 5), theme.primary_hex, theme.accent_hex, topic_title, kind="panel", width=800)
+        _Canvas(title_slide, theme, L.content_band(has_takeaway=False)).picture(_hero, 8.85, 0.95, 3.95, 4.94)
+    except Exception:
+        pass
     bar = title_slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.9), Inches(2.0), Inches(1.4), Inches(0.14))
     bar.fill.solid(); bar.fill.fore_color.rgb = theme.accent_rgb
     bar.line.fill.background()
@@ -615,7 +625,17 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                 and not (layout_type == "TABLE" and imp.get("table_rows"))):
             from learnova.rendering.pptx_visuals import draw_family
 
-            _family_drawn = draw_family(slide, _sp, theme, band)
+            _illo = imp.get("illustration") or None
+            _draw_band = band
+            if _illo and _illo.get("bytes"):
+                _pw = band.width * 0.3
+                _draw_band = L.Box(band.left, band.top, band.width - _pw - 0.25, band.height)
+            _family_drawn = draw_family(slide, _sp, theme, _draw_band)
+            if _family_drawn and _illo and _illo.get("bytes"):
+                from learnova.rendering.pptx_visuals import _Canvas
+
+                _Canvas(slide, theme, band).picture(_illo["bytes"], band.left + band.width - _pw - 0.1, band.top + 0.12,
+                                                    _pw, band.height - 0.24)
 
         # ── 1. TABLE LAYOUT ──────────────────────────────────────────────────
         if _family_drawn:
@@ -721,62 +741,59 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         # ── 3. INTERLEAVED QUIZ CHECKPOINT ────────────────────────────────────
         elif layout_type == "QUIZ":
             q_text = imp.get("question", "Checkpoint Question")
-            options = imp.get("options", [])
+            options = [str(o) for o in imp.get("options", [])][:4]
             correct_opt = str(imp.get("correct", "A")).strip()[:1].upper()
             explanation = str(imp.get("explanation", "")).strip()
             difficulty = str(imp.get("difficulty", "")).strip()
+            from learnova.rendering.pptx_visuals import _Canvas
 
-            qbox = slide.shapes.add_textbox(Inches(0.6), Inches(1.3), Inches(12.1), Inches(1.4))
-            qtf = qbox.text_frame
-            qtf.word_wrap = True
-            qp = qtf.paragraphs[0]
-            qp.text = f"Q.  {q_text}"
-            qp.font.size = Pt(22)
-            qp.font.bold = True
-            qp.font.color.rgb = theme.primary_rgb
-            if difficulty:
-                dp = qtf.add_paragraph()
-                dp.text = difficulty.upper()
-                dp.font.size = Pt(11)
-                dp.font.color.rgb = theme.subtext_rgb
+            qc = _Canvas(slide, theme, band)
+            # question card
+            qh = 1.35
+            qc.card(qc.x, qc.y, qc.w, qh, fill=_tint(theme.primary_rgb, 0.9), line=theme.primary_rgb, radius=0.1)
+            tag = qc.shape(MSO_SHAPE.ROUNDED_RECTANGLE, qc.x + 0.2, qc.y + 0.17, 2.6, 0.36, theme.primary_rgb, radius=0.5)
+            qc.text(0, 0, 0, 0, [(f"QUESTION  ·  {difficulty.upper() or 'CHECK'}", 10.5, True, _readable(theme.primary_rgb))],
+                    PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=tag)
+            qsz = qc.fit([q_text], qc.w - 0.6, qh - 0.7, 28, 16)
+            tb = slide.shapes.add_textbox(Inches(qc.x + 0.2), Inches(qc.y + 0.55), Inches(qc.w - 0.4), Inches(qh - 0.6))
+            tb.text_frame.word_wrap = True
+            tb.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+            r_ = tb.text_frame.paragraphs[0].add_run(); r_.text = q_text
+            r_.font.size = Pt(qsz); r_.font.bold = True; r_.font.color.rgb = _readable(_tint(theme.primary_rgb, 0.9), prefer=theme.primary_rgb)
 
-            # Options — all neutral, no spoiler. The correct answer + why lives
-            # in a box that only appears on the final click (entrance animation).
-            card_positions = [
-                (Inches(0.6), Inches(2.9)), (Inches(6.9), Inches(2.9)),
-                (Inches(0.6), Inches(4.3)), (Inches(6.9), Inches(4.3)),
-            ]
-            for idx, opt_text in enumerate(options[:4]):
-                c_left, c_top = card_positions[idx]
-                card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c_left, c_top, Inches(5.8), Inches(1.2))
-                card.fill.solid()
-                card.fill.fore_color.rgb = theme.card_bg_rgb
-                card.line.color.rgb = theme.primary_rgb
-                card.line.width = Pt(1.5)
-                cp = card.text_frame.paragraphs[0]
-                card.text_frame.word_wrap = True
-                cp.text = str(opt_text)
-                cp.font.size = Pt(15)
-                cp.font.color.rgb = theme.text_rgb
+            # answer box height (revealed on the last click; shown in static exports)
+            ah = 0.95
+            gap = 0.22
+            top = qc.y + qh + gap
+            avail = qc.h - qh - gap - ah - gap
+            cw, ch = (qc.w - gap) / 2, (avail - gap) / 2
+            letters = "ABCD"
+            for i, opt in enumerate(options):
+                r, k = divmod(i, 2)
+                x, y = qc.x + k * (cw + gap), top + r * (ch + gap)
+                qc.card(x, y, cw, ch, radius=0.1)
+                dd = min(0.62, ch * 0.5)
+                qc.badge(x + 0.2, y + (ch - dd) / 2, letters[i], d=dd)
+                osz = qc.fit([opt], cw - dd - 0.6, ch - 0.2, 22, 12)
+                ob = slide.shapes.add_textbox(Inches(x + dd + 0.4), Inches(y + 0.05), Inches(cw - dd - 0.55), Inches(ch - 0.1))
+                ob.text_frame.word_wrap = True
+                ob.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+                rr = ob.text_frame.paragraphs[0].add_run(); rr.text = opt
+                rr.font.size = Pt(osz); rr.font.color.rgb = theme.text_rgb
 
-            ans = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                                         Inches(0.6), Inches(5.8), Inches(12.1), Inches(1.3))
-            ans.fill.solid()
-            ans.fill.fore_color.rgb = theme.primary_rgb
-            ans.line.color.rgb = theme.accent_rgb
-            ans.line.width = Pt(2)
+            ans = qc.shape(MSO_SHAPE.ROUNDED_RECTANGLE, qc.x, qc.y + qc.h - ah, qc.w, ah, theme.primary_rgb, radius=0.12)
+            ink = _readable(theme.primary_rgb)
             atf = ans.text_frame
             atf.word_wrap = True
-            ap = atf.paragraphs[0]
-            ap.text = f"Answer: {correct_opt}"
-            ap.font.size = Pt(16)
-            ap.font.bold = True
-            ap.font.color.rgb = theme.accent_rgb
+            atf.vertical_anchor = MSO_ANCHOR.MIDDLE
+            atf.margin_left = Inches(0.3)
+            p1 = atf.paragraphs[0]
+            r1 = p1.add_run(); r1.text = f"Answer: {correct_opt}"
+            r1.font.size = Pt(18); r1.font.bold = True; r1.font.color.rgb = _readable(theme.primary_rgb, prefer=theme.accent_rgb)
             if explanation:
-                ep = atf.add_paragraph()
-                ep.text = explanation
-                ep.font.size = Pt(12)
-                ep.font.color.rgb = theme.text_rgb
+                p2 = atf.add_paragraph()
+                r2 = p2.add_run(); r2.text = explanation
+                r2.font.size = Pt(qc.fit([explanation], qc.w - 0.7, ah - 0.5, 15, 10.5)); r2.font.color.rgb = ink
 
         # ── 4. FLOWCHART / PROCESS STEP CARDS ──────────────────────────────────
         elif layout_type == "FLOWCHART":
