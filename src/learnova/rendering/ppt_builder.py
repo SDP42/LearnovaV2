@@ -10,7 +10,7 @@ import re
 from pptx import Presentation
 from pptx.util import Emu, Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.oxml.xmlchemy import OxmlElement
 
@@ -20,6 +20,40 @@ from learnova.rendering.theme_engine import (
     get_theme, auto_detect_theme, select_slide_layout, resolve_theme,
     ColorPalette, THEMES, LAYOUT_STYLES,
 )
+
+def _lum(rgb) -> float:
+    ch = []
+    for v in (rgb[0], rgb[1], rgb[2]):
+        c = v / 255.0
+        ch.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+
+
+def _contrast(a, b) -> float:
+    la, lb = sorted((_lum(a), _lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def _readable(bg, prefer=None) -> RGBColor:
+    """Text colour that stays legible on ``bg``: ``prefer`` if it has contrast ≥ 4, else white/ink."""
+    if prefer is not None and _contrast(prefer, bg) >= 4.0:
+        return prefer
+    return RGBColor(0xFF, 0xFF, 0xFF) if _contrast(RGBColor(255, 255, 255), bg) >= _contrast(RGBColor(0x11, 0x14, 0x22), bg) else RGBColor(0x11, 0x14, 0x22)
+
+
+def _tint(rgb, t: float) -> RGBColor:
+    return RGBColor(int(rgb[0] + (255 - rgb[0]) * t), int(rgb[1] + (255 - rgb[1]) * t), int(rgb[2] + (255 - rgb[2]) * t))
+
+
+def _deco(slide, theme, corner: str = "tr") -> None:
+    """Canva-style corner decoration: two soft overlapping circles in the accent/primary tints."""
+    x = 11.6 if corner == "tr" else -0.7
+    y = -0.8
+    for d, col, dx, dy in ((2.2, _tint(theme.accent_rgb, 0.35), 0, 0), (1.3, _tint(theme.primary_rgb, 0.55), -0.5, 0.9)):
+        c = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x + dx), Inches(y + dy), Inches(d), Inches(d))
+        c.fill.solid(); c.fill.fore_color.rgb = col
+        c.line.fill.background()
+
 
 def SubElement(parent, tagname, **kwargs):
     element = OxmlElement(tagname)
@@ -238,35 +272,65 @@ def _add_header_bar(slide, title_text: str, theme: ColorPalette):
     header_bar.fill.solid()
     header_bar.fill.fore_color.rgb = theme.primary_rgb
     header_bar.line.fill.background()
+    strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(1.1), Inches(13.33), Inches(0.07))
+    strip.fill.solid(); strip.fill.fore_color.rgb = theme.accent_rgb
+    strip.line.fill.background()
 
     title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.1), Inches(12.3), Inches(0.9))
     tf = title_box.text_frame
     tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     tf.text = title_text
     p = tf.paragraphs[0]
-    p.font.size = Pt(L.fit_font_size([title_text], 12.3, 0.85, max_pt=28, min_pt=15))
+    p.font.size = Pt(L.fit_font_size([title_text], 12.3, 0.85, max_pt=30, min_pt=15))
     p.font.bold = True
-    p.font.color.rgb = theme.accent_rgb
+    # accent text only when it genuinely contrasts with the bar; otherwise the readable colour
+    p.font.color.rgb = _readable(theme.primary_rgb, prefer=theme.accent_rgb)
+
+
+def _add_footer(slide, n: int, total: int, theme: ColorPalette):
+    tb = slide.shapes.add_textbox(Inches(11.4), Inches(7.12), Inches(1.6), Inches(0.3))
+    tf = tb.text_frame
+    tf.text = f"{n} / {total}"
+    tf.paragraphs[0].alignment = PP_ALIGN.RIGHT
+    tf.paragraphs[0].font.size = Pt(10)
+    tf.paragraphs[0].font.color.rgb = theme.subtext_rgb
+    tb2 = slide.shapes.add_textbox(Inches(0.5), Inches(7.12), Inches(3), Inches(0.3))
+    tb2.text_frame.text = "Learnova"
+    tb2.text_frame.paragraphs[0].font.size = Pt(10)
+    tb2.text_frame.paragraphs[0].font.bold = True
+    tb2.text_frame.paragraphs[0].font.color.rgb = theme.subtext_rgb
+
 
 def _add_takeaway_bar(slide, takeaway_text: str, theme: ColorPalette):
     if not takeaway_text:
         return
     band = L.takeaway_band()
-    tkw_box = slide.shapes.add_textbox(
-        Inches(band.left), Inches(band.top), Inches(band.width), Inches(band.height))
-    tkw_box.fill.solid()
-    tkw_box.fill.fore_color.rgb = theme.primary_rgb
-    tkw_box.line.color.rgb = theme.accent_rgb
-    tkw_box.line.width = Pt(2)
+    fill = _tint(theme.accent_rgb, 0.78)
+    box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(band.left), Inches(band.top),
+                                 Inches(band.width), Inches(band.height))
+    try:
+        box.adjustments[0] = 0.2
+    except Exception:
+        pass
+    box.fill.solid(); box.fill.fore_color.rgb = fill
+    box.line.fill.background()
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(band.left), Inches(band.top + 0.06),
+                                 Inches(0.09), Inches(max(0.1, band.height - 0.12)))
+    bar.fill.solid(); bar.fill.fore_color.rgb = theme.accent_rgb
+    bar.line.fill.background()
 
-    ttk = tkw_box.text_frame
+    ttk = box.text_frame
     ttk.word_wrap = True
-    tp = ttk.paragraphs[0]
-    tp.text = f"Key Takeaway: {takeaway_text}"
-    tp.font.color.rgb = theme.text_rgb
-    tp.font.size = Pt(L.fit_font_size(
-        [tp.text], band.width - 0.3, band.height - 0.15, max_pt=15, min_pt=9))
-    tp.font.bold = True
+    ttk.vertical_anchor = MSO_ANCHOR.MIDDLE
+    ttk.margin_left = Inches(0.25)
+    ttk.paragraphs[0].alignment = PP_ALIGN.LEFT
+    run = ttk.paragraphs[0].add_run()
+    run.text = f"Key takeaway:  {takeaway_text}"
+    run.font.color.rgb = _readable(fill, prefer=theme.text_rgb)
+    run.font.size = Pt(L.fit_font_size(
+        [run.text], band.width - 0.45, band.height - 0.15, max_pt=15, min_pt=9))
+    run.font.bold = True
 
 def _add_figure_slide(prs, theme: ColorPalette, title_text: str, image_bytes: bytes,
                       caption: str = "") -> bool:
@@ -479,24 +543,27 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
     title_slide = prs.slides.add_slide(prs.slide_layouts[6])
     title_slide.background.fill.solid()
     title_slide.background.fill.fore_color.rgb = theme.primary_rgb
-
-    accent = title_slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(3.5), Inches(13.33), Inches(0.12))
-    accent.fill.solid()
-    accent.fill.fore_color.rgb = theme.accent_rgb
-    accent.line.fill.background()
-
-    tf1 = title_slide.shapes.add_textbox(Inches(1), Inches(1.5), Inches(11), Inches(1.8)).text_frame
-    tf1.text = topic_title.upper()
-    tf1.paragraphs[0].font.size = Pt(48)
+    _on_p = _readable(theme.primary_rgb)
+    for d, col, x, y in ((6.2, _tint(theme.accent_rgb, 0.1), 9.4, 3.9), (3.4, _tint(theme.primary_rgb, 0.25), 8.2, -1.4),
+                         (1.6, _tint(theme.accent_rgb, 0.5), 11.6, 0.6)):
+        o = title_slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(d), Inches(d))
+        o.fill.solid(); o.fill.fore_color.rgb = col
+        o.line.fill.background()
+    bar = title_slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.9), Inches(2.0), Inches(1.4), Inches(0.14))
+    bar.fill.solid(); bar.fill.fore_color.rgb = theme.accent_rgb
+    bar.line.fill.background()
+    tbox = title_slide.shapes.add_textbox(Inches(0.8), Inches(2.3), Inches(8.6), Inches(2.6))
+    tf1 = tbox.text_frame
+    tf1.word_wrap = True
+    tf1.vertical_anchor = MSO_ANCHOR.TOP
+    tf1.text = topic_title
+    tf1.paragraphs[0].font.size = Pt(54 if len(topic_title) < 28 else 40 if len(topic_title) < 55 else 32)
     tf1.paragraphs[0].font.bold = True
-    tf1.paragraphs[0].font.color.rgb = theme.accent_rgb
-    tf1.paragraphs[0].alignment = PP_ALIGN.CENTER
-
-    tf2 = title_slide.shapes.add_textbox(Inches(1), Inches(3.8), Inches(11), Inches(1)).text_frame
-    tf2.text = f"Generated by Learnova AI Engine • Theme: {theme.name}"
-    tf2.paragraphs[0].font.size = Pt(20)
-    tf2.paragraphs[0].font.color.rgb = theme.text_rgb
-    tf2.paragraphs[0].alignment = PP_ALIGN.CENTER
+    tf1.paragraphs[0].font.color.rgb = _on_p
+    sub = title_slide.shapes.add_textbox(Inches(0.9), Inches(5.0), Inches(8), Inches(0.5)).text_frame
+    sub.text = f"{len(slides_data)} slides  •  made with Learnova"
+    sub.paragraphs[0].font.size = Pt(18)
+    sub.paragraphs[0].font.color.rgb = _readable(theme.primary_rgb, prefer=_tint(theme.primary_rgb, 0.7))
 
     # ── Content slides ────────────────────────────────────────────────────────
     prev_style = None
@@ -521,6 +588,12 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
         # Speaker notes pane (key point, per-click cues, "read exactly", timing)
         _sp = deck_plan.by_index(idx) if deck_plan is not None else None
+        if _sp is not None and "takeaway" in (getattr(_sp, "params", None) or {}):
+            takeaway_text = str(_sp.params["takeaway"] or "").strip()  # the visual's own synthesis wins
+        elif len(takeaway_text) > 190:
+            takeaway_text = ""
+        if layout_type == "QUIZ":
+            takeaway_text = ""  # the answer/explanation box owns the bottom of a checkpoint slide
         if _sp and getattr(_sp, "speaker_notes", ""):
             try:
                 slide.notes_slide.notes_text_frame.text = _sp.speaker_notes
@@ -533,9 +606,21 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                               has_quiz=bool(inline_quiz))
 
         _add_header_bar(slide, title_text, theme)
+        _add_footer(slide, idx + 1, len(slides_data), theme)
+
+        # ── 0. CONTENT-ENGINE VISUAL — wins over the older layout guesses, as in the web deck
+        _family_drawn = False
+        if (_sp and getattr(_sp, "family", None) and getattr(_sp, "data", None)
+                and getattr(_sp, "confidence", 0) >= 0.62 and layout_type != "QUIZ"
+                and not (layout_type == "TABLE" and imp.get("table_rows"))):
+            from learnova.rendering.pptx_visuals import draw_family
+
+            _family_drawn = draw_family(slide, _sp, theme, band)
 
         # ── 1. TABLE LAYOUT ──────────────────────────────────────────────────
-        if layout_type == "TABLE" and imp.get("table_headers") and imp.get("table_rows"):
+        if _family_drawn:
+            pass
+        elif layout_type == "TABLE" and imp.get("table_headers") and imp.get("table_rows"):
             headers = imp.get("table_headers", [])
             rows = imp.get("table_rows", [])
 
@@ -836,18 +921,21 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
     end_slide = prs.slides.add_slide(prs.slide_layouts[6])
     end_slide.background.fill.solid()
     end_slide.background.fill.fore_color.rgb = theme.primary_rgb
-    _add_slide_transition(end_slide)
-
-    accent2 = end_slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(3.5), Inches(13.33), Inches(0.12))
-    accent2.fill.solid()
-    accent2.fill.fore_color.rgb = theme.accent_rgb
-
-    tfe = end_slide.shapes.add_textbox(Inches(1), Inches(2.8), Inches(11), Inches(1.5)).text_frame
-    tfe.text = "THANK YOU"
-    tfe.paragraphs[0].font.size = Pt(60)
+    for d, col, x, y in ((5.4, _tint(theme.accent_rgb, 0.1), -1.4, 4.6), (2.8, _tint(theme.primary_rgb, 0.25), 10.6, -0.9)):
+        o = end_slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(d), Inches(d))
+        o.fill.solid(); o.fill.fore_color.rgb = col
+        o.line.fill.background()
+    tfe = end_slide.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11.3), Inches(1.6)).text_frame
+    tfe.text = "Thank you"
+    tfe.paragraphs[0].font.size = Pt(64)
     tfe.paragraphs[0].font.bold = True
-    tfe.paragraphs[0].font.color.rgb = theme.accent_rgb
+    tfe.paragraphs[0].font.color.rgb = _readable(theme.primary_rgb)
     tfe.paragraphs[0].alignment = PP_ALIGN.CENTER
+    tq = end_slide.shapes.add_textbox(Inches(1), Inches(4.0), Inches(11.3), Inches(0.8)).text_frame
+    tq.text = "Questions?"
+    tq.paragraphs[0].font.size = Pt(26)
+    tq.paragraphs[0].font.color.rgb = _readable(theme.primary_rgb, prefer=theme.accent_rgb)
+    tq.paragraphs[0].alignment = PP_ALIGN.CENTER
 
     _apply_theme_fonts(prs, theme)
 
@@ -873,9 +961,9 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                     # Question stays visible; options reveal one per click, the
                     # answer + explanation box reveals last. Skip header(0),
                     # title(1) and the question box(2).
-                    shape_ids = [s.shape_id for s in slide.shapes][3:9]
+                    shape_ids = [s.shape_id for s in slide.shapes][6:12]
                 else:
-                    shape_ids = [s.shape_id for s in slide.shapes][2:8]
+                    shape_ids = [s.shape_id for s in slide.shapes][5:11]
                     if n_groups >= 2:
                         shape_ids = shape_ids[: max(2, n_groups)]
                 apply_click_builds(slide, shape_ids)

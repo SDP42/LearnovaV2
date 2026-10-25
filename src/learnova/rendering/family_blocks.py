@@ -85,23 +85,29 @@ def _timeline(data: Dict[str, Any], theme) -> Optional[str]:
     events = data.get("events") or []
     if len(events) < 3:
         return None
-    n = len(events[:8])
     dots = ""
     for i, e in enumerate(events[:8]):
         date = _esc(str(e.get("date", "")))
         title = _esc(str(e.get("title", "")))
+        up = i % 2 == 0
+        card = (
+            f'<div style="background:{theme.card_bg_hex};border:1px solid {theme.primary_hex}22;border-radius:14px;'
+            f'padding:12px 12px;box-shadow:0 6px 16px {theme.primary_hex}14;min-height:96px;">'
+            f'<div style="font-weight:900;color:{theme.primary_hex};font-size:1.35rem;line-height:1.1;">{date}</div>'
+            f'<div style="font-size:0.95rem;color:{theme.text_hex};line-height:1.3;margin-top:4px;">{title}</div></div>'
+        )
+        dot = (f'<div style="width:20px;height:20px;border-radius:50%;background:{theme.accent_hex};border:4px solid '
+               f'{theme.primary_hex};margin:0 auto;z-index:1;"></div>')
         dots += (
-            f'<div data-el="el.{i}" data-build="{i}" '
-            f'style="flex:1;position:relative;padding:0 6px;text-align:center;">'
-            f'<div style="width:14px;height:14px;border-radius:50%;background:{theme.accent_hex};'
-            f'border:3px solid {theme.primary_hex};margin:0 auto 8px;"></div>'
-            f'<div style="font-weight:700;color:{theme.primary_hex};font-size:0.8rem;">{date}</div>'
-            f'<div style="font-size:0.78rem;color:{theme.text_hex};line-height:1.3;">{title}</div></div>'
+            f'<div data-el="el.{i}" data-build="{i}" style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;'
+            f'justify-content:center;gap:10px;padding:0 5px;text-align:center;">'
+            + (f'{card}{dot}<div style="height:96px"></div>' if up else f'<div style="height:96px"></div>{dot}{card}')
+            + "</div>"
         )
     return (
-        f'<div style="margin-top:26px;">'
-        f'<div style="position:relative;height:3px;background:{theme.primary_hex}44;margin:0 6px 12px;"></div>'
-        f'<div style="display:flex;">{dots}</div></div>'
+        f'<div style="position:relative;margin-top:12px;min-height:420px;display:flex;align-items:center;">'
+        f'<div style="position:absolute;left:0;right:0;top:50%;height:4px;background:{theme.primary_hex}55;border-radius:2px;"></div>'
+        f'<div style="display:flex;width:100%;position:relative;">{dots}</div></div>'
     )
 
 
@@ -109,15 +115,32 @@ def _stages(data: Dict[str, Any], theme, *, cyclic: bool) -> Optional[str]:
     stages = data.get("stages") or data.get("steps") or []
     if len(stages) < 3:
         return None
-    n = len(stages[:8])
-    arrow = "↻" if cyclic else "→"
-    chips = []
-    for i, s in enumerate(stages[:8]):
-        chips.append(
-            _chip(str(s), i, theme.card_bg_hex, theme.text_hex, theme.primary_hex)
+    items = stages[:8]
+    n = len(items)
+    arrow = "↻" if cyclic else "›"
+    cells = []
+    for i, st in enumerate(items):
+        if isinstance(st, dict):
+            label, detail = str(st.get("label", "")), str(st.get("detail", ""))
+        else:
+            label, detail = str(st), ""
+        if detail.strip().lower() == label.strip().lower():
+            detail = ""
+        cells.append(
+            f'<div data-el="el.{i}" data-build="{i}" style="flex:1 1 {200 if n <= 4 else 150}px;min-width:150px;'
+            f'background:{theme.card_bg_hex};border:1px solid {theme.primary_hex}22;border-radius:16px;'
+            f'padding:18px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 18px {theme.primary_hex}14;">'
+            f'<span style="width:34px;height:34px;border-radius:50%;background:{theme.primary_hex};color:{_on(theme)};'
+            f'display:grid;place-items:center;font-weight:800;font-size:1rem;">{i + 1}</span>'
+            f'<div style="font-weight:800;font-size:1.3rem;color:{theme.primary_hex};line-height:1.2;">{_esc(label)}</div>'
+            + (f'<div style="font-size:1rem;line-height:1.45;color:{theme.text_hex};">{_esc(detail)}</div>' if detail else "")
+            + "</div>"
         )
-    joined = f'<span style="color:{theme.primary_hex};font-size:1.4rem;align-self:center;">{arrow}</span>'.join(chips)
-    return f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;">{joined}</div>'
+    sep = f'<span style="color:{theme.primary_hex};font-size:2rem;align-self:center;font-weight:800;">{arrow}</span>'
+    foot = (f'<div style="text-align:center;color:{theme.primary_hex};font-weight:700;margin-top:10px;font-size:1rem;">↻ and the cycle repeats</div>'
+            if cyclic else "")
+    return (f'<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin-top:20px;min-height:400px;'
+            f'align-content:stretch;">{sep.join(cells)}</div>{foot}')
 
 
 def _pyramid(data: Dict[str, Any], theme) -> Optional[str]:
@@ -387,19 +410,19 @@ def _compare_table(data: Dict[str, Any], theme) -> Optional[str]:
         return None
     on = _on(theme)
     th = "".join(
-        f'<th style="background:{theme.primary_hex};color:{on};padding:8px 12px;'
-        f'text-align:left;font-size:0.82rem;">{_esc(str(h))}</th>' for h in headers
+        f'<th style="background:{theme.primary_hex};color:{on};padding:16px 20px;'
+        f'text-align:left;font-size:1.1rem;">{_esc(str(h))}</th>' for h in headers
     )
     body = ""
     for i, r in enumerate(rows[:8]):
         cells = "".join(
-            f'<td style="padding:8px 12px;border-bottom:1px solid {theme.primary_hex}22;'
-            f'font-size:0.82rem;color:{theme.text_hex};">{_esc(str(c))}</td>'
+            f'<td style="padding:16px 20px;border-bottom:1px solid {theme.primary_hex}22;'
+            f'font-size:1.02rem;line-height:1.4;color:{theme.text_hex};">{_esc(str(c))}</td>'
             for c in (list(r) + [""] * len(headers))[:len(headers)]
         )
         body += f'<tr data-el="el.{i}" data-build="{i}">{cells}</tr>'
     return (
-        f'<div style="margin-top:18px;overflow-x:auto;max-width:820px;">'
+        f'<div style="margin-top:18px;overflow-x:auto;width:100%;">'
         f'<table style="width:100%;border-collapse:collapse;background:{theme.card_bg_hex};'
         f'border-radius:8px;overflow:hidden;">'
         f'<thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>'
@@ -444,6 +467,179 @@ def _on(theme) -> str:
         return readable_text_hex(theme.primary_hex)
     except Exception:
         return "#ffffff"
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Content-engine families (visuals/engine.py). All carry the full sentence text,
+# so choosing one never drops a fact, and all stretch to fill the slide body.
+# ─────────────────────────────────────────────────────────────────────────────
+_FILL = "min-height:420px;"
+
+
+def _tint(theme, a: str = "14") -> str:
+    return f"{theme.primary_hex}{a}"
+
+
+def _key_points(data: Dict[str, Any], theme) -> Optional[str]:
+    cards = data.get("cards") or []
+    if len(cards) < 2:
+        return None
+    n = len(cards[:6])
+    cols = 2 if n in (2, 4) else 3
+    cells = ""
+    for i, c in enumerate(cards[:6]):
+        head = _esc(str(c.get("heading", "")))
+        body = _esc(str(c.get("body", "")))
+        if body.strip().lower() == head.strip().lower():
+            body = ""
+        cells += (
+            f'<div data-el="el.{i}" data-build="{i}" style="background:{theme.card_bg_hex};border-radius:18px;'
+            f'padding:20px 20px 18px;border:1px solid {_tint(theme, "22")};box-shadow:0 8px 22px {_tint(theme)};'
+            f'display:flex;flex-direction:column;justify-content:center;gap:10px;">'
+            f'<span style="width:38px;height:38px;border-radius:12px;background:{theme.primary_hex};color:{_on(theme)};'
+            f'display:grid;place-items:center;font-weight:800;">{i + 1}</span>'
+            f'<div style="font-weight:800;font-size:1.3rem;color:{theme.primary_hex};line-height:1.2;">{head}</div>'
+            + (f'<div style="font-size:1.05rem;line-height:1.5;color:{theme.text_hex};">{body}</div>' if body else "")
+            + "</div>"
+        )
+    return (f'<div style="display:grid;grid-template-columns:repeat({cols},1fr);gap:16px;margin-top:18px;'
+            f'{_FILL}align-content:stretch;">{cells}</div>')
+
+
+def _stat_tiles(data: Dict[str, Any], theme) -> Optional[str]:
+    tiles = data.get("tiles") or []
+    if not tiles:
+        return None
+    n = len(tiles[:4])
+    cells = ""
+    for i, t in enumerate(tiles[:4]):
+        detail = _esc(str(t.get("detail", "")))
+        cells += (
+            f'<div data-el="el.{i}" data-build="{i}" style="flex:1 1 {230 if n < 4 else 180}px;background:{theme.card_bg_hex};'
+            f'border-radius:20px;padding:26px 22px;border:1px solid {_tint(theme, "22")};'
+            f'box-shadow:0 10px 26px {_tint(theme)};display:flex;flex-direction:column;justify-content:center;gap:10px;">'
+            f'<div style="font-weight:900;font-size:{3.4 if n < 4 else 2.9}rem;line-height:1;color:{theme.primary_hex};'
+            f'letter-spacing:-.02em;">{_esc(str(t.get("value", "")))}</div>'
+            f'<div style="font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-size:0.8rem;'
+            f'color:{theme.accent_hex};">{_esc(str(t.get("label", "")))}</div>'
+            f'<div style="font-size:0.9rem;line-height:1.4;color:{theme.text_hex};">{detail}</div></div>'
+        )
+    return f'<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:18px;{_FILL}align-items:stretch;">{cells}</div>'
+
+
+def _cause_effect(data: Dict[str, Any], theme) -> Optional[str]:
+    nodes = data.get("nodes") or []
+    if len(nodes) < 3:
+        return None
+    n = len(nodes[:6])
+    parts = []
+    for i, nd in enumerate(nodes[:6]):
+        label, detail = str(nd.get("label", "")), str(nd.get("detail", ""))
+        if detail.strip().lower() == label.strip().lower():
+            detail = ""
+        parts.append(
+            f'<div data-el="el.{i}" data-build="{i}" style="display:flex;gap:14px;align-items:flex-start;'
+            f'background:{theme.card_bg_hex};border-radius:16px;padding:14px 18px;border:1px solid {_tint(theme, "22")};'
+            f'box-shadow:0 6px 16px {_tint(theme)};">'
+            f'<span style="flex:none;width:36px;height:36px;border-radius:50%;background:{theme.primary_hex};color:{_on(theme)};'
+            f'display:grid;place-items:center;font-weight:800;">{i + 1}</span>'
+            f'<div><div style="font-weight:800;color:{theme.primary_hex};font-size:1.05rem;">{_esc(label)}</div>'
+            + (f'<div style="font-size:0.9rem;line-height:1.4;color:{theme.text_hex};margin-top:2px;">{_esc(detail)}</div>' if detail else "")
+            + "</div></div>"
+        )
+    arrow = f'<div style="text-align:center;color:{theme.accent_hex};font-size:1.3rem;line-height:1;font-weight:800;">↓</div>'
+    foot = (f'<div style="text-align:center;color:{theme.accent_hex};font-weight:800;font-size:1rem;">↺ and the effect feeds back into the cause</div>'
+            if data.get("loop") else "")
+    gap = 4 if n >= 5 else 8
+    return (f'<div style="display:flex;flex-direction:column;gap:{gap}px;margin-top:14px;{_FILL}justify-content:center;">'
+            f'{arrow.join(parts)}{foot}</div>')
+
+
+def _layers(data: Dict[str, Any], theme) -> Optional[str]:
+    levels = data.get("levels") or []
+    if len(levels) < 3:
+        return None
+    n = len(levels[:6])
+    rows = ""
+    for i, lv in enumerate(levels[:6]):
+        label, detail = str(lv.get("label", "")), str(lv.get("detail", ""))
+        if detail.strip().lower() == label.strip().lower():
+            detail = ""
+        alpha = 0.18 + 0.82 * (i / max(1, n - 1))
+        width = 100 - i * (28 / max(1, n - 1))
+        light = alpha < 0.5
+        fg = theme.text_hex if light else _on(theme)
+        rows += (
+            f'<div data-el="el.{i}" data-build="{i}" style="width:{width:.0f}%;margin:0 auto;border-radius:14px;'
+            f'background:{theme.primary_hex}{int(alpha * 255):02x};color:{fg};padding:14px 20px;display:flex;'
+            f'gap:16px;align-items:center;">'
+            f'<span style="font-weight:900;font-size:1.15rem;min-width:130px;">{_esc(label)}</span>'
+            f'<span style="font-size:0.9rem;line-height:1.35;opacity:.95;">{_esc(detail)}</span></div>'
+        )
+    return f'<div style="display:flex;flex-direction:column;gap:8px;margin-top:18px;{_FILL}justify-content:center;">{rows}</div>'
+
+
+def _formula_callout(data: Dict[str, Any], theme) -> Optional[str]:
+    formula = str(data.get("formula", "")).strip()
+    if not formula:
+        return None
+    term = _esc(str(data.get("term", "")))
+    stmt = _esc(str(data.get("statement", "")))
+    notes = [str(x) for x in (data.get("notes") or []) if str(x).strip()]
+    lis = "".join(
+        f'<li data-el="el.{j}" data-build="{j}" style="margin-bottom:6px;">{_esc(x)}</li>' for j, x in enumerate(notes[:4])
+    )
+    return (
+        f'<div style="margin-top:18px;{_FILL}display:flex;flex-direction:column;gap:18px;justify-content:center;">'
+        f'<div style="font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:{theme.accent_hex};font-size:0.85rem;">{term}</div>'
+        f'<div style="font-size:1.25rem;line-height:1.45;color:{theme.text_hex};">{stmt}</div>'
+        f'<div data-el="el.9" data-build="0" style="background:{theme.primary_hex};color:{_on(theme)};border-radius:20px;'
+        f'padding:30px 24px;text-align:center;font-size:2.6rem;font-weight:800;'
+        f'font-family:Georgia,\'Times New Roman\',serif;letter-spacing:.01em;box-shadow:0 14px 34px {_tint(theme, "40")};">'
+        f'{_esc(formula)}</div>'
+        + (f'<ul style="margin:0;padding-left:20px;font-size:0.95rem;line-height:1.5;color:{theme.text_hex};">{lis}</ul>' if lis else "")
+        + "</div>"
+    )
+
+
+def _checklist(data: Dict[str, Any], theme) -> Optional[str]:
+    items = data.get("items") or []
+    if len(items) < 2:
+        return None
+    n = len(items[:8])
+    cols = 2 if n > 5 else 1
+    cells = ""
+    for i, it in enumerate(items[:8]):
+        txt = it.get("text", "") if isinstance(it, dict) else str(it)
+        cells += (
+            f'<div data-el="el.{i}" data-build="{i}" style="display:flex;gap:14px;align-items:center;background:{theme.card_bg_hex};'
+            f'border-radius:16px;padding:16px 18px;border:1px solid {_tint(theme, "22")};box-shadow:0 6px 16px {_tint(theme)};">'
+            f'<span style="flex:none;width:30px;height:30px;border-radius:50%;background:{theme.accent_hex};color:{_on(theme)};'
+            f'display:grid;place-items:center;font-weight:900;">✓</span>'
+            f'<span style="font-size:1.1rem;line-height:1.35;color:{theme.text_hex};">{_esc(str(txt))}</span></div>'
+        )
+    return (f'<div style="display:grid;grid-template-columns:repeat({cols},1fr);gap:12px;margin-top:18px;{_FILL}align-content:center;">'
+            f'{cells}</div>')
+
+
+def _funnel(data: Dict[str, Any], theme) -> Optional[str]:
+    stages = data.get("stages") or []
+    if len(stages) < 3:
+        return None
+    n = len(stages[:6])
+    rows = ""
+    for i, st in enumerate(stages[:6]):
+        width = 100 - i * (58 / max(1, n - 1))
+        alpha = 0.95 - i * (0.5 / max(1, n - 1))
+        rows += (
+            f'<div data-el="el.{i}" data-build="{i}" style="width:{width:.0f}%;margin:0 auto;border-radius:12px;'
+            f'background:{theme.primary_hex}{int(alpha * 255):02x};color:{_on(theme)};padding:14px 20px;display:flex;'
+            f'justify-content:space-between;align-items:center;gap:14px;">'
+            f'<span style="font-weight:700;font-size:1rem;">{_esc(str(st.get("label", "")))}</span>'
+            f'<span style="font-weight:900;font-size:1.5rem;">{_esc(str(st.get("value", "")))}</span></div>'
+        )
+    return f'<div style="display:flex;flex-direction:column;gap:8px;margin-top:18px;{_FILL}justify-content:center;">{rows}</div>'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -699,6 +895,13 @@ def _chem(data: Dict[str, Any], theme) -> Optional[str]:
 
 _BUILDERS = {
     "LIST_STRUCTURED": _cards,
+    "KEY_POINTS": _key_points,
+    "STAT_TILES": _stat_tiles,
+    "CAUSE_EFFECT": _cause_effect,
+    "LAYERS": _layers,
+    "FORMULA_CALLOUT": _formula_callout,
+    "CHECKLIST": _checklist,
+    "FUNNEL": _funnel,
     "COMPARE_VISUAL": _pros_cons,
     "COMPARE_TABLE": _compare_table,
     "MATRIX_GRID": _matrix_2x2,
@@ -725,6 +928,11 @@ _BUILDERS = {
 }
 
 
+_FILL_WRAP = {"COMPARE_TABLE", "COMPARE_VISUAL", "TIMELINE", "DEFINITION", "QUOTE", "SET_DIAGRAM", "MATRIX_GRID",
+              "HIERARCHY_NEST", "MIND_MAP", "LIST_STRUCTURED", "CHART_CATEGORICAL", "CHART_RANKING", "CHART_TREND",
+              "CHART_PART_TO_WHOLE"}
+
+
 def render_family_block(family: str, data: Dict[str, Any], theme) -> Optional[str]:
     """Return an HTML block for ``family`` given its structured data, or None."""
     if not data:
@@ -737,9 +945,12 @@ def render_family_block(family: str, data: Dict[str, Any], theme) -> Optional[st
     if not fn:
         return None
     try:
-        return fn(data, theme)
+        out = fn(data, theme)
     except Exception:
         return None
+    if out and family in _FILL_WRAP:
+        out = (f'<div style="min-height:430px;display:flex;flex-direction:column;justify-content:center;">{out}</div>')
+    return out
 
 
 __all__ = ["render_family_block"]

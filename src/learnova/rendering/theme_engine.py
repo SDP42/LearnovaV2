@@ -4,6 +4,7 @@ Provides 10 Curated Color Schemes and 10 Slide Design Layout Styles (100+ Templa
 for PPTX Decks and HTML5 Web Presentations.
 """
 
+import re
 from dataclasses import dataclass, replace
 from pptx.dml.color import RGBColor
 
@@ -30,6 +31,54 @@ class ColorPalette:
 
 # ── 10 Curated Professional Color Palettes ────────────────────────────────────
 THEMES = {
+    "canva_bright": ColorPalette(
+        id="canva_bright",
+        name="Bright Blue (Default)",
+        description="Airy white canvas, strong blue headings and a sunny yellow accent — clean and friendly.",
+        bg_hex="#F7FAFF", bg_rgb=RGBColor(247, 250, 255),
+        primary_hex="#1D4ED8", primary_rgb=RGBColor(29, 78, 216),
+        accent_hex="#FFC93C", accent_rgb=RGBColor(255, 201, 60),
+        card_bg_hex="#FFFFFF", card_bg_rgb=RGBColor(255, 255, 255),
+        text_hex="#0F172A", text_rgb=RGBColor(15, 23, 42),
+        subtext_hex="#475569", subtext_rgb=RGBColor(71, 85, 105),
+        heading_font="Poppins", body_font="Inter",
+    ),
+    "sunrise_pop": ColorPalette(
+        id="sunrise_pop",
+        name="Sunrise Pop",
+        description="Warm cream with a confident coral-red and golden highlights.",
+        bg_hex="#FFF8F1", bg_rgb=RGBColor(255, 248, 241),
+        primary_hex="#C2371C", primary_rgb=RGBColor(194, 55, 28),
+        accent_hex="#FFD166", accent_rgb=RGBColor(255, 209, 102),
+        card_bg_hex="#FFFFFF", card_bg_rgb=RGBColor(255, 255, 255),
+        text_hex="#2B1B17", text_rgb=RGBColor(43, 27, 23),
+        subtext_hex="#6B5B54", subtext_rgb=RGBColor(107, 91, 84),
+        heading_font="Poppins", body_font="Inter",
+    ),
+    "forest_calm": ColorPalette(
+        id="forest_calm",
+        name="Forest Calm",
+        description="Fresh pale-green canvas with deep emerald and amber accents.",
+        bg_hex="#F4FBF6", bg_rgb=RGBColor(244, 251, 246),
+        primary_hex="#0F6B4F", primary_rgb=RGBColor(15, 107, 79),
+        accent_hex="#F6C453", accent_rgb=RGBColor(246, 196, 83),
+        card_bg_hex="#FFFFFF", card_bg_rgb=RGBColor(255, 255, 255),
+        text_hex="#0F2A20", text_rgb=RGBColor(15, 42, 32),
+        subtext_hex="#4B6358", subtext_rgb=RGBColor(75, 99, 88),
+        heading_font="Poppins", body_font="Inter",
+    ),
+    "violet_soft": ColorPalette(
+        id="violet_soft",
+        name="Violet Soft",
+        description="Light lavender canvas with rich violet and a pink accent.",
+        bg_hex="#FAF7FF", bg_rgb=RGBColor(250, 247, 255),
+        primary_hex="#5B3FD8", primary_rgb=RGBColor(91, 63, 216),
+        accent_hex="#FF9EC7", accent_rgb=RGBColor(255, 158, 199),
+        card_bg_hex="#FFFFFF", card_bg_rgb=RGBColor(255, 255, 255),
+        text_hex="#1E1B3A", text_rgb=RGBColor(30, 27, 58),
+        subtext_hex="#5B5878", subtext_rgb=RGBColor(91, 88, 120),
+        heading_font="Poppins", body_font="Inter",
+    ),
     # The id is load-bearing: saved decks store it in their metadata, so it
     # stays "brutalist_neon" regardless of the accent colour.
     "brutalist_neon": ColorPalette(
@@ -399,35 +448,24 @@ def apply_font(theme: ColorPalette, font_id: str) -> ColorPalette:
 
 
 def get_theme(theme_id: str) -> ColorPalette:
-    """Retrieve theme color palette by ID, defaulting to brutalist_neon."""
-    return THEMES.get(theme_id, THEMES["brutalist_neon"])
+    """Retrieve theme color palette by ID, defaulting to the bright default."""
+    return THEMES.get(theme_id, THEMES["canva_bright"])
 
 def auto_detect_theme(topic_title: str) -> ColorPalette:
-    """
-    Intelligently select matching theme palette based on title keywords.
-    """
-    title_lower = (topic_title or "").lower()
-    
-    if any(k in title_lower for k in ["medical", "health", "biology", "science", "nature", "green", "environment"]):
-        return THEMES["emerald_academic"]
-    elif any(k in title_lower for k in ["cyber", "code", "programming", "software", "tech", "data", "ai", "machine"]):
-        return THEMES["midnight_cyber"]
-    elif any(k in title_lower for k in ["business", "finance", "corporate", "swiss", "market", "management", "report"]):
-        return THEMES["swiss_corporate"]
-    elif any(k in title_lower for k in ["history", "art", "literature", "education", "humanities", "editorial"]):
-        return THEMES["sunset_editorial"]
-    elif any(k in title_lower for k in ["ocean", "water", "cloud", "network", "system", "database"]):
-        return THEMES["ocean_tech"]
-    elif any(k in title_lower for k in ["executive", "luxury", "gold", "premium", "strategic", "lead"]):
-        return THEMES["charcoal_gold"]
-    elif any(k in title_lower for k in ["architecture", "design", "warm", "terracotta", "craft"]):
-        return THEMES["warm_terracotta"]
-    elif any(k in title_lower for k in ["nordic", "clean", "slate", "simple", "minimal"]):
-        return THEMES["nordic_slate"]
-    elif any(k in title_lower for k in ["glass", "indigo", "modern", "future"]):
-        return THEMES["glass_indigo"]
-    
-    return THEMES["brutalist_neon"]
+    """Pick a *bright* palette from title keywords (dark themes stay opt-in)."""
+    t = (topic_title or "").lower()
+    rules = (
+        (("medical", "health", "biology", "science", "nature", "green", "environment", "chemistry"), "forest_calm"),
+        (("history", "art", "literature", "education", "humanities", "editorial", "marketing", "creative"), "sunrise_pop"),
+        (("business", "finance", "corporate", "swiss", "market", "management", "report", "economics"), "swiss_corporate"),
+        (("glass", "indigo", "modern", "future", "design", "startup", "product"), "violet_soft"),
+        (("nordic", "clean", "slate", "simple", "minimal"), "nordic_slate"),
+        (("architecture", "warm", "terracotta", "craft"), "warm_terracotta"),
+    )
+    for words, tid in rules:
+        if any(re.search(r"\b" + re.escape(w), t) for w in words):  # word start: 'art' must not match 'quarterly'
+            return THEMES[tid]
+    return THEMES["canva_bright"]
 
 
 def resolve_theme(topic_title: str, theme_id: str = "auto",

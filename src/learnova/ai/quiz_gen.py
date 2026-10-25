@@ -70,14 +70,26 @@ def _parse_llm_json(raw_response: str) -> dict | None:
         return None
 
 
-def generate_quizzes(improved_results: list[dict]) -> list[dict]:
+def generate_quizzes(improved_results: list[dict], frequency: int = 4, positions: list[int] | None = None) -> list[dict]:
     """
     Generate MCQs for improved slides.
+
+    Offline by default: questions are built deterministically from each slide's
+    structured content (see ``quiz_offline``) — free, instant, no API call. The
+    LLM path (one request per 3 slides) is opt-in via ``LEARNOVA_QUIZ_LLM=1``.
     Sequential execution — safe on macOS with httpx connection pools.
     """
+    import os
+
+    from learnova.ai.quiz_offline import offline_quizzes
+
+    if os.getenv("LEARNOVA_QUIZ_LLM", "0").lower() not in {"1", "true", "yes", "on"}:
+        qs = offline_quizzes(improved_results, frequency=frequency, positions=positions)
+        logger.info("Generated %d offline quiz(es)", len(qs))
+        return qs
     provider = _get_quiz_provider()
     if not provider:
-        return []
+        return offline_quizzes(improved_results, frequency=frequency, positions=positions)
 
     # Group slides into batches of 3
     batches = []

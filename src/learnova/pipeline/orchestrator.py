@@ -73,7 +73,7 @@ class PipelineConfig:
     quiz_positions: Optional[List[int]] = None
     # "inline" = a band at the foot of a slide; "slide" = a dedicated
     # interactive checkpoint slide.
-    quiz_style: str = "inline"
+    quiz_style: str = "slide"
     textbook_mode: bool = False
     enable_vision_ocr: bool = True
     enable_quizzes: bool = True
@@ -591,7 +591,7 @@ def generate(
 
     # 9. Quiz generation + interleaving
     def _quiz():
-        result.quizzes = generate_quizzes(result.improved)
+        result.quizzes = generate_quizzes(result.improved, frequency=config.quiz_frequency, positions=config.quiz_positions or None)
         result.final_deck = interleave_quizzes_into_slides(
             result.improved, result.quizzes,
             frequency=config.quiz_frequency,

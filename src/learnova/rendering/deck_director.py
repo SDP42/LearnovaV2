@@ -35,6 +35,11 @@ from learnova.logging_config import logger
 
 _WORD = re.compile(r"[A-Za-z][A-Za-z\-']+")
 
+from learnova.ai.master_prompt import TREATMENT_TO_FAMILY as _T2F
+
+# family → flat treatment key (reverse of the master-prompt table)
+_FAMILY_TO_TREATMENT = {fam: key for key, (fam, _v) in _T2F.items()}
+
 # Reveal.js transition names (also mapped to PPTX transitions in ppt_builder).
 TRANSITIONS = ("none", "fade", "slide", "convex", "concave", "zoom")
 
@@ -63,6 +68,8 @@ class SlidePlan:
     est_seconds: float
     is_section_start: bool
     confidence: float
+    visual_reason: str = ""
+    visual_alternatives: List[Any] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -82,6 +89,8 @@ class SlidePlan:
             "est_seconds": round(self.est_seconds),
             "is_section_start": self.is_section_start,
             "confidence": round(self.confidence, 3),
+            "visual_reason": self.visual_reason,
+            "visual_alternatives": self.visual_alternatives,
         }
 
 
@@ -259,6 +268,23 @@ def build_speaker_notes(imp: Dict[str, Any], animation: Dict[str, Any],
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _residual_notes(text: str, data: Dict[str, Any], limit: int = 3) -> List[str]:
+    """Sentences the chosen visual does not carry — kept as notes so no fact is lost."""
+    from learnova.visuals.engine import split_sentences
+
+    import json as _json
+
+    covered = set(_WORD.findall(_json.dumps(data, default=str).lower()))
+    out: List[str] = []
+    for s_ in split_sentences(text):
+        words = [w for w in _WORD.findall(s_.lower()) if len(w) > 3]
+        if not words:
+            continue
+        if sum(1 for w in words if w in covered) / len(words) < 0.6:
+            out.append(s_.strip())
+    return out[:limit]
+
+
 def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
     """Produce the full DeckPlan for a finished deck."""
     from learnova.ai.master_prompt import TREATMENT_TO_FAMILY
@@ -373,6 +399,23 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         else:
             treatment, family, variant = vd.treatment, vd.family, vd.variant
             data = vd.data or {}
+        # Content Decision Engine: it reads the slide and chooses the visual *and*
+        # builds its data. It overrides plain-text outcomes (every slide gets a
+        # visual) and the older selector's guesses, but never an editor-forced
+        # family, a real LLM/table payload, or a checkpoint quiz.
+        visual_reason, visual_alts, params = "", [], {}
+        engine_conf = vd.confidence
+        user_forced = bool(vdata and vdata.get("forced"))
+        llm_data = bool(vdata and vdata.get("data") and vdata.get("source") == "llm" and family == vdata.get("family"))
+        if not user_forced and not hard_layout and existing_layout != "QUIZ" and not llm_data:
+            from learnova.visuals import decide
+
+            dec = decide(title, vms_source, bullets, vms=vd)
+            treatment = _FAMILY_TO_TREATMENT.get(dec.family, dec.family)
+            family, variant, data = dec.family, dec.variant, dec.data
+            visual_reason, visual_alts = dec.reason, dec.alternatives
+            engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
+            params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": dec.takeaway}
         animation = plan_animation_steps(
             bullets, treatment, family, takeaway=str(imp.get("takeaway", ""))
         )
@@ -400,10 +443,11 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
 
         plan.slides.append(SlidePlan(
             index=i, title=title, treatment=treatment, family=family, variant=variant,
-            params={}, data=data,
+            params=params, data=data,
             animation=animation, transition=transition, transition_reason=reason,
             summary_directive=directive, verbatim=verbatim, speaker_notes=notes,
-            est_seconds=est, is_section_start=is_section, confidence=vd.confidence,
+            est_seconds=est, is_section_start=is_section, confidence=engine_conf,
+            visual_reason=visual_reason, visual_alternatives=[[f, round(c, 2)] for f, c in visual_alts],
         ))
         if is_section:
             plan.section_starts.append(i)

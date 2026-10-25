@@ -1,0 +1,288 @@
+[
+ {
+  "id": "h_proc1",
+  "title": "How a Vaccine Works",
+  "text": "A weakened or inactive germ is introduced to the body. The immune system recognises it as foreign. White blood cells produce antibodies against it. Memory cells are created. If the real germ arrives later, the body responds quickly.",
+  "ok": [
+   "PROCESS_LINEAR",
+   "CAUSE_EFFECT"
+  ]
+ },
+ {
+  "id": "h_proc2",
+  "title": "Making Tea",
+  "text": "Boil fresh water in a kettle. Place a tea bag in a cup. Pour the hot water over the bag. Let it steep for three minutes. Remove the bag and add milk if desired.",
+  "ok": [
+   "PROCESS_LINEAR",
+   "CHECKLIST"
+  ]
+ },
+ {
+  "id": "h_proc3",
+  "title": "Scientific Method",
+  "text": "Start by asking a question. Next, research the topic. Then form a hypothesis. After that, test it with an experiment. Finally, analyse the data and share the conclusion.",
+  "ok": [
+   "PROCESS_LINEAR",
+   "PROCESS_CYCLIC"
+  ]
+ },
+ {
+  "id": "h_cycle",
+  "title": "The Carbon Cycle",
+  "text": "Plants absorb carbon dioxide during photosynthesis. Animals eat plants and release carbon dioxide when they breathe. Decomposers return carbon to the soil. Burning fossil fuels adds more carbon to the air, and the cycle continues.",
+  "ok": [
+   "PROCESS_CYCLIC"
+  ]
+ },
+ {
+  "id": "h_time1",
+  "title": "Space Exploration Milestones",
+  "text": "Sputnik 1 launched in 1957. Yuri Gagarin became the first human in space in 1961. Apollo 11 landed on the Moon in 1969. The International Space Station was first occupied in 2000. Perseverance touched down on Mars in 2021.",
+  "ok": [
+   "TIMELINE"
+  ]
+ },
+ {
+  "id": "h_time2",
+  "title": "Company History",
+  "text": "The firm was founded in 2005 in a garage. It raised its first funding round in 2008. The first overseas office opened in 2012. It went public in 2017. By 2023 it employed 5,000 people.",
+  "ok": [
+   "TIMELINE"
+  ]
+ },
+ {
+  "id": "h_cmp1",
+  "title": "Cats versus Dogs",
+  "text": "Cats are independent, while dogs need constant attention. Cats groom themselves; dogs need regular baths. Dogs can be trained to follow many commands, whereas cats learn fewer.",
+  "ok": [
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "h_cmp2",
+  "title": "Python vs Java",
+  "text": "Python uses dynamic typing, but Java uses static typing. Python code is concise; Java code is more verbose. Java usually runs faster, while Python is quicker to write.",
+  "ok": [
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "h_cmp3",
+  "title": "Renting and Buying a Home",
+  "text": "Renting offers flexibility, whereas buying builds equity. Renters avoid maintenance costs. Owners pay for repairs themselves.",
+  "ok": [
+   "COMPARE_TABLE",
+   "COMPARE_VISUAL",
+   "KEY_POINTS",
+   "LIST_STRUCTURED"
+  ]
+ },
+ {
+  "id": "h_pc1",
+  "title": "Electric Cars",
+  "text": "Electric cars produce no tailpipe emissions and cost less to run. They are quiet and smooth. The drawbacks are limited range and long charging times. Batteries are expensive to replace.",
+  "ok": [
+   "COMPARE_VISUAL",
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "h_pc2",
+  "title": "Social Media",
+  "text": "Social media connects people across the world and helps small businesses reach customers. On the downside, it spreads misinformation. It can harm mental health and reduce attention spans.",
+  "ok": [
+   "COMPARE_VISUAL",
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "h_layer1",
+  "title": "The OSI Model",
+  "text": "The OSI model has seven layers. The physical layer sits at the bottom and moves raw bits. Above it, the data link layer handles frames. The network layer routes packets. The transport layer ensures reliable delivery. At the top, the application layer serves the user.",
+  "ok": [
+   "LAYERS",
+   "HIERARCHY_NEST",
+   "KEY_POINTS"
+  ]
+ },
+ {
+  "id": "h_layer2",
+  "title": "Food Pyramid",
+  "text": "Grains form the base of the pyramid and should make up most of the diet. Vegetables and fruit come next. Then dairy and protein. Fats and sweets sit at the very top and should be eaten sparingly.",
+  "ok": [
+   "LAYERS",
+   "HIERARCHY_NEST"
+  ]
+ },
+ {
+  "id": "h_venn",
+  "title": "Plants and Fungi",
+  "text": "Plants and fungi both have cell walls and are not able to move. Only plants contain chlorophyll and make their own food. Only fungi absorb nutrients from their surroundings.",
+  "ok": [
+   "SET_DIAGRAM"
+  ]
+ },
+ {
+  "id": "h_pie",
+  "title": "Where Energy Comes From",
+  "text": "Natural gas supplies 40% of electricity. Coal supplies 20%. Nuclear supplies 18%. Renewables supply 22%.",
+  "ok": [
+   "CHART_PART_TO_WHOLE"
+  ]
+ },
+ {
+  "id": "h_bar",
+  "title": "Tallest Mountains",
+  "text": "Everest is 8,849 metres high. K2 is 8,611 metres high. Kangchenjunga is 8,586 metres high. Lhotse is 8,516 metres high.",
+  "ok": [
+   "CHART_CATEGORICAL",
+   "CHART_RANKING"
+  ]
+ },
+ {
+  "id": "h_line",
+  "title": "Population Growth",
+  "text": "The town had 12,000 people in 2000, 15,500 in 2010, and 21,000 in 2020, growing steadily.",
+  "ok": [
+   "CHART_TREND",
+   "CHART_CATEGORICAL"
+  ]
+ },
+ {
+  "id": "h_stats",
+  "title": "Survey Highlights",
+  "text": "78% of respondents prefer online learning. The average session lasts 42 minutes. 9 out of 10 students would recommend the course. Completion rates rose by 31%.",
+  "ok": [
+   "STAT_TILES",
+   "KPI"
+  ]
+ },
+ {
+  "id": "h_kpi",
+  "title": "The Big Number",
+  "text": "The company processed 3.2 million orders last year.",
+  "ok": [
+   "KPI",
+   "STAT_TILES"
+  ]
+ },
+ {
+  "id": "h_def1",
+  "title": "What is Photosynthesis",
+  "text": "Photosynthesis is the process by which plants convert light energy into chemical energy stored in glucose. It takes place mainly in the leaves.",
+  "ok": [
+   "DEFINITION"
+  ]
+ },
+ {
+  "id": "h_def2",
+  "title": "Inflation Defined",
+  "text": "Inflation refers to a general rise in prices over time, which reduces the purchasing power of money.",
+  "ok": [
+   "DEFINITION"
+  ]
+ },
+ {
+  "id": "h_form",
+  "title": "Ohm's Law",
+  "text": "Ohm's law states that the current through a conductor is proportional to the voltage across it. The relationship is V = I R, where R is the resistance.",
+  "ok": [
+   "FORMULA_CALLOUT",
+   "DEFINITION"
+  ]
+ },
+ {
+  "id": "h_cause1",
+  "title": "Why the Sea is Salty",
+  "text": "Rain slowly erodes rocks on land. Rivers carry dissolved minerals to the ocean. When seawater evaporates, the salt stays behind. As a result, the ocean becomes saltier over millions of years.",
+  "ok": [
+   "CAUSE_EFFECT",
+   "PROCESS_LINEAR"
+  ]
+ },
+ {
+  "id": "h_cause2",
+  "title": "Greenhouse Effect",
+  "text": "Sunlight warms the Earth. The surface radiates heat back upwards. Greenhouse gases trap part of that heat, which leads to a warmer atmosphere. More heat then melts ice, so less sunlight is reflected.",
+  "ok": [
+   "CAUSE_EFFECT",
+   "PROCESS_CYCLIC",
+   "PROCESS_LINEAR"
+  ]
+ },
+ {
+  "id": "h_funnel",
+  "title": "Hiring Funnel",
+  "text": "1,200 candidates applied for the role. 300 passed the resume screen. 60 attended interviews. 12 received offers. 9 accepted.",
+  "ok": [
+   "FUNNEL",
+   "CHART_CATEGORICAL",
+   "STAT_TILES"
+  ]
+ },
+ {
+  "id": "h_matrix",
+  "title": "Impact versus Effort",
+  "text": "Ideas are placed on two axes: impact and effort. High impact and low effort ideas are quick wins. High impact and high effort ideas are major projects. Low impact and low effort ideas are fill-ins. Low impact and high effort ideas are avoided.",
+  "ok": [
+   "MATRIX_GRID"
+  ]
+ },
+ {
+  "id": "h_cards",
+  "title": "Three Types of Memory",
+  "text": "Human memory has three types. Sensory memory: holds impressions for a fraction of a second. Short-term memory: stores a handful of items for seconds. Long-term memory: keeps information for years.",
+  "ok": [
+   "LIST_STRUCTURED",
+   "KEY_POINTS"
+  ]
+ },
+ {
+  "id": "h_tips",
+  "title": "Public Speaking Tips",
+  "text": "Practice your talk out loud. Make eye contact with the audience. Slow down and pause often. Use simple slides. Finish with one clear takeaway.",
+  "ok": [
+   "CHECKLIST",
+   "KEY_POINTS",
+   "LIST_STRUCTURED"
+  ]
+ },
+ {
+  "id": "h_para1",
+  "title": "Why Bees Matter",
+  "text": "Bees pollinate about a third of the food we eat. Without them, many fruits and vegetables would become scarce and expensive. Bee populations are declining because of pesticides and habitat loss.",
+  "ok": [
+   "KEY_POINTS",
+   "CAUSE_EFFECT",
+   "STAT_TILES",
+   "LIST_STRUCTURED"
+  ]
+ },
+ {
+  "id": "h_para2",
+  "title": "Course Introduction",
+  "text": "Welcome to Introduction to Economics. This course covers supply and demand, market structures and basic macroeconomics. No prior knowledge is required.",
+  "ok": [
+   "KEY_POINTS",
+   "LIST_STRUCTURED"
+  ]
+ },
+ {
+  "id": "h_worked",
+  "title": "Quadratic Example",
+  "text": "Solve x squared minus 5x + 6 = 0. Factorise: (x - 2)(x - 3) = 0. So x - 2 = 0 or x - 3 = 0. Therefore x = 2 or x = 3.",
+  "ok": [
+   "WORKED_EXAMPLE"
+  ]
+ },
+ {
+  "id": "h_func",
+  "title": "Graph of a Parabola",
+  "text": "The quadratic function y = x^2 has a parabola as its graph. Its vertex is at the origin and it opens upward.",
+  "ok": [
+   "FUNCTION_PLOT",
+   "WORKED_EXAMPLE",
+   "FORMULA_CALLOUT"
+  ]
+ }
+]

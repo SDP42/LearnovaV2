@@ -282,7 +282,14 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         style_pattern = select_slide_layout(idx, layout_type, prev_style)
         prev_style = style_pattern
         title_text = html.escape(imp.get("title", orig.get("title", f"Slide {idx}")))
-        takeaway_text = html.escape(imp.get("takeaway", "").strip())
+        _tk_raw = (imp.get("takeaway", "") or "").strip()
+        _sp0 = deck_plan.by_index(idx - 1) if deck_plan is not None else None
+        if _sp0 is not None and "takeaway" in (getattr(_sp0, "params", None) or {}):
+            _tk_raw = str(_sp0.params["takeaway"] or "").strip()  # the visual's own synthesis wins
+        # A takeaway longer than a sentence or two just restates the slide body — drop it.
+        if len(_tk_raw) > 190 or (_tk_raw and _tk_raw.lower() in " ".join(str(b).lower() for b in (imp.get("bullets") or [])) and len(_tk_raw.split()) > 14):
+            _tk_raw = ""
+        takeaway_text = html.escape(_tk_raw)
 
         sp = deck_plan.by_index(idx - 1) if deck_plan is not None else None
         image_block = _image_html(orig, theme)
@@ -361,8 +368,10 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         ):
             _fam_block = _family_block(sp.family, sp.data, theme)
 
+        _family_used = False
         if _fam_block:
             slide_body = _fam_block
+            _family_used = True
 
         # ── 1. TABLE LAYOUT ──────────────────────────────────────────────────
         elif layout_type == "TABLE" and "table_headers" in imp:
@@ -455,6 +464,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             sp.family, sp.data, theme
         ):
             slide_body = _family_block(sp.family, sp.data, theme)
+            _family_used = True
 
         # ── 6. DEFAULT MINIMAL TEXT LAYOUT ───────────────────────────────────
         else:
@@ -493,6 +503,13 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         _text_layout = layout_type in {
             "MINIMAL_TEXT", "", "CARD_GRID", "FLOWCHART", "PROCESS_DIAGRAM"
         } and not _fam_block
+        _notes = (getattr(sp, "params", None) or {}).get("notes") if (sp and _family_used) else None
+        if _notes:
+            slide_body += (
+                f'<div class="lv-vnotes" style="margin-top:14px;padding:12px 16px;border-left:4px solid {theme.accent_hex};'
+                f'background:{theme.card_bg_hex};border-radius:8px;font-size:0.85rem;line-height:1.45;color:{theme.text_hex};">'
+                + "<br>".join(html.escape(str(n)) for n in _notes) + "</div>"
+            )
         if _text_layout and image_block:
             body_inner = f"""
             <div style="display:flex; gap:26px; align-items:flex-start;">

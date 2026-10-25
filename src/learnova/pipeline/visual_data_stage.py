@@ -20,6 +20,9 @@ MAX_LLM_EXTRACTIONS = 10
 _MIN_CONFIDENCE = 0.55
 
 
+_ENGINE_SURE = 0.7  # engine confidence above which no LLM call is made
+
+
 def fill_visual_data(deck: List[dict]) -> int:
     """Attach ``improved['visual_data']`` where an LLM extraction helped. Returns count."""
     try:
@@ -49,15 +52,17 @@ def fill_visual_data(deck: List[dict]) -> int:
             continue
 
         vd = select_visual(source, title)
+
+        # The deterministic Content Decision Engine handles almost every slide
+        # with no network call. Only when it is genuinely unsure do we spend an
+        # LLM request, and only for families whose payload an LLM can extract.
+        from learnova.visuals import decide
+
+        if decide(title, source, bullets, vms=vd).confidence >= _ENGINE_SURE:
+            continue
         if vd.family not in LLM_EXTRACTABLE or vd.confidence < _MIN_CONFIDENCE:
             continue
-
-        # Heuristic first — free.
-        try:
-            f = extract_features(source, title)
-            data = vd.data or build_family_data(vd.bullets or bullets, vd.family, f) or {}
-        except Exception:
-            data = vd.data or {}
+        data = {}
 
         if not data:
             if used_llm >= MAX_LLM_EXTRACTIONS:
@@ -76,6 +81,7 @@ def fill_visual_data(deck: List[dict]) -> int:
             "variant": vd.variant,
             "data": data,
             "confidence": round(vd.confidence, 3),
+            "source": "llm",
         }
         filled += 1
 

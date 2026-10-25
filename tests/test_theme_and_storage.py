@@ -86,8 +86,18 @@ class TestResolveTheme:
         assert theme.id == "swiss_corporate"
         assert theme.heading_font == "Montserrat"
 
-    def test_auto_detection_still_works(self):
-        assert resolve_theme("Cyber Security Basics", "auto").id == "midnight_cyber"
+    def test_auto_detection_picks_bright_themes_by_topic(self):
+        assert resolve_theme("Cell Biology Basics", "auto").id == "forest_calm"
+        assert resolve_theme("Quarterly Finance Report", "auto").id == "swiss_corporate"
+        assert resolve_theme("Totally Unrelated Words", "auto").id == "canva_bright"
+
+    def test_auto_detection_never_picks_a_dark_background(self):
+        for title in ("Cyber Security", "Ocean Systems", "Executive Strategy", "Glass Future", "plain"):
+            bg = resolve_theme(title, "auto").bg_rgb
+            assert (bg[0] + bg[1] + bg[2]) / 3 > 200, title
+
+    def test_dark_themes_remain_available_by_id(self):
+        assert resolve_theme("x", "midnight_cyber").id == "midnight_cyber"
 
 
 class TestThemeReachesArtifacts:

@@ -1,0 +1,385 @@
+[
+ {
+  "id": "process1",
+  "title": "Photosynthesis Process",
+  "text": "Photosynthesis happens in stages. First, chlorophyll absorbs sunlight in the thylakoid membranes. Next, water molecules are split to release oxygen and electrons. Then the energy is stored in ATP and NADPH. Finally, the Calvin cycle uses ATP and carbon dioxide to build glucose.",
+  "ok": [
+   "PROCESS_LINEAR",
+   "PROCESS_CYCLIC"
+  ],
+  "image": true
+ },
+ {
+  "id": "process2",
+  "title": "How a Bill Becomes Law",
+  "text": "A bill is introduced in the House. It is sent to a committee for review. The committee votes to release it. The full House debates and votes. Then the Senate repeats the process. Finally the President signs it into law.",
+  "ok": [
+   "PROCESS_LINEAR"
+  ],
+  "image": false
+ },
+ {
+  "id": "process3",
+  "title": "Software Release Steps",
+  "text": "Step 1: write the code. Step 2: run automated tests. Step 3: request a code review. Step 4: merge to main. Step 5: deploy to production.",
+  "ok": [
+   "PROCESS_LINEAR"
+  ],
+  "image": false
+ },
+ {
+  "id": "cycle1",
+  "title": "The Water Cycle",
+  "text": "Water evaporates from oceans and lakes. It condenses into clouds. Precipitation returns water to the surface as rain or snow. Runoff flows back to the oceans and the cycle repeats continuously.",
+  "ok": [
+   "PROCESS_CYCLIC"
+  ],
+  "image": true
+ },
+ {
+  "id": "cycle2",
+  "title": "PDCA Improvement Loop",
+  "text": "Plan the change, do it on a small scale, check the results, and act on what you learn. Then the loop repeats, forming a continuous improvement cycle.",
+  "ok": [
+   "PROCESS_CYCLIC"
+  ],
+  "image": false
+ },
+ {
+  "id": "timeline1",
+  "title": "History of Computing",
+  "text": "In 1936 Alan Turing described the universal machine. In 1945 ENIAC became the first general purpose electronic computer. In 1971 Intel released the first microprocessor. In 1991 the World Wide Web opened to the public. In 2007 the iPhone launched the smartphone era.",
+  "ok": [
+   "TIMELINE"
+  ],
+  "image": false
+ },
+ {
+  "id": "timeline2",
+  "title": "The French Revolution",
+  "text": "The Bastille was stormed in 1789. The monarchy was abolished in 1792. Louis XVI was executed in 1793. The Reign of Terror lasted from 1793 to 1794. Napoleon seized power in 1799.",
+  "ok": [
+   "TIMELINE"
+  ],
+  "image": false
+ },
+ {
+  "id": "compare1",
+  "title": "Supervised vs Unsupervised Learning",
+  "text": "Supervised learning uses labelled data, while unsupervised learning finds patterns in unlabelled data. Supervised models predict outputs such as prices or classes. Unsupervised models group similar items, for example customers. Supervised learning needs costly labels, whereas unsupervised learning needs none but is harder to evaluate.",
+  "ok": [
+   "COMPARE_TABLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "compare2",
+  "title": "SQL versus NoSQL",
+  "text": "SQL databases use fixed schemas and tables, whereas NoSQL databases store flexible documents. SQL scales vertically, NoSQL scales horizontally. SQL guarantees ACID transactions; NoSQL often favours availability.",
+  "ok": [
+   "COMPARE_TABLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "procon1",
+  "title": "Remote Work",
+  "text": "Remote work gives flexibility and removes commuting. It widens the hiring pool. However it can cause isolation. Collaboration is harder across time zones. The main disadvantage is blurred work-life boundaries.",
+  "ok": [
+   "COMPARE_VISUAL",
+   "COMPARE_TABLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "procon2",
+  "title": "Nuclear Energy",
+  "text": "Advantages: low carbon emissions and high energy density. Disadvantages: radioactive waste and high construction cost. A further drawback is the risk of rare accidents.",
+  "ok": [
+   "COMPARE_VISUAL",
+   "COMPARE_TABLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "matrix1",
+  "title": "Eisenhower Matrix",
+  "text": "Tasks are sorted on two axes: urgent and important. Urgent and important tasks are done now. Important but not urgent tasks are scheduled. Urgent but not important tasks are delegated. Neither urgent nor important tasks are eliminated.",
+  "ok": [
+   "MATRIX_GRID"
+  ],
+  "image": false
+ },
+ {
+  "id": "hier1",
+  "title": "Layers of the Earth",
+  "text": "The Earth has four main layers. The crust is the thin outer shell. Beneath it lies the mantle, which is the thickest layer. The outer core is liquid iron and nickel. The inner core is solid and extremely hot.",
+  "ok": [
+   "HIERARCHY_NEST",
+   "LAYERS"
+  ],
+  "image": true
+ },
+ {
+  "id": "hier2",
+  "title": "Maslow's Hierarchy of Needs",
+  "text": "Maslow arranged human needs in levels. Physiological needs form the base. Safety needs build on them. Then come love and belonging, esteem, and finally self-actualisation at the top.",
+  "ok": [
+   "HIERARCHY_NEST",
+   "LAYERS"
+  ],
+  "image": false
+ },
+ {
+  "id": "venn1",
+  "title": "Mammals and Birds",
+  "text": "Both mammals and birds are warm-blooded and have a four-chambered heart. Only mammals produce milk and have hair. Only birds lay hard-shelled eggs and have feathers.",
+  "ok": [
+   "SET_DIAGRAM"
+  ],
+  "image": false
+ },
+ {
+  "id": "mind1",
+  "title": "Components of a Computer",
+  "text": "A computer is made of several parts: the processor, the memory, the storage drive, the motherboard, the power supply, the graphics card and the cooling system.",
+  "ok": [
+   "MIND_MAP",
+   "LIST_STRUCTURED",
+   "KEY_POINTS"
+  ],
+  "image": false
+ },
+ {
+  "id": "cards1",
+  "title": "Pillars of Sustainability",
+  "text": "Sustainability rests on three pillars. Environmental: protecting ecosystems and resources. Social: ensuring fairness, health and community wellbeing. Economic: maintaining long-term prosperity.",
+  "ok": [
+   "LIST_STRUCTURED",
+   "KEY_POINTS"
+  ],
+  "image": false
+ },
+ {
+  "id": "list1",
+  "title": "Benefits of Exercise",
+  "text": "Regular exercise improves heart health. It strengthens muscles and bones. It boosts mood and reduces anxiety. It improves sleep quality. It helps maintain a healthy weight.",
+  "ok": [
+   "LIST_STRUCTURED",
+   "KEY_POINTS",
+   "CHECKLIST"
+  ],
+  "image": true
+ },
+ {
+  "id": "list2",
+  "title": "Study Tips",
+  "text": "Review notes within 24 hours. Teach the material to someone else. Use spaced repetition for facts. Practice with past questions. Sleep well before an exam.",
+  "ok": [
+   "LIST_STRUCTURED",
+   "KEY_POINTS",
+   "CHECKLIST"
+  ],
+  "image": false
+ },
+ {
+  "id": "chart1",
+  "title": "Market Share by Region",
+  "text": "Asia holds 38% of the market. Europe holds 27%. North America holds 22%. The rest of the world holds 13%.",
+  "ok": [
+   "CHART_PART_TO_WHOLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "chart2",
+  "title": "Quarterly Revenue",
+  "text": "Revenue was $2.1 million in Q1, $2.6 million in Q2, $3.4 million in Q3 and $4.2 million in Q4, showing steady growth over the year.",
+  "ok": [
+   "CHART_TREND",
+   "CHART_CATEGORICAL"
+  ],
+  "image": false
+ },
+ {
+  "id": "chart3",
+  "title": "Programming Language Popularity",
+  "text": "Python has 45 thousand developers in the survey, JavaScript has 52 thousand, Java has 31 thousand, Go has 12 thousand and Rust has 9 thousand.",
+  "ok": [
+   "CHART_CATEGORICAL",
+   "CHART_RANKING"
+  ],
+  "image": false
+ },
+ {
+  "id": "kpi1",
+  "title": "Market Results Q3",
+  "text": "Revenue grew 24% year over year to $4.2 million. Customer retention reached 93%. Churn fell from 7% to 4%. The company added 1,200 new customers, a 15% increase over Q2.",
+  "ok": [
+   "KPI",
+   "STAT_TILES",
+   "CHART_CATEGORICAL"
+  ],
+  "image": false
+ },
+ {
+  "id": "kpi2",
+  "title": "The Headline Number",
+  "text": "Global internet users reached 5.4 billion in 2024, which is 67% of the world population.",
+  "ok": [
+   "KPI",
+   "STAT_TILES"
+  ],
+  "image": false
+ },
+ {
+  "id": "def1",
+  "title": "Definition of Entropy",
+  "text": "Entropy is a measure of the disorder or randomness in a system. In information theory, entropy quantifies the average uncertainty of a random variable.",
+  "ok": [
+   "DEFINITION",
+   "FORMULA_CALLOUT"
+  ],
+  "image": true
+ },
+ {
+  "id": "def2",
+  "title": "What is Machine Learning",
+  "text": "Machine learning refers to algorithms that improve automatically through experience. It is known as a subfield of artificial intelligence.",
+  "ok": [
+   "DEFINITION"
+  ],
+  "image": true
+ },
+ {
+  "id": "def3",
+  "title": "Entropy Formula",
+  "text": "Entropy is a measure of the disorder in a system. The formula H = -sum p(x) log p(x) gives the entropy of a distribution.",
+  "ok": [
+   "DEFINITION",
+   "FORMULA_CALLOUT",
+   "WORKED_EXAMPLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "law1",
+  "title": "Newton's Second Law",
+  "text": "The acceleration of an object depends on the net force acting on it and its mass. Force equals mass times acceleration. A heavier object needs more force to accelerate at the same rate.",
+  "ok": [
+   "FORMULA_CALLOUT",
+   "QUOTE",
+   "DEFINITION",
+   "CAUSE_EFFECT"
+  ],
+  "image": false
+ },
+ {
+  "id": "quote1",
+  "title": "Pareto Principle",
+  "text": "The Pareto principle states that roughly 80% of effects come from 20% of causes.",
+  "ok": [
+   "QUOTE",
+   "KPI",
+   "STAT_TILES",
+   "FORMULA_CALLOUT"
+  ],
+  "image": false
+ },
+ {
+  "id": "cause1",
+  "title": "Causes of Inflation",
+  "text": "Excess money supply raises demand. Higher demand pushes prices up. Rising prices reduce purchasing power, which leads workers to demand higher wages, which in turn raises costs again.",
+  "ok": [
+   "CAUSE_EFFECT",
+   "PROCESS_LINEAR",
+   "PROCESS_CYCLIC"
+  ],
+  "image": false
+ },
+ {
+  "id": "cause2",
+  "title": "Why Ice Melts",
+  "text": "Heat energy is absorbed by the ice. The molecules vibrate faster. As a result the bonds between molecules break and the ice turns into water.",
+  "ok": [
+   "CAUSE_EFFECT",
+   "PROCESS_LINEAR"
+  ],
+  "image": false
+ },
+ {
+  "id": "funnel1",
+  "title": "Sales Funnel",
+  "text": "10,000 visitors arrive at the website. 2,000 sign up for a trial. 400 become paying customers. 120 upgrade to the premium plan.",
+  "ok": [
+   "FUNNEL",
+   "CHART_CATEGORICAL",
+   "STAT_TILES"
+  ],
+  "image": false
+ },
+ {
+  "id": "worked1",
+  "title": "Solving a Linear Equation",
+  "text": "Solve 2x + 6 = 14. Subtract 6 from both sides: 2x = 8. Divide both sides by 2: x = 4. Check: 2(4) + 6 = 14.",
+  "ok": [
+   "WORKED_EXAMPLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "func1",
+  "title": "Plotting a Line",
+  "text": "The linear function y = 2x + 1 has slope 2 and intercept 1. For each increase of 1 in x, y increases by 2.",
+  "ok": [
+   "FUNCTION_PLOT",
+   "WORKED_EXAMPLE"
+  ],
+  "image": false
+ },
+ {
+  "id": "algo1",
+  "title": "Bubble Sort",
+  "text": "Given the array [5, 3, 8, 1], bubble sort compares adjacent elements and swaps them if they are out of order, repeating until sorted.",
+  "ok": [
+   "ALGORITHM_TRACE",
+   "DATA_STRUCTURE"
+  ],
+  "image": false
+ },
+ {
+  "id": "geo1",
+  "title": "Pythagorean Theorem",
+  "text": "In a right triangle with sides a, b and hypotenuse c, the theorem states a squared plus b squared equals c squared. The hypotenuse is the longest side.",
+  "ok": [
+   "GEOMETRY",
+   "FORMULA_CALLOUT",
+   "DEFINITION"
+  ],
+  "image": false
+ },
+ {
+  "id": "para1",
+  "title": "Importance of Sleep",
+  "text": "Sleep is essential for memory consolidation and learning. During deep sleep the brain clears metabolic waste. Chronic sleep loss is linked to weaker immunity and poorer concentration, so adults are advised to sleep seven to nine hours.",
+  "ok": [
+   "KEY_POINTS",
+   "CAUSE_EFFECT",
+   "LIST_STRUCTURED",
+   "CHECKLIST",
+   "STAT_TILES"
+  ],
+  "image": true
+ },
+ {
+  "id": "para2",
+  "title": "Project Overview",
+  "text": "This project builds a mobile app for tracking personal expenses. It targets students who manage tight budgets. The team will deliver a prototype in three months using agile methods.",
+  "ok": [
+   "KEY_POINTS",
+   "LIST_STRUCTURED",
+   "TIMELINE"
+  ],
+  "image": true
+ }
+]

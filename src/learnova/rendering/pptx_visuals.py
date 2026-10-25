@@ -1,0 +1,564 @@
+"""
+Native PowerPoint drawing for every visual family the Content Decision Engine can
+choose. Shapes, tables and real chart objects — editable in PowerPoint, no
+screenshots — so the .pptx matches the web deck instead of falling back to bullets.
+
+``draw_family`` returns True if it drew something. Any family without a bespoke
+drawing is rendered as a card grid built from its text, so a visual slide never
+degrades to a plain bullet list.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Any, Dict, List, Sequence, Tuple
+
+from pptx.chart.data import CategoryChartData
+from pptx.dml.color import RGBColor
+from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.util import Emu, Inches, Pt
+
+from learnova.logging_config import logger
+
+
+def _blend(rgb: RGBColor, t: float) -> RGBColor:
+    """Mix ``rgb`` toward white by ``t`` (0 = rgb, 1 = white)."""
+    r, g, b = rgb[0], rgb[1], rgb[2]
+    return RGBColor(int(r + (255 - r) * t), int(g + (255 - g) * t), int(b + (255 - b) * t))
+
+
+def _on(rgb: RGBColor) -> RGBColor:
+    lum = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+    return RGBColor(0x10, 0x14, 0x24) if lum > 150 else RGBColor(0xFF, 0xFF, 0xFF)
+
+
+class _Canvas:
+    def __init__(self, slide, theme, band, reserve: float = 0.0):
+        self.s, self.t = slide, theme
+        self.x = band.left + 0.3
+        self.y = band.top + 0.1
+        self.w = band.width - 0.6
+        self.h = band.height - 0.2 - reserve
+        self.tint = _blend(theme.primary_rgb, 0.9)
+        # type scale: body text grows to fill roomy slides, shrinks when a quiz/takeaway squeezes the band
+        self.k = max(0.62, min(1.28, self.h / 4.2))
+
+    # -- primitives -----------------------------------------------------------
+    def shape(self, kind, x, y, w, h, fill=None, line=None, line_w=0.75, radius=0.12):
+        shp = self.s.shapes.add_shape(kind, Inches(x), Inches(y), Inches(max(0.05, w)), Inches(max(0.05, h)))
+        if kind == MSO_SHAPE.ROUNDED_RECTANGLE:
+            try:
+                shp.adjustments[0] = radius
+            except Exception:
+                pass
+        if fill is None:
+            shp.fill.background()
+        else:
+            shp.fill.solid()
+            shp.fill.fore_color.rgb = fill
+        if line is None:
+            shp.line.fill.background()
+        else:
+            shp.line.color.rgb = line
+            shp.line.width = Pt(line_w)
+        shp.shadow.inherit = False
+        return shp
+
+    def card(self, x, y, w, h, fill=None, line=None, radius=0.1):
+        return self.shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h, fill or self.t.card_bg_rgb,
+                          line or _blend(self.t.primary_rgb, 0.7), radius=radius)
+
+    def text(self, x, y, w, h, runs: Sequence[Tuple[str, float, bool, RGBColor]], align=PP_ALIGN.LEFT,
+             anchor=MSO_ANCHOR.TOP, shape=None):
+        shp = shape or self.s.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
+        tf = shp.text_frame
+        tf.word_wrap = True
+        tf.vertical_anchor = anchor
+        tf.margin_left = tf.margin_right = Inches(0.08)
+        tf.margin_top = tf.margin_bottom = Inches(0.04)
+        first = True
+        for txt, size, bold, color in runs:
+            p = tf.paragraphs[0] if first else tf.add_paragraph()
+            first = False
+            p.alignment = align
+            r = p.add_run()
+            r.text = str(txt)
+            r.font.size = Pt(max(8, round(size * self.k, 1)))
+            r.font.bold = bold
+            r.font.color.rgb = color
+        return shp
+
+    def badge(self, x, y, n, d=0.42, fill=None):
+        fill = fill or self.t.primary_rgb
+        shp = self.shape(MSO_SHAPE.OVAL, x, y, d, d, fill)
+        self.text(0, 0, 0, 0, [(str(n), 13, True, _on(fill))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=shp)
+        return shp
+
+
+def _readable_accent(theme) -> RGBColor:
+    """Accent colour for text on a white card — falls back to the primary when the accent is too pale."""
+    a = theme.accent_rgb
+    lum = 0.299 * a[0] + 0.587 * a[1] + 0.114 * a[2]
+    return theme.primary_rgb if lum > 150 else a
+
+
+def _pt(n_chars: int, base: float, lo: float, scale: float = 1.0) -> float:
+    return max(lo, min(base, base - (n_chars - 60) / 30.0)) * scale
+
+
+def _flatten(data: Any, out: List[str]) -> None:
+    if isinstance(data, str):
+        if data.strip() and len(data) > 2:
+            out.append(data.strip())
+    elif isinstance(data, dict):
+        for v in data.values():
+            _flatten(v, out)
+    elif isinstance(data, (list, tuple)):
+        for v in data:
+            _flatten(v, out)
+
+
+def _grid(c: _Canvas, items: List[Tuple[str, str]], numbered: bool = True, cols: int = 0) -> None:
+    n = len(items)
+    cols = cols or (2 if n in (2, 4) else 3)
+    rows = math.ceil(n / cols)
+    gap = 0.22
+    cw = (c.w - gap * (cols - 1)) / cols
+    ch = min(2.6, (c.h - gap * (rows - 1)) / rows)
+    top = c.y + (c.h - (ch * rows + gap * (rows - 1))) / 2
+    for i, (head, body) in enumerate(items):
+        r, k = divmod(i, cols)
+        x, y = c.x + k * (cw + gap), top + r * (ch + gap)
+        c.card(x, y, cw, ch)
+        off = 0.0
+        if numbered:
+            c.badge(x + 0.18, y + 0.18, i + 1)
+            off = 0.55
+        runs = [(head, 16 if body else 18, True, c.t.primary_rgb)]
+        if body and body.strip().lower() != head.strip().lower():
+            runs.append((body, _pt(len(body), 13, 10), False, c.t.text_rgb))
+        c.text(x + 0.12, y + 0.12 + off, cw - 0.24, ch - 0.24 - off, runs, anchor=MSO_ANCHOR.TOP if numbered else MSO_ANCHOR.MIDDLE)
+
+
+# ── family drawers ────────────────────────────────────────────────────────────
+def _process(c: _Canvas, data, cyclic: bool) -> bool:
+    raw = data.get("stages") or data.get("steps") or []
+    items = []
+    for st in raw[:8]:
+        if isinstance(st, dict):
+            items.append((str(st.get("label", "")), str(st.get("detail", ""))))
+        else:
+            items.append((str(st), ""))
+    if len(items) < 2:
+        return False
+    n = len(items)
+    per = n if n <= 4 else math.ceil(n / 2)
+    rows = math.ceil(n / per)
+    gap = 0.42
+    cw = (c.w - gap * (per - 1)) / per
+    ch = min(2.8, (c.h - 0.5 - 0.3 * (rows - 1)) / rows)
+    top = c.y + (c.h - 0.45 - (ch * rows + 0.3 * (rows - 1))) / 2
+    for i, (lab, det) in enumerate(items):
+        r, k = divmod(i, per)
+        x, y = c.x + k * (cw + gap), top + r * (ch + 0.3)
+        c.card(x, y, cw, ch)
+        c.badge(x + 0.15, y + 0.15, i + 1)
+        runs = [(lab, 15, True, c.t.primary_rgb)]
+        if det and det.strip().lower() != lab.strip().lower():
+            runs.append((det, _pt(len(det), 12, 9.5), False, c.t.text_rgb))
+        c.text(x + 0.1, y + 0.65, cw - 0.2, ch - 0.75, runs)
+        if k < per - 1 and i < n - 1:
+            c.shape(MSO_SHAPE.RIGHT_ARROW, x + cw + 0.05, y + ch / 2 - 0.15, gap - 0.1, 0.3, c.t.accent_rgb)
+    if cyclic:
+        c.text(c.x, c.y + c.h - 0.42, c.w, 0.4, [("↻  and the cycle repeats", 13, True, c.t.primary_rgb)], PP_ALIGN.CENTER)
+    return True
+
+
+def _worked(c: _Canvas, data) -> bool:
+    rows = data.get("rows") or [{"step": s, "reason": ""} for s in (data.get("steps") or [])]
+    rows = [r for r in rows if str(r.get("step", "")).strip()][:8]
+    if len(rows) < 2:
+        return False
+    rh = min(0.85, c.h / len(rows))
+    for i, r in enumerate(rows):
+        y = c.y + i * rh
+        c.badge(c.x, y + 0.05, i + 1, d=min(0.4, rh - 0.12))
+        runs = [(r["step"], 14, True, c.t.primary_rgb)]
+        if str(r.get("reason", "")).strip():
+            runs.append((r["reason"], 11, False, c.t.text_rgb))
+        c.text(c.x + 0.6, y, c.w - 0.6, rh - 0.05, runs, anchor=MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def _timeline(c: _Canvas, data) -> bool:
+    ev = [e for e in (data.get("events") or []) if e.get("title")][:7]
+    if len(ev) < 3:
+        return False
+    n = len(ev)
+    cy = c.y + c.h / 2
+    c.shape(MSO_SHAPE.RECTANGLE, c.x, cy - 0.025, c.w, 0.05, _blend(c.t.primary_rgb, 0.4))
+    step = c.w / n
+    cw, ch = min(step * 1.7, 2.7), min(1.9, (c.h - 0.9) / 2)
+    for i, e in enumerate(ev):
+        cx = c.x + step * (i + 0.5)
+        c.shape(MSO_SHAPE.OVAL, cx - 0.11, cy - 0.11, 0.22, 0.22, c.t.accent_rgb, c.t.primary_rgb, 2)
+        up = i % 2 == 0
+        y = cy - 0.3 - ch if up else cy + 0.3
+        x = min(max(c.x, cx - cw / 2), c.x + c.w - cw)
+        c.card(x, y, cw, ch)
+        c.text(x, y, cw, ch, [(e.get("date", ""), 20, True, c.t.primary_rgb),
+                              (e.get("title", ""), _pt(len(str(e.get("title", ""))), 14, 10.5), False, c.t.text_rgb)],
+               PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def _compare_table(c: _Canvas, data) -> bool:
+    heads, rows = data.get("headers") or [], data.get("rows") or []
+    if len(heads) < 2 or len(rows) < 2:
+        return False
+    rows = rows[:7]
+    gf = c.s.shapes.add_table(len(rows) + 1, len(heads), Inches(c.x), Inches(c.y + 0.2), Inches(c.w),
+                              Inches(min(c.h - 0.4, 0.95 * (len(rows) + 1))))
+    tbl = gf.table
+    for j, h in enumerate(heads):
+        cell = tbl.cell(0, j)
+        cell.fill.solid(); cell.fill.fore_color.rgb = c.t.primary_rgb
+        cell.text = str(h)
+        for p in cell.text_frame.paragraphs:
+            for r in p.runs:
+                r.font.size = Pt(20); r.font.bold = True; r.font.color.rgb = _on(c.t.primary_rgb)
+    for i, row in enumerate(rows, start=1):
+        for j in range(len(heads)):
+            cell = tbl.cell(i, j)
+            cell.fill.solid(); cell.fill.fore_color.rgb = c.t.card_bg_rgb if i % 2 else _blend(c.t.primary_rgb, 0.92)
+            cell.text = str((list(row) + [""] * len(heads))[j])
+            for p in cell.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(16); r.font.color.rgb = c.t.text_rgb
+    return True
+
+
+def _pros_cons(c: _Canvas, data) -> bool:
+    pros, cons = [str(x) for x in data.get("pros") or []][:5], [str(x) for x in data.get("cons") or []][:5]
+    if not (pros and cons):
+        return False
+    cw = c.w / 2 - 0.15
+    for k, (title, items, col) in enumerate((("Advantages", pros, RGBColor(0x1A, 0x7F, 0x4B)), ("Trade-offs", cons, RGBColor(0xB2, 0x3B, 0x3B)))):
+        x = c.x + k * (cw + 0.3)
+        c.card(x, c.y + 0.1, cw, c.h - 0.2, line=col)
+        c.text(x + 0.1, c.y + 0.18, cw - 0.2, 0.5, [(title.upper(), 15, True, col)])
+        c.text(x + 0.1, c.y + 0.75, cw - 0.2, c.h - 1.0, [("•  " + t, 13, False, c.t.text_rgb) for t in items])
+    return True
+
+
+def _matrix(c: _Canvas, data) -> bool:
+    q = (data.get("quadrants") or data.get("cells") or [])[:4]
+    if len(q) < 3:
+        return False
+    gap = 0.2
+    cw, ch = (c.w - gap) / 2, (c.h - gap) / 2
+    for i, qd in enumerate(q):
+        r, k = divmod(i, 2)
+        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
+        c.card(x, y, cw, ch, fill=_blend(c.t.primary_rgb, 0.88 - 0.05 * i))
+        items = [str(t) for t in (qd.get("items") or [])]
+        c.text(x + 0.1, y + 0.1, cw - 0.2, ch - 0.2, [(qd.get("title", ""), 15, True, c.t.primary_rgb)] + [(t, 12, False, c.t.text_rgb) for t in items[:3]],
+               anchor=MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def _layers(c: _Canvas, data) -> bool:
+    lv = (data.get("levels") or [])[:6]
+    if len(lv) < 3:
+        return False
+    n = len(lv)
+    rh = min(1.0, c.h / n - 0.1)
+    for i, it in enumerate(lv):
+        label, detail = (it.get("label", ""), it.get("detail", "")) if isinstance(it, dict) else (str(it), "")
+        frac = 1.0 - i * (0.28 / max(1, n - 1))
+        w = c.w * frac
+        fill = _blend(c.t.primary_rgb, 0.78 - 0.78 * (i / max(1, n - 1)))
+        y = c.y + (c.h - (rh + 0.1) * n) / 2 + i * (rh + 0.1)
+        shp = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x + (c.w - w) / 2, y, w, rh, fill)
+        fg = _on(fill)
+        runs = [(label, 15, True, fg)]
+        if detail and detail.strip().lower() != label.strip().lower():
+            runs.append((detail, 11, False, fg))
+        c.text(0, 0, 0, 0, runs, PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=shp)
+    return True
+
+
+def _venn(c: _Canvas, data) -> bool:
+    items = [str(x) for x in data.get("items") or []][:8]
+    if len(items) < 3:
+        return False
+    d = min(c.h * 0.85, c.w * 0.38)
+    top = c.y + (c.h - d) / 2
+    c.shape(MSO_SHAPE.OVAL, c.x, top, d, d, _blend(c.t.primary_rgb, 0.7), c.t.primary_rgb, 1.5)
+    c.shape(MSO_SHAPE.OVAL, c.x + d * 0.6, top, d, d, _blend(c.t.accent_rgb, 0.7), c.t.accent_rgb, 1.5)
+    c.text(c.x + d * 1.75, c.y, c.w - d * 1.75, c.h, [("•  " + t, 13, False, c.t.text_rgb) for t in items], anchor=MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def _stat_tiles(c: _Canvas, data) -> bool:
+    tiles = (data.get("tiles") or [])[:4]
+    if not tiles:
+        return False
+    n = len(tiles)
+    gap = 0.25
+    cw = (c.w - gap * (n - 1)) / n
+    ch = min(3.4, c.h - 0.3)
+    top = c.y + (c.h - ch) / 2
+    for i, t in enumerate(tiles):
+        x = c.x + i * (cw + gap)
+        c.card(x, top, cw, ch)
+        val = str(t.get("value", ""))
+        c.text(x, top + 0.2, cw, ch - 0.3, [(val, 48 if len(val) < 8 else 34, True, c.t.primary_rgb),
+                                           (str(t.get("label", "")).upper(), 14, True, _readable_accent(c.t)),
+                                           (str(t.get("detail", "")), 13, False, c.t.text_rgb)], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def _cause_effect(c: _Canvas, data) -> bool:
+    nodes = (data.get("nodes") or [])[:6]
+    if len(nodes) < 3:
+        return False
+    n = len(nodes)
+    arrow_h = 0.22
+    nh = (c.h - arrow_h * (n - 1) - (0.35 if data.get("loop") else 0)) / n
+    for i, nd in enumerate(nodes):
+        y = c.y + i * (nh + arrow_h)
+        c.card(c.x, y, c.w, nh)
+        c.badge(c.x + 0.15, y + nh / 2 - 0.21, i + 1)
+        runs = [(nd.get("label", ""), 14, True, c.t.primary_rgb)]
+        det = str(nd.get("detail", ""))
+        if det and det.strip().lower() != str(nd.get("label", "")).strip().lower():
+            runs.append((det, 11, False, c.t.text_rgb))
+        c.text(c.x + 0.7, y, c.w - 0.8, nh, runs, anchor=MSO_ANCHOR.MIDDLE)
+        if i < n - 1:
+            c.shape(MSO_SHAPE.DOWN_ARROW, c.x + c.w / 2 - 0.12, y + nh, 0.24, arrow_h, c.t.accent_rgb)
+    if data.get("loop"):
+        c.text(c.x, c.y + c.h - 0.34, c.w, 0.32, [("↺  and the effect feeds back into the cause", 12, True, c.t.accent_rgb)], PP_ALIGN.CENTER)
+    return True
+
+
+def _formula(c: _Canvas, data) -> bool:
+    f = str(data.get("formula", "")).strip()
+    if not f:
+        return False
+    notes = [str(x) for x in data.get("notes") or []][:3]
+    oy = max(0.0, (c.h - 4.1 * c.k) / 2)
+    c.text(c.x, c.y + oy, c.w, 0.45, [(str(data.get("term", "")).upper(), 14, True, c.t.accent_rgb)])
+    c.text(c.x, c.y + oy + 0.45, c.w, 1.0, [(str(data.get("statement", "")), 20, False, c.t.text_rgb)])
+    box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y + oy + 1.55 * c.k, c.w, 1.6 * c.k, c.t.primary_rgb)
+    c.text(0, 0, 0, 0, [(f, 38, True, _on(c.t.primary_rgb))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=box)
+    if notes:
+        c.text(c.x, c.y + oy + 3.3 * c.k, c.w, max(0.6, c.h - oy - 3.3 * c.k), [("•  " + t, 15, False, c.t.text_rgb) for t in notes])
+    return True
+
+
+def _definition(c: _Canvas, data) -> bool:
+    term, meaning = str(data.get("term", "")), str(data.get("definition", ""))
+    if not (term and meaning):
+        return False
+    notes = [str(x) for x in data.get("notes") or []][:4]
+    oy = max(0.0, (c.h - 4.0 * c.k) / 2)
+    box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y + oy, c.w, 2.4 * c.k, _blend(c.t.primary_rgb, 0.9), c.t.primary_rgb, 1.5)
+    c.text(0, 0, 0, 0, [(term, 32, True, c.t.primary_rgb), (meaning, 20, False, c.t.text_rgb)], PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=box)
+    if notes:
+        c.text(c.x, c.y + oy + 2.6 * c.k, c.w, max(0.6, c.h - oy - 2.6 * c.k), [("•  " + t, 16, False, c.t.text_rgb) for t in notes])
+    return True
+
+
+def _quote(c: _Canvas, data) -> bool:
+    t = str(data.get("text", ""))
+    if not t:
+        return False
+    box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y + 0.4, c.w, c.h - 0.8, _blend(c.t.primary_rgb, 0.9))
+    runs = [("“" + t + "”", 26, True, c.t.primary_rgb)]
+    if data.get("attribution"):
+        runs.append(("— " + str(data["attribution"]), 14, False, c.t.text_rgb))
+    c.text(0, 0, 0, 0, runs, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=box)
+    return True
+
+
+def _funnel(c: _Canvas, data) -> bool:
+    st = (data.get("stages") or [])[:6]
+    if len(st) < 3:
+        return False
+    n = len(st)
+    rh = min(0.95, c.h / n - 0.1)
+    for i, s_ in enumerate(st):
+        w = c.w * (1.0 - i * (0.58 / max(1, n - 1)))
+        fill = _blend(c.t.primary_rgb, 0.05 + 0.5 * i / max(1, n - 1))
+        y = c.y + (c.h - (rh + 0.1) * n) / 2 + i * (rh + 0.1)
+        shp = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x + (c.w - w) / 2, y, w, rh, fill)
+        c.text(0, 0, 0, 0, [(f"{s_.get('value', '')}   {s_.get('label', '')}", 15, True, _on(fill))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=shp)
+    return True
+
+
+def _chart(c: _Canvas, data, kind: str) -> bool:
+    pts = []
+    for p in data.get("points") or data.get("series") or data.get("items") or []:
+        try:
+            pts.append((str(p.get("label") or p.get("x") or ""), float(p.get("value") if p.get("value") is not None else p.get("y"))))
+        except (AttributeError, TypeError, ValueError):
+            continue
+    pts = pts[:10]
+    if len(pts) < 2:
+        return False
+    cd = CategoryChartData()
+    cd.categories = [l for l, _ in pts]
+    cd.add_series("Value", [v for _, v in pts])
+    ctype = {"pie": XL_CHART_TYPE.PIE, "line": XL_CHART_TYPE.LINE_MARKERS, "bar": XL_CHART_TYPE.BAR_CLUSTERED}[kind]
+    gf = c.s.shapes.add_chart(ctype, Inches(c.x), Inches(c.y), Inches(c.w), Inches(c.h), cd)
+    ch = gf.chart
+    ch.has_legend = kind == "pie"
+    if kind == "pie":
+        ch.legend.position = XL_LEGEND_POSITION.RIGHT
+        ch.legend.include_in_layout = False
+    plot = ch.plots[0]
+    plot.has_data_labels = True
+    plot.data_labels.font.size = Pt(12)
+    if kind == "pie":
+        for i in range(len(pts)):
+            pt = plot.series[0].points[i]
+            pt.format.fill.solid()
+            pt.format.fill.fore_color.rgb = _blend(c.t.primary_rgb, 0.0 if i == 0 else min(0.75, 0.18 * i))
+    else:
+        ser = plot.series[0]
+        if kind == "bar":
+            ser.format.fill.solid()
+            ser.format.fill.fore_color.rgb = c.t.primary_rgb
+        else:
+            ser.format.line.color.rgb = c.t.primary_rgb
+            ser.format.line.width = Pt(3)
+        ch.category_axis.tick_labels.font.size = Pt(12)
+        ch.value_axis.tick_labels.font.size = Pt(11)
+        ch.value_axis.has_major_gridlines = False
+    return True
+
+
+def _function_plot(c: _Canvas, data) -> bool:
+    from learnova.rendering.family_blocks import _eval_expr
+
+    expr = str(data.get("expr", "")).strip()
+    a, b = (data.get("domain") or [-5, 5])[:2]
+    xs = [a + (b - a) * i / 80 for i in range(81)]
+    ys = [(x, _eval_expr(expr, x)) for x in xs]
+    pts = [(x, y) for x, y in ys if y is not None and abs(y) < 1e6]
+    if len(pts) < 6:
+        return False
+    ymin, ymax = min(y for _, y in pts), max(y for _, y in pts)
+    if ymax == ymin:
+        ymax += 1
+    px, py, pw, ph = c.x + 0.4, c.y + 0.3, c.w - 0.8, c.h - 0.9
+    c.shape(MSO_SHAPE.RECTANGLE, px, py, pw, ph, _blend(c.t.primary_rgb, 0.95), _blend(c.t.primary_rgb, 0.6))
+    if ymin < 0 < ymax:
+        yy = py + ph * (1 - (0 - ymin) / (ymax - ymin))
+        c.shape(MSO_SHAPE.RECTANGLE, px, yy - 0.01, pw, 0.02, c.t.text_rgb)
+    if a < 0 < b:
+        xx = px + pw * (0 - a) / (b - a)
+        c.shape(MSO_SHAPE.RECTANGLE, xx - 0.01, py, 0.02, ph, c.t.text_rgb)
+    coords = [(Inches(px + pw * (x - a) / (b - a)), Inches(py + ph * (1 - (y - ymin) / (ymax - ymin)))) for x, y in pts]
+    fb = c.s.shapes.build_freeform(Emu(int(coords[0][0])), Emu(int(coords[0][1])), scale=1.0)
+    fb.add_line_segments([(Emu(int(x)), Emu(int(y))) for x, y in coords[1:]], close=False)
+    curve = fb.convert_to_shape()
+    curve.fill.background()
+    curve.line.color.rgb = c.t.primary_rgb
+    curve.line.width = Pt(3.5)
+    c.text(px, py + ph + 0.05, pw, 0.4, [(f"y = {expr}", 14, True, c.t.primary_rgb)], PP_ALIGN.CENTER)
+    return True
+
+
+def _mind_map(c: _Canvas, data) -> bool:
+    center = str(data.get("center") or data.get("central") or "")
+    br = [str(b) for b in (data.get("branches") or data.get("items") or []) if str(b).strip()][:8]
+    if not center or len(br) < 3:
+        return False
+    cx, cy = c.x + c.w / 2, c.y + c.h / 2
+    hub = c.shape(MSO_SHAPE.OVAL, cx - 1.1, cy - 0.6, 2.2, 1.2, c.t.primary_rgb)
+    c.text(0, 0, 0, 0, [(center, 15, True, _on(c.t.primary_rgb))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=hub)
+    rx, ry = c.w / 2 - 1.3, c.h / 2 - 0.55
+    for i, b in enumerate(br):
+        ang = 2 * math.pi * i / len(br) - math.pi / 2
+        x, y = cx + rx * math.cos(ang), cy + ry * math.sin(ang)
+        c.card(x - 1.2, y - 0.4, 2.4, 0.8)
+        c.text(x - 1.2, y - 0.4, 2.4, 0.8, [(b, 12, False, c.t.text_rgb)], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def draw_family(slide, sp, theme, band) -> bool:
+    family = getattr(sp, "family", "") or ""
+    data = getattr(sp, "data", {}) or {}
+    if not data:
+        return False
+    notes = [str(n) for n in ((getattr(sp, "params", None) or {}).get("notes") or []) if str(n).strip()]
+    c = _Canvas(slide, theme, band, reserve=0.75 if notes else 0.0)
+    try:
+        if family in {"PROCESS_LINEAR", "PROCESS_CYCLIC"}:
+            ok = _process(c, data, family == "PROCESS_CYCLIC")
+        elif family == "WORKED_EXAMPLE":
+            ok = _worked(c, data)
+        elif family == "TIMELINE":
+            ok = _timeline(c, data)
+        elif family == "COMPARE_TABLE":
+            ok = _compare_table(c, data)
+        elif family == "COMPARE_VISUAL":
+            ok = _pros_cons(c, data)
+        elif family == "MATRIX_GRID":
+            ok = _matrix(c, data)
+        elif family in {"LAYERS", "HIERARCHY_NEST"}:
+            ok = _layers(c, {"levels": [{"label": x} if isinstance(x, str) else x for x in data.get("levels", [])]})
+        elif family == "SET_DIAGRAM":
+            ok = _venn(c, data)
+        elif family == "STAT_TILES":
+            ok = _stat_tiles(c, data)
+        elif family == "CAUSE_EFFECT":
+            ok = _cause_effect(c, data)
+        elif family == "FORMULA_CALLOUT":
+            ok = _formula(c, data)
+        elif family == "DEFINITION":
+            ok = _definition(c, data)
+        elif family == "QUOTE":
+            ok = _quote(c, data)
+        elif family == "FUNNEL":
+            ok = _funnel(c, data)
+        elif family in {"CHART_CATEGORICAL", "CHART_RANKING"}:
+            ok = _chart(c, data, "bar")
+        elif family == "CHART_TREND":
+            ok = _chart(c, data, "line")
+        elif family == "CHART_PART_TO_WHOLE":
+            ok = _chart(c, data, "pie")
+        elif family in {"FUNCTION_PLOT", "CALCULUS_VIZ"}:
+            ok = _function_plot(c, data)
+        elif family == "MIND_MAP":
+            ok = _mind_map(c, data)
+        elif family in {"KEY_POINTS", "LIST_STRUCTURED"}:
+            cards = [(str(x.get("heading", "")), str(x.get("body", ""))) for x in (data.get("cards") or [])[:6] if isinstance(x, dict)]
+            ok = len(cards) >= 2
+            if ok:
+                _grid(c, cards)
+        elif family == "CHECKLIST":
+            items = [(str(x.get("text", x)) if isinstance(x, dict) else str(x), "") for x in (data.get("items") or [])[:8]]
+            ok = len(items) >= 2
+            if ok:
+                _grid(c, [("✓  " + t, "") for t, _ in items], numbered=False, cols=2 if len(items) > 5 else 1)
+        else:
+            ok = False
+        if not ok:  # any other family: a card grid from its text — still a visual, never bullets
+            flat: List[str] = []
+            _flatten(data, flat)
+            flat = flat[:6]
+            if len(flat) < 2:
+                return False
+            _grid(c, [(t[:60], t if len(t) > 60 else "") for t in flat])
+        if notes:
+            box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, band.top + band.height - 0.85, c.w, 0.7, _blend(theme.accent_rgb, 0.85), None)
+            c.text(0, 0, 0, 0, [(" ".join(notes)[:420], 12.5, False, theme.text_rgb)], PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=box)
+        return True
+    except Exception as exc:  # best-effort: never break deck export
+        logger.warning("pptx visual %s failed: %s", family, exc)
+        return False
