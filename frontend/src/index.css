@@ -19,42 +19,42 @@
 :root {
   --radius: 0.65rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.21 0.03 264);
+  --background: oklch(0.985 0.008 250);
+  --foreground: oklch(0.27 0.06 262);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.21 0.03 264);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.21 0.03 264);
 
-  --primary: oklch(0.55 0.21 273);          /* indigo 600-ish */
-  --primary-foreground: oklch(0.98 0.01 273);
+  --primary: oklch(0.55 0.22 262);          /* indigo 600-ish */
+  --primary-foreground: oklch(0.99 0.005 250);
   --secondary: oklch(0.968 0.007 264);
   --secondary-foreground: oklch(0.28 0.03 264);
   --muted: oklch(0.968 0.007 264);
   --muted-foreground: oklch(0.55 0.02 264);
-  --accent: oklch(0.95 0.03 273);
-  --accent-foreground: oklch(0.3 0.08 273);
+  --accent: oklch(0.95 0.03 250);
+  --accent-foreground: oklch(0.35 0.1 262);
   --destructive: oklch(0.58 0.24 27);
   --destructive-foreground: oklch(0.98 0.01 27);
 
   --border: oklch(0.92 0.006 264);
   --input: oklch(0.92 0.006 264);
-  --ring: oklch(0.55 0.21 273);
+  --ring: oklch(0.55 0.22 262);
 
-  --chart-1: oklch(0.55 0.21 273);
-  --chart-2: oklch(0.62 0.17 198);
+  --chart-1: oklch(0.55 0.22 262);
+  --chart-2: oklch(0.65 0.12 190);
   --chart-3: oklch(0.7 0.15 162);
   --chart-4: oklch(0.75 0.16 85);
   --chart-5: oklch(0.65 0.2 15);
 
   --sidebar: oklch(0.985 0.002 264);
   --sidebar-foreground: oklch(0.21 0.03 264);
-  --sidebar-primary: oklch(0.55 0.21 273);
-  --sidebar-primary-foreground: oklch(0.98 0.01 273);
-  --sidebar-accent: oklch(0.95 0.02 273);
-  --sidebar-accent-foreground: oklch(0.3 0.08 273);
+  --sidebar-primary: oklch(0.55 0.22 262);
+  --sidebar-primary-foreground: oklch(0.99 0.005 250);
+  --sidebar-accent: oklch(0.95 0.03 250);
+  --sidebar-accent-foreground: oklch(0.35 0.1 262);
   --sidebar-border: oklch(0.92 0.006 264);
-  --sidebar-ring: oklch(0.55 0.21 273);
+  --sidebar-ring: oklch(0.55 0.22 262);
 }
 
 .dark {
@@ -139,7 +139,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
 }
 
@@ -468,3 +468,6 @@
     background-clip: content-box;
   }
 }
+
+/* Display type: Bricolage Grotesque for headings across the app shell. */
+[data-learnova-app] h1,[data-learnova-app] h2,[data-learnova-app] h3{font-family:"Bricolage Grotesque","Plus Jakarta Sans",system-ui,sans-serif;letter-spacing:-0.025em}

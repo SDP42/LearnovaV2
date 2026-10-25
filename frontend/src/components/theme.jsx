@@ -3,7 +3,7 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const KEY = "learnova-theme";
-const ThemeCtx = createContext({ theme: "dark", setTheme: () => {}, toggle: () => {} });
+const ThemeCtx = createContext({ theme: "light", setTheme: () => {}, toggle: () => {} });
 
 function apply(theme) {
   const root = document.documentElement;
@@ -11,15 +11,13 @@ function apply(theme) {
   root.style.colorScheme = theme;
 }
 
-export function ThemeProvider({ children, defaultTheme = "dark" }) {
-  const [theme, setThemeState] = useState(() => {
-    if (typeof localStorage === "undefined") return defaultTheme;
-    return localStorage.getItem(KEY) || defaultTheme;
-  });
+// Learnova ships a single bright theme; any stored "dark" preference is ignored.
+export function ThemeProvider({ children }) {
+  const [theme, setThemeState] = useState("light");
 
   useEffect(() => {
     apply(theme);
-    localStorage.setItem(KEY, theme);
+    try { localStorage.removeItem(KEY); } catch { /* ignore */ }
   }, [theme]);
 
   const setTheme = useCallback((t) => setThemeState(t), []);
@@ -36,6 +34,8 @@ export function ThemeProvider({ children, defaultTheme = "dark" }) {
 export const useTheme = () => useContext(ThemeCtx);
 
 export function ThemeToggle({ className }) {
+  return null;
+  // eslint-disable-next-line no-unreachable
   const { theme, toggle } = useTheme();
   return (
     <Button

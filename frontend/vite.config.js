@@ -15,7 +15,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          clerk: ["@clerk/react", "@clerk/themes"],
+          three: ["three", "@react-three/fiber", "@react-three/drei"],
           charts: ["recharts"],
           vendor: ["react", "react-dom", "react-router-dom"],
         },

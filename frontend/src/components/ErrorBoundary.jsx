@@ -1,4 +1,5 @@
 import { Component } from "react";
+import { reportError } from "@/api";
 
 /**
  * Catches render-time errors anywhere below it so one broken page shows a
@@ -12,6 +13,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    reportError(error?.message || error, info?.componentStack, "react");
     // eslint-disable-next-line no-console
     console.error("Learnova UI error:", error, info?.componentStack);
   }

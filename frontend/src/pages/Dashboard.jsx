@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useUser } from "@/auth";
+import { Blobs } from "@/components/fx/Haikei";
 import {
   BarChart3,
   FileStack,
@@ -62,6 +63,7 @@ export default function Dashboard() {
         {/* hero */}
         <div className="relative overflow-hidden rounded-2xl border p-6 sm:p-8">
           <div className="lv-aurora" />
+          <Blobs />
           <div className="relative flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

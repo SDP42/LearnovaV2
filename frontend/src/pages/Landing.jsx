@@ -1,336 +1,138 @@
+import { Component, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, GraduationCap, Presentation, Users, X } from "lucide-react";
-import LandingNav from "@/components/landing/LandingNav";
-import Hero from "@/components/landing/Hero";
-import FeatureBento from "@/components/landing/FeatureBento";
-import Reveal from "@/components/landing/Reveal";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, BarChart3, BrainCircuit, GitBranch, Home, Layers, LogIn, Presentation, Smartphone, Sparkles, Timer, Wand2 } from "lucide-react";
+import { SignedIn, SignedOut } from "@/auth";
+import { CountUp, Magnetic, Reveal, TiltCard } from "@/components/fx/Effects";
+import { BorderTrail, Dock, InfiniteSlider, ScrollProgress, TextScramble } from "@/components/fx/Primitives";
+import Compare from "@/components/landing2/Compare";
+import { MaskLine, SplitChars, WordCycle, WordScrub } from "@/components/landing2/Text";
+import "./landing.css";
 
-const STEPS = [
-  ["Ingest", "Upload a PPTX or PDF, or paste a syllabus. Everything converges on one editable markdown representation."],
-  ["Review", "See the structure the pipeline will reason over. Edit it — what you change is what gets built."],
-  ["Generate", "Layout classification, visual planning, progressive-reveal timing, quizzes, and engagement scoring."],
-  ["Present", "An animated PPTX and an interactive web deck with speaker notes, a timer, and a next-slide preview."],
-];
+const World = lazy(() => import("@/components/world/World"));
 
-const AUDIENCES = [
-  {
-    icon: GraduationCap,
-    title: "Educators & lecturers",
-    body: "Drop in a week's lecture notes and get a deck that paces one idea at a time, with checkpoint questions already placed. Spend your prep time on delivery, not on dragging text boxes.",
-  },
-  {
-    icon: Users,
-    title: "Trainers & onboarding leads",
-    body: "Turn a process document or SOP into a walkthrough with flowcharts and comparisons drawn from the actual steps — not a bullet dump of the source file.",
-  },
-  {
-    icon: Presentation,
-    title: "Students & researchers",
-    body: "Paste a paper's method section or a chapter summary and rehearse with the presenter console: notes, a timer, a next-slide preview, and a reveal-step indicator.",
-  },
-];
+class WorldBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? null : this.props.children; }
+}
 
-const IS = [
-  "Reads the structure of your content and picks a visual to match it",
-  "Keeps definitions, theorems, quotations and formulae verbatim",
-  "Builds one idea per click, like a lecturer working through a board",
-  "Scores every slide against a cognitive-load metric and repaginates",
-  "Exports an animated PPTX and a standalone web deck from one source",
+const FEATURES = [
+  [Layers, "1000+ visuals", "Flowcharts, timelines, Venns, mind maps — picked by the shape of your content.", "wide"],
+  [BrainCircuit, "Inline quizzes", "Recall checkpoints attach to the slide, not as interruptions."],
+  [BarChart3, "Engagement score", "Every slide is scored and repaginated against cognitive load."],
+  [GitBranch, "Progressive reveal", "One idea per click, like a lecturer at a board."],
+  [Timer, "Presenter console", "Notes, timer, next-slide preview, reveal-step indicator.", "wide"],
+  [Wand2, "Works without keys", "Heuristic layout runs offline. Keys only improve the writing."],
 ];
+const KINDS = ["Bar chart", "Flowchart", "Timeline", "KPI cards", "Cycle", "Comparison", "Mind map", "Venn", "Pyramid", "Pie chart", "Matrix", "Definition"];
+const STATEMENT = "Most slides are walls of text nobody reads. Learnova reads your content, finds the steps, the dates, the numbers and the contrasts, and turns each one into the visual that makes it click.";
 
-const ISNT = [
-  "A template gallery you pour text into",
-  "A summariser that flattens everything to three bullets",
-  "A wall-of-text generator with clip-art headers",
-  "A tool that needs you to choose the chart type yourself",
-  "A slideshow locked to one export format or one player",
-];
-
-const RESEARCH = [
-  {
-    tag: "Scoring",
-    title: "Every slide gets an engagement score",
-    body: "Three things, multiplied: how much meaningful content per unit of space, how much the slide asks working memory to hold at once, and whether the visual and the text say the same thing. Multiplied, not averaged — so one bad dimension can't hide behind two good ones.",
-  },
-  {
-    tag: "Pagination",
-    title: "It decides where slides break",
-    body: "Rather than cutting at a fixed bullet count, it searches the possible break points for the split that keeps every slide's cognitive load reasonable across the whole deck.",
-  },
-  {
-    tag: "Transitions",
-    title: "Animation that means something",
-    body: "A slide that continues the last one gets no visual break; a contrast gets a different move; a new section gets a hard cut. The build steps come from the same read of the content.",
-  },
-];
-
-const FAQ = [
-  {
-    q: "Do I need an API key to try it?",
-    a: "No. Without a key, an extractive summariser scores and compresses sentences and the full visual pipeline still runs. Add a free Groq key (or an NVIDIA NIM key) for LLM rewriting, analogies, and quiz generation.",
-  },
-  {
-    q: "What can I feed it?",
-    a: "A .pptx or .pdf upload, or text typed straight into the Create screen — a syllabus, lecture notes, a chapter summary, a process document. Scanned PDFs are OCR'd when a Gemini key is present.",
-  },
-  {
-    q: "Will it rewrite text I need kept exact?",
-    a: "No. Definitions, theorems, quotations, code, and formulae are detected and left verbatim. Only wordy explanatory prose is tightened, and you see the editable structure before anything is built.",
-  },
-  {
-    q: "What do I get out?",
-    a: "An animated PowerPoint (.pptx) with entrance builds, and a standalone Reveal.js web deck with a built-in presenter view. Both are generated from the same slide model, so they stay in step.",
-  },
-  {
-    q: "Where does my content go?",
-    a: "Decks are stored per-user on the server running the app. LLM calls go to whichever provider's key you configured (Groq / NVIDIA / Gemini) and nowhere else.",
-  },
-];
+function Stats() {
+  const S = [[1000, "+", "addressable visuals"], [39, "", "ready gallery decks"], [4, "", "export formats"], [0, "", "API keys required"]];
+  return (
+    <div className="lx-stats">
+      {S.map(([n, s, l]) => (<Reveal key={l}><div className="lx-stat"><b><CountUp to={n} suffix={s} /></b><span>{l}</span></div></Reveal>))}
+    </div>
+  );
+}
 
 export default function Landing() {
   return (
-    <div data-learnova-app className="min-h-svh bg-background text-foreground">
-      <LandingNav />
-      <Hero />
-      <FeatureBento />
+    <div data-learnova-app className="lx">
+      <WorldBoundary><Suspense fallback={null}><World /></Suspense></WorldBoundary>
+      <ScrollProgress />
+      <Dock items={[
+        { label: "Top", href: "#top", icon: Home },
+        { label: "The engine", href: "#engine", icon: Presentation },
+        { label: "Features", href: "#features", icon: Sparkles },
+        { label: "Sign in", href: "/sign-in", icon: LogIn },
+      ]} />
+      <header className="lx-nav">
+        <Link to="/" className="lx-logo"><Sparkles size={18} /> Learnova</Link>
+        <nav><a href="#engine">The engine</a><a href="#gallery">Visuals</a><a href="#features">Features</a></nav>
+        <SignedOut><Link to="/sign-in" className="lx-btn lx-btn-ghost sm">Sign in</Link></SignedOut>
+        <SignedIn><Link to="/app" className="lx-btn lx-btn-primary sm">Open app</Link></SignedIn>
+      </header>
 
-      {/* before / after — the transform, shown not told */}
-      <section className="relative overflow-hidden border-t">
-        <div className="lv-dots absolute inset-0" />
-        <div className="relative mx-auto max-w-6xl px-4 py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-semibold tracking-tight">From a wall of text to a slide that teaches</h2>
-            <p className="mt-3 text-muted-foreground">
-              Same content. One paginated, one paced.
-            </p>
-          </div>
-          <div className="mt-12 grid gap-5 md:grid-cols-2">
-            <div className="lv-card rounded-2xl p-6">
-              <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                <X className="size-3" /> Your source
-              </p>
-              <div className="rounded-lg border bg-muted/30 p-4 text-[13px] leading-relaxed text-muted-foreground">
-                The machine learning workflow begins by framing the problem and
-                choosing an evaluation metric, because that metric shapes every
-                later decision. Next you collect and label a representative
-                dataset, since the model can only learn from what it is shown.
-                You then split the data into training, validation and test sets
-                before doing anything else, so you never tune against data you
-                will later use to judge the model…
-              </div>
-            </div>
-            <div className="lv-card lv-glow-host relative overflow-hidden rounded-2xl p-6">
-              <div className="lv-glow left-1/2 top-0 h-[160px] w-[320px] -translate-x-1/2 opacity-40" />
-              <p className="relative mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                <Check className="size-3" /> Learnova
-              </p>
-              <p className="relative text-sm font-semibold text-foreground">The ML workflow</p>
-              <div className="relative mt-3 flex flex-col gap-2">
-                {[
-                  "Frame the problem & choose a metric",
-                  "Collect and label a representative dataset",
-                  "Split into train / validation / test",
-                  "Choose a model family and loss function",
-                  "Train, tune on validation",
-                  "Evaluate once on the held-out test set",
-                ].map((s, i) => (
-                  <div
-                    key={s}
-                    className="lv-in flex items-center gap-3 rounded-lg border bg-card/60 px-3 py-2 text-[13px]"
-                    style={{ animationDelay: `${i * 70}ms` }}
-                  >
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                      {i + 1}
-                    </span>
-                    {s}
-                  </div>
-                ))}
-              </div>
-              <p className="relative mt-3 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary">
-                Revealed one step per click · full detail kept in the speaker notes
-              </p>
+      <main>
+        <section id="top" className="lx-s hero">
+          <div className="lx-box left">
+            <span className="lx-pill"><Sparkles size={14} /> AI presentation engine</span>
+            <h1 className="lx-h1">Turn any <WordCycle words={["syllabus", "chapter", "lecture", "PDF"]} /><br />into slides that <em>teach.</em></h1>
+            <p className="lx-lead">Learnova reads your content and decides, slide by slide, whether to keep text, tighten it, or turn it into a flowchart, timeline or diagram.</p>
+            <div className="lx-cta-row">
+              <SignedOut>
+                <Magnetic><BorderTrail><Link to="/sign-in" className="lx-btn lx-btn-primary"><Smartphone size={18} /> Continue with mobile <ArrowRight size={16} /></Link></BorderTrail></Magnetic>
+              </SignedOut>
+              <SignedIn><Link to="/app" className="lx-btn lx-btn-primary">Open app <ArrowRight size={16} /></Link></SignedIn>
+              <a href="#engine" className="lx-btn lx-btn-ghost">Fly in ↓</a>
             </div>
           </div>
-        </div>
-      </section>
+          <div className="lx-scrollhint"><i /> scroll</div>
+        </section>
 
-      <section id="how" className="border-t bg-muted/20">
-        <div className="mx-auto max-w-6xl px-4 py-20">
-          <Reveal>
-            <h2 className="text-center text-3xl font-semibold tracking-tight">How it works</h2>
-            <div className="lv-rule mx-auto mt-4 w-24" />
-          </Reveal>
-          <div className="mt-12 grid gap-4 md:grid-cols-4">
-            {STEPS.map(([title, body], i) => (
-              <Reveal key={title} delay={i * 90} className="lv-card flex flex-col gap-2 rounded-xl p-5">
-                <span className="inline-flex w-fit items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                  Step {i + 1}
-                </span>
-                <h3 className="font-medium">{title}</h3>
-                <p className="text-sm text-muted-foreground">{body}</p>
-              </Reveal>
-            ))}
+        <section className="lx-s tall">
+          <div className="lx-box right wide">
+            <span className="lx-mono lx-eyebrow">// THE PROBLEM</span>
+            <WordScrub text={STATEMENT} />
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-20">
-        <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-semibold tracking-tight">Who it's for</h2>
-          <p className="mt-3 text-muted-foreground">
-            Anyone who has to turn dense source material into something a room can follow.
-          </p>
-        </Reveal>
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
-          {AUDIENCES.map(({ icon: Icon, title, body }, i) => (
-            <Reveal key={title} delay={i * 90} className="lv-card flex flex-col gap-3 rounded-xl p-6">
-              <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Icon className="size-5" />
-              </span>
-              <h3 className="font-medium">{title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{body}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
+        <section id="engine" className="lx-s tall">
+          <div className="lx-box left">
+            <span className="lx-mono lx-eyebrow"><TextScramble text="// THE ENGINE" /></span>
+            <SplitChars text="Fly through the gate." className="lx-h2" />
+            <p className="lx-lead"><MaskLine>Raw pages go in on one side.</MaskLine><br /><MaskLine delay={0.1}>Designed, visual slides come out the other.</MaskLine></p>
+            <ul className="lx-checks">
+              <li>Reads steps, dates, numbers and contrasts</li>
+              <li>Picks the visual that fits — never a wall of text</li>
+              <li>Keeps definitions and formulae word for word</li>
+            </ul>
+          </div>
+        </section>
 
-      <section className="border-t bg-muted/20">
-        <div className="mx-auto max-w-5xl px-4 py-20">
-          <h2 className="text-center text-3xl font-semibold tracking-tight">
-            What Learnova is — and isn't
-          </h2>
-          <div className="lv-rule mx-auto mt-4 w-24" />
-          <div className="mt-12 grid gap-4 md:grid-cols-2">
-            <div className="lv-card rounded-xl p-6">
-              <p className="mb-4 flex items-center gap-2 font-medium text-primary">
-                <Check className="size-4" /> It is
-              </p>
-              <ul className="flex flex-col gap-3">
-                {IS.map((t) => (
-                  <li key={t} className="flex gap-2 text-sm text-muted-foreground">
-                    <Check className="mt-0.5 size-4 shrink-0 text-primary" /> {t}
-                  </li>
-                ))}
-              </ul>
+        <section id="gallery" className="lx-s tall">
+          <div className="lx-box right">
+            <span className="lx-mono lx-eyebrow">// ONE SOURCE, EVERY VISUAL</span>
+            <SplitChars text="Every idea gets its own picture." className="lx-h2" />
+            <div className="lx-slider-wrap"><InfiniteSlider duration={30}>{KINDS.map((t) => <span key={t} className="fx-pchip">{t}</span>)}</InfiniteSlider></div>
+          </div>
+        </section>
+
+        <section id="features" className="lx-s features">
+          <div className="lx-wrapw">
+            <span className="lx-mono lx-eyebrow center"><TextScramble text="// FEATURES" /></span>
+            <SplitChars text="Everything a lecture needs" className="lx-h2 center" />
+            <div className="lx-bento">
+              {FEATURES.map(([Icon, t, b, w], i) => (
+                <Reveal key={t} delay={i * 0.05} className={w === "wide" ? "span2" : ""}>
+                  <TiltCard><Icon size={26} className="lx-ico" /><h3>{t}</h3><p>{b}</p></TiltCard>
+                </Reveal>
+              ))}
             </div>
-            <div className="lv-card rounded-xl p-6">
-              <p className="mb-4 flex items-center gap-2 font-medium text-muted-foreground">
-                <X className="size-4" /> It isn't
-              </p>
-              <ul className="flex flex-col gap-3">
-                {ISNT.map((t) => (
-                  <li key={t} className="flex gap-2 text-sm text-muted-foreground">
-                    <X className="mt-0.5 size-4 shrink-0 opacity-60" /> {t}
-                  </li>
-                ))}
-              </ul>
+            <Stats />
+          </div>
+        </section>
+
+        <section className="lx-s cmp-sec">
+          <div className="lx-wrapw">
+            <span className="lx-mono lx-eyebrow center">// BEFORE / AFTER</span>
+            <SplitChars text="Drag. Feel the difference." className="lx-h2 center" />
+            <Reveal delay={0.1}><Compare /></Reveal>
+          </div>
+        </section>
+
+        <section className="lx-s final">
+          <div className="lx-box center">
+            <h2 className="lx-h2 big"><MaskLine>Your next lecture,</MaskLine><br /><MaskLine delay={0.12}><em>ready before the coffee cools.</em></MaskLine></h2>
+            <div className="lx-cta-row center">
+              <Magnetic><BorderTrail><Link to="/sign-in" className="lx-btn lx-btn-primary big">Get started with your number <ArrowRight size={18} /></Link></BorderTrail></Magnetic>
             </div>
           </div>
-        </div>
-      </section>
-
-      <section id="research" className="relative mx-auto max-w-5xl overflow-hidden px-4 py-24">
-        <div className="lv-glow left-1/2 top-8 h-[200px] w-[400px] -translate-x-1/2 opacity-25" />
-        <div className="relative mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-semibold tracking-tight">The parts that make it teach</h2>
-          <p className="mx-auto mt-3 text-muted-foreground">
-            Grounded in Cognitive Load Theory and Mayer's multimedia principles.
-            The score that judges a finished deck is the same model that plans it.
-          </p>
-        </div>
-        <div className="relative mt-12 grid gap-4 md:grid-cols-3">
-          {RESEARCH.map(({ tag, title, body }) => (
-            <div key={title} className="lv-card flex flex-col gap-3 rounded-xl p-6">
-              <span className="inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                {tag}
-              </span>
-              <h3 className="font-medium leading-snug">{title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{body}</p>
-            </div>
-          ))}
-        </div>
-        <div className="relative mt-10 text-center">
-          <Button asChild variant="outline">
-            <Link to="/app/create">
-              Try it now <ArrowRight />
-            </Link>
-          </Button>
-        </div>
-      </section>
-
-      <section id="faq" className="border-t bg-muted/20">
-        <div className="mx-auto max-w-3xl px-4 py-20">
-          <h2 className="text-center text-3xl font-semibold tracking-tight">
-            Frequently asked
-          </h2>
-          <div className="lv-rule mx-auto mt-4 w-24" />
-          <div className="mt-10 flex flex-col gap-3">
-            {FAQ.map(({ q, a }) => (
-              <details key={q} className="lv-card group rounded-xl p-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between font-medium">
-                  {q}
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-                </summary>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="relative mx-auto max-w-3xl overflow-hidden px-4 py-24 text-center">
-        <div className="lv-dots absolute inset-0" />
-        <div className="lv-glow left-1/2 top-1/2 h-[240px] w-[440px] -translate-x-1/2 -translate-y-1/2 opacity-30" />
-        <div className="relative">
-          <h2 className="text-3xl font-semibold tracking-tight">
-            Try it with something real
-          </h2>
-          <p className="mx-auto mt-3 max-w-lg text-muted-foreground">
-            Paste a week of lecture notes, or start from a ready-made lesson. The
-            denser the source, the more the difference shows.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" className="lv-cta rounded-lg">
-              <Link to="/app/create">
-                Create a presentation <ArrowRight />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/app/library">Browse lessons</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-4">
-          <div className="sm:col-span-2">
-            <p className="font-semibold">Learnova</p>
-            <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-              An AI presentation engine that reasons about your content's
-              structure — cognitive-load aware, research-grounded.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Product</p>
-            <a href="#features" className="hover:text-foreground">Features</a>
-            <a href="#how" className="hover:text-foreground">How it works</a>
-            <a href="#research" className="hover:text-foreground">Research</a>
-            <a href="#faq" className="hover:text-foreground">FAQ</a>
-          </div>
-          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Get started</p>
-            <Link to="/app/create" className="hover:text-foreground">Create a deck</Link>
-            <Link to="/sign-in" className="hover:text-foreground">Sign in</Link>
-            <Link to="/app/docs" className="hover:text-foreground">Documentation</Link>
-          </div>
-        </div>
-        <div className="border-t">
-          <div className="mx-auto max-w-6xl px-4 py-6 text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Learnova
-          </div>
-        </div>
+        </section>
+      </main>
+      <footer className="lx-footer">
+        © Learnova · Turn text into teaching. · <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link>
       </footer>
     </div>
   );

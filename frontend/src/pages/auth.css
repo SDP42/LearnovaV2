@@ -1,0 +1,29 @@
+.au{min-height:100svh;display:grid;place-items:center;padding:24px;background:#F4F9FF;color:#0B1F44;position:relative;overflow:hidden;font-family:"Plus Jakarta Sans",system-ui,sans-serif;perspective:1200px}
+.au *{box-sizing:border-box}
+.au-aurora{position:absolute;inset:-20%;background:linear-gradient(135deg,#C4DAFF,#BDF1E4,#FFE9A8,#C4DAFF);opacity:.8}
+@keyframes aur{to{transform:rotate(360deg)}}
+.au-logo{position:absolute;top:22px;left:26px;display:flex;gap:8px;align-items:center;color:#0B1F44;text-decoration:none;font-weight:700;z-index:2}
+.au-card{position:relative;z-index:2;width:100%;max-width:420px;padding:36px 32px;border-radius:28px;background:#ffffffe8;border:1px solid #fff;box-shadow:0 30px 90px #2563EB30;display:flex;flex-direction:column;gap:14px}
+.au-card.wide{max-width:480px}
+.au-card form,.au-card>div{display:flex;flex-direction:column;gap:14px}
+.au-card h1{font-size:26px;margin:0;letter-spacing:-.02em}.au-card p{margin:0;color:#52617D;font-size:14px;line-height:1.5}
+.au-badge,.au-avatar{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#5B8CFF,#37d0ff);color:#fff}
+.au-avatar{border-radius:50%;font-weight:700;font-size:20px;width:56px;height:56px}
+.au-phone{display:flex;gap:8px}
+.au input,.au select{background:#fff;border:1px solid #0B1F4422;color:#0B1F44;border-radius:12px;padding:13px 14px;font-size:16px;outline:none;width:100%;font-family:inherit}
+.au select{width:auto;flex:none}
+.au input:focus,.au select:focus{border-color:#2563EB;box-shadow:0 0 0 3px #2563EB33}
+.au-otp{display:flex;gap:8px;justify-content:space-between}
+.au-otp input{width:100%;min-width:0;text-align:center;font-size:22px;font-weight:700;padding:14px 0}
+.au-btn{display:flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;padding:14px;font-size:16px;font-weight:600;color:#fff;cursor:pointer;background:#2563EB;box-shadow:0 10px 28px #2563EB55;transition:.2s}
+.au-btn:hover:not(:disabled){box-shadow:0 14px 40px #2563EB88;transform:translateY(-1px)}.au-btn:disabled{opacity:.5;cursor:not-allowed}
+.au-link,.au-back,.au-dev{background:none;border:0;color:#2563EB;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:6px;padding:4px;font-family:inherit}
+.au-link:disabled{color:#6b678c;cursor:default}.au-back{color:#52617D;align-self:flex-start}
+.au-dev{justify-content:center;background:#fbbf2418;border:1px dashed #fbbf2466;color:#a16207;border-radius:10px;padding:8px}
+.au-err{background:#ff4d6d1f;border:1px solid #ff4d6d55;color:#c81e4a;border-radius:10px;padding:10px 12px;font-size:14px}
+.au label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#52617D}.au label small{opacity:.6}
+.au-chips{display:flex;gap:8px;flex-wrap:wrap}
+.au-chips button{border:1px solid #0B1F4422;background:#fff;color:#0B1F44;border-radius:999px;padding:8px 14px;cursor:pointer;font-family:inherit}
+.au-chips button.on{border-color:#2563EB;background:#2563EB1f}
+.au-chips .sw{width:32px;height:32px;padding:0;border-radius:50%}.au-chips .sw.on{outline:2px solid #0B1F44;outline-offset:2px}
+.spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}

@@ -214,7 +214,7 @@ export default function Settings() {
           <CardHeader><CardTitle className="text-base">Account</CardTitle></CardHeader>
           <CardContent className="overflow-hidden">
             {typeof UserProfile === "function" ? (
-              <UserProfile routing="hash" />
+              <UserProfile />
             ) : (
               <p className="text-sm text-muted-foreground">Sign in to manage your account.</p>
             )}

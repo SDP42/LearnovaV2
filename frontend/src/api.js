@@ -1,8 +1,8 @@
 // Thin wrapper over the Learnova REST API.
 // Vite proxies /api to the FastAPI server in dev (see vite.config.js).
 //
-// Every protected call carries Clerk's session JWT. `setTokenGetter` is
-// installed once from App.jsx with Clerk's `getToken`, so callers never have
+// Every protected call carries the phone-login session token. `setTokenGetter`
+// is installed once from App.jsx with the auth context's `getToken`, so callers never have
 // to thread a token through by hand.
 
 const BASE = "";
@@ -30,6 +30,56 @@ async function json(response) {
     throw new Error(detail);
   }
   return response.status === 204 ? null : response.json();
+}
+
+// ── Phone + OTP auth ──────────────────────────────────────────────────────
+const post = async (url, body, token) =>
+  json(
+    await fetch(`${BASE}${url}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body),
+    })
+  );
+export const requestOtp = (phone) => post("/api/auth/otp/request", { phone });
+export const verifyOtp = (phone, code) => post("/api/auth/otp/verify", { phone, code });
+export async function authMe(token) {
+  return json(await fetch(`${BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }));
+}
+export async function saveProfile(profile) {
+  return json(
+    await fetch(`${BASE}/api/auth/profile`, {
+      method: "PUT",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(profile),
+    })
+  );
+}
+export async function authLogout() {
+  return json(await fetch(`${BASE}/api/auth/logout`, { method: "POST", headers: await authHeaders() }));
+}
+
+export async function deleteAccount() {
+  return json(await fetch(`${BASE}/api/auth/account`, { method: "DELETE", headers: await authHeaders() }));
+}
+export async function logoutAll() {
+  return json(await fetch(`${BASE}/api/auth/logout-all`, { method: "POST", headers: await authHeaders() }));
+}
+
+// First-party analytics + client error tracking (fire-and-forget, never throws).
+export function track(name, props = {}) {
+  authHeaders({ "Content-Type": "application/json" })
+    .then((headers) =>
+      fetch(`${BASE}/api/events`, { method: "POST", headers, body: JSON.stringify({ name, path: location.pathname, props }), keepalive: true })
+    )
+    .catch(() => {});
+}
+export function reportError(message, stack = "", source = "client") {
+  authHeaders({ "Content-Type": "application/json" })
+    .then((headers) =>
+      fetch(`${BASE}/api/errors`, { method: "POST", headers, body: JSON.stringify({ message: String(message), stack: String(stack), path: location.pathname, source }), keepalive: true })
+    )
+    .catch(() => {});
 }
 
 // ── Public ────────────────────────────────────────────────────────────────

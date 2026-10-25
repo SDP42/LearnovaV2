@@ -1,10 +1,13 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { SignedIn, SignedOut, useAuth } from "@/auth";
+import { useAuth } from "@/auth";
 import * as api from "./api";
 import Cursor from "./components/Cursor.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
+import Onboarding from "./pages/Onboarding.jsx";
+import NotFound from "./pages/NotFound.jsx";
+import Legal from "./pages/Legal.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Audience from "./pages/Audience.jsx";
 import Create from "./pages/Create.jsx";
@@ -41,21 +44,41 @@ function AuthBridge({ children }) {
     });
   }, [getToken]);
 
-  if (!isLoaded) return null;
+  useEffect(() => {
+    const onErr = (e) => api.reportError(e.message, e.error?.stack, "window");
+    const onRej = (e) => api.reportError(e.reason?.message || e.reason, e.reason?.stack, "promise");
+    window.addEventListener("error", onErr);
+    window.addEventListener("unhandledrejection", onRej);
+    return () => {
+      window.removeEventListener("error", onErr);
+      window.removeEventListener("unhandledrejection", onRej);
+    };
+  }, []);
+
+  const { pathname } = useLocation();
+  useEffect(() => api.track("page_view"), [pathname]);
+
+  if (!isLoaded)
+    return (
+      <div className="grid min-h-svh place-items-center" role="status" aria-label="Loading">
+        <div className="size-9 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+      </div>
+    );
   return children;
 }
 
-/** Sends signed-out visitors to /sign-in, remembering where they were headed. */
+/** Signed-out → /sign-in (remembering the target); signed-in without a profile → /welcome. */
 function Protected({ children }) {
   const location = useLocation();
-  return (
-    <>
-      <SignedIn>{children}</SignedIn>
-      <SignedOut>
-        <Navigate to="/sign-in" replace state={{ from: location.pathname }} />
-      </SignedOut>
-    </>
-  );
+  const { isSignedIn, user } = useAuth();
+  if (!isSignedIn) return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />;
+  if (user && user.completed === false) return <Navigate to="/welcome" replace />;
+  return children;
+}
+
+function Welcome() {
+  const { isSignedIn } = useAuth();
+  return isSignedIn ? <Onboarding /> : <Navigate to="/sign-in" replace />;
 }
 
 export default function App() {
@@ -65,8 +88,9 @@ export default function App() {
       <ErrorBoundary>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/sign-in/*" element={<AuthPage mode="sign-in" />} />
-        <Route path="/sign-up/*" element={<AuthPage mode="sign-up" />} />
+        <Route path="/sign-in" element={<AuthPage />} />
+        <Route path="/sign-up" element={<Navigate to="/sign-in" replace />} />
+        <Route path="/welcome" element={<Welcome />} />
         <Route
           path="/studio"
           element={
@@ -101,7 +125,9 @@ export default function App() {
         <Route path="/app/docs" element={<Protected><Docs /></Protected>} />
         <Route path="/app/settings" element={<Protected><Settings /></Protected>} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/privacy" element={<Legal kind="privacy" />} />
+        <Route path="/terms" element={<Legal kind="terms" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
       </ErrorBoundary>
     </AuthBridge>
