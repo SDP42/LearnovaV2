@@ -38,9 +38,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from learnova.auth import AuthError, user_id_from_header
-from learnova.config import MAX_FILE_SIZE_MB, auth_enabled, ensure_dirs
+from learnova.auth import AuthError, phone as phone_auth, user_id_from_header
+from learnova.auth.phone import PhoneAuthError
+from learnova.config import MAX_FILE_SIZE_MB, auth_enabled, ensure_dirs, get_clerk_publishable_key
 from learnova.logging_config import logger
+from learnova.security import RateLimitMiddleware
 from learnova.parsers.markdown_converter import from_typed_text, split_sections
 from learnova.pipeline.jobs import Job, get_store
 from learnova.pipeline.orchestrator import STAGES, PipelineConfig
@@ -72,6 +74,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+if os.getenv("LEARNOVA_RATE_LIMIT", "on") != "off":
+    app.add_middleware(RateLimitMiddleware)
+
 ALLOWED_SUFFIXES = {".pptx", ".pdf"}
 ANONYMOUS_USER = "anonymous"
 
@@ -86,10 +91,22 @@ def current_user(authorization: Optional[str] = Header(default=None)) -> str:
     """
     if not auth_enabled():
         return ANONYMOUS_USER
-    try:
-        return user_id_from_header(authorization)
-    except AuthError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    token = _bearer(authorization)
+    uid = phone_auth.user_id_from_token(token)
+    if uid:
+        return uid
+    if get_clerk_publishable_key():  # legacy Clerk sessions still accepted
+        try:
+            return user_id_from_header(authorization)
+        except AuthError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+    raise HTTPException(status_code=401, detail="Sign in to continue")
+
+
+def _bearer(authorization: Optional[str]) -> Optional[str]:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return None
 
 
 def _require_own_job(job_id: str, user_id: str) -> Job:
@@ -99,6 +116,112 @@ def _require_own_job(job_id: str, user_id: str) -> Job:
     if job is None or (job.user_id or ANONYMOUS_USER) != user_id:
         raise HTTPException(status_code=404, detail="job not found")
     return job
+
+
+# ── Phone / OTP auth ──────────────────────────────────────────────────────────
+class OtpRequest(BaseModel):
+    phone: str
+
+
+class OtpVerify(BaseModel):
+    phone: str
+    code: str
+
+
+class ProfileUpdate(BaseModel):
+    full_name: str
+    email: str = ""
+    role: str = ""
+    organization: str = ""
+    avatar_color: str = ""
+
+
+@app.exception_handler(PhoneAuthError)
+async def _phone_auth_error(_: Request, exc: PhoneAuthError) -> JSONResponse:
+    headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after else None
+    return JSONResponse({"detail": str(exc)}, status_code=exc.status, headers=headers)
+
+
+@app.post("/api/auth/otp/request")
+def auth_request_otp(body: OtpRequest) -> dict:
+    return phone_auth.request_otp(body.phone)
+
+
+@app.post("/api/auth/otp/verify")
+def auth_verify_otp(body: OtpVerify, request: Request) -> dict:
+    return phone_auth.verify_otp(body.phone, body.code, request.headers.get("user-agent", ""))
+
+
+@app.get("/api/auth/me")
+def auth_me(user_id: str = Depends(current_user)) -> dict:
+    user = phone_auth.get_user(user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Sign in to continue")
+    return user
+
+
+@app.put("/api/auth/profile")
+def auth_update_profile(body: ProfileUpdate, user_id: str = Depends(current_user)) -> dict:
+    return phone_auth.update_profile(user_id, **body.model_dump())
+
+
+@app.post("/api/auth/logout", status_code=204)
+def auth_logout(authorization: Optional[str] = Header(default=None)) -> Response:
+    token = _bearer(authorization)
+    if token:
+        phone_auth.logout(token)
+    return Response(status_code=204)
+
+
+class EventIn(BaseModel):
+    name: str
+    path: str = ""
+    props: dict = {}
+
+
+class ClientError(BaseModel):
+    message: str
+    stack: str = ""
+    path: str = ""
+    source: str = "client"
+
+
+def _optional_user(authorization: Optional[str]) -> Optional[str]:
+    return phone_auth.user_id_from_token(_bearer(authorization))
+
+
+@app.post("/api/events", status_code=204)
+def track_event(body: EventIn, authorization: Optional[str] = Header(default=None)) -> Response:
+    """First-party, privacy-friendly analytics: no cookies, no third party."""
+    phone_auth.record_event(body.name, body.path, body.props, _optional_user(authorization))
+    return Response(status_code=204)
+
+
+@app.post("/api/errors", status_code=204)
+def report_client_error(body: ClientError, authorization: Optional[str] = Header(default=None)) -> Response:
+    phone_auth.record_error(body.source, body.message, body.stack, body.path, _optional_user(authorization))
+    return Response(status_code=204)
+
+
+@app.post("/api/auth/logout-all", status_code=204)
+def auth_logout_all(user_id: str = Depends(current_user)) -> Response:
+    phone_auth.logout_all(user_id)
+    return Response(status_code=204)
+
+
+@app.delete("/api/auth/account", status_code=204)
+def auth_delete_account(user_id: str = Depends(current_user)) -> Response:
+    phone_auth.delete_account(user_id)
+    return Response(status_code=204)
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+    try:
+        phone_auth.record_error("server", f"{type(exc).__name__}: {exc}", path=request.url.path)
+    except Exception:  # never let logging mask the real failure
+        pass
+    return JSONResponse({"detail": "Something went wrong on our side. Please try again."}, status_code=500)
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -124,7 +247,7 @@ class GenerateRequest(BaseModel):
     theme_spec: Optional[ThemeSpec] = None
     quiz_frequency: int = 4
     quiz_positions: Optional[list[int]] = None
-    quiz_style: str = "inline"
+    quiz_style: str = "slide"
     enable_vision_ocr: bool = True
     enable_quizzes: bool = True
     build_pptx: bool = True

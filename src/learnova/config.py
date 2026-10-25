@@ -106,5 +106,8 @@ def get_clerk_issuer() -> Optional[str]:
 
 
 def auth_enabled() -> bool:
-    """Auth is enforced only when Clerk is configured, so local dev still runs."""
-    return bool(get_clerk_publishable_key())
+    """
+    Auth is enforced by default (phone + OTP). Set LEARNOVA_AUTH=off to run the
+    API as a single anonymous user, e.g. for the VITE_DEMO frontend or tests.
+    """
+    return os.getenv("LEARNOVA_AUTH", "on").lower() not in ("off", "0", "false")
