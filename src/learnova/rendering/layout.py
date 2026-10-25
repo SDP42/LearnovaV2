@@ -29,12 +29,20 @@ SLIDE_H = 7.5
 
 MARGIN_X = 0.5
 HEADER_H = 1.1
-CONTENT_TOP = 1.35
-BOTTOM_MARGIN = 0.35
+CONTENT_TOP = 1.42          # header (1.1) + accent strip (0.07) + 0.25 breathing room
+BOTTOM_MARGIN = 0.5         # content stops here; the footer band sits below it
+FOOTER_Y = 7.08             # footer text box top (height FOOTER_H) — identical on every slide
+FOOTER_H = 0.3
 
-TAKEAWAY_H = 1.05
+# One grid for the whole deck: every card, box and text inset uses these.
+PAD = 0.22                  # internal padding of every card / box
+GUTTER = 0.22               # gap between neighbouring cards
+ICON_D = 0.62               # icon disc diameter
+BADGE_D = 0.5               # number / letter badge diameter
+
+TAKEAWAY_H = 1.0
 QUIZ_BAND_H = 2.05          # question line + a row of four options
-GAP = 0.2
+GAP = 0.22
 
 # Typography bounds. Below MIN_PT text stops being readable from the back of a
 # room, so we paginate instead of shrinking further.
@@ -45,7 +53,8 @@ MIN_CARD_PT = 9.0
 
 # Average glyph width as a fraction of point size, and line height multiplier.
 _GLYPH_RATIO = 0.52
-_LINE_HEIGHT = 1.28
+_BOLD_RATIO = 0.575
+_LINE_HEIGHT = 1.26
 
 
 @dataclass(frozen=True)
@@ -81,29 +90,63 @@ def takeaway_band() -> Box:
 
 
 # ── Measurement ───────────────────────────────────────────────────────────────
-def estimate_lines(text: str, width_in: float, font_pt: float) -> int:
-    """How many wrapped lines a string needs in a box of the given width."""
+def estimate_lines(text: str, width_in: float, font_pt: float, bold: bool = False) -> int:
+    """How many wrapped lines a string needs in a box of the given width (word-aware)."""
     if not text:
         return 0
-    chars_per_line = max(1, int((width_in * 72.0) / (font_pt * _GLYPH_RATIO)))
+    ratio = _BOLD_RATIO if bold else _GLYPH_RATIO
+    cpl = max(1, int((width_in * 72.0) / (font_pt * ratio)))
     lines = 0
     for paragraph in str(text).splitlines() or [""]:
-        lines += max(1, math.ceil(len(paragraph) / chars_per_line))
+        cur, n = 0, 1
+        for word in paragraph.split():
+            wl = len(word)
+            if wl > cpl:                      # an over-long word breaks across lines
+                if cur:
+                    n += 1
+                n += (wl - 1) // cpl
+                cur = wl % cpl or cpl
+            elif cur == 0:
+                cur = wl
+            elif cur + 1 + wl <= cpl:
+                cur += 1 + wl
+            else:
+                n += 1
+                cur = wl
+        lines += n
     return max(1, lines)
 
 
 def block_height(texts: Sequence[str], width_in: float, font_pt: float,
-                 spacing_pt: float = 8.0) -> float:
+                 spacing_pt: float = 8.0, bold: bool = False) -> float:
     """Height in inches needed to render these paragraphs at this size."""
-    total_lines = sum(estimate_lines(t, width_in, font_pt) for t in texts)
+    total_lines = sum(estimate_lines(t, width_in, font_pt, bold) for t in texts)
     line_in = (font_pt * _LINE_HEIGHT) / 72.0
     gaps_in = (max(0, len(texts) - 1) * spacing_pt) / 72.0
     return total_lines * line_in + gaps_in
 
 
+def paras_height(paras: Sequence[Tuple[str, float, bool, float]], width_in: float) -> float:
+    """Height of mixed paragraphs given as ``(text, size_pt, bold, space_before_pt)``."""
+    total = 0.0
+    for i, (text, size, bold, before) in enumerate(paras):
+        if not str(text).strip():
+            continue
+        total += estimate_lines(str(text), width_in, size, bold) * size * _LINE_HEIGHT / 72.0
+        if i:
+            total += before / 72.0
+    return total
+
+
+def longest_word_fits(texts: Sequence[str], width_in: float, font_pt: float, bold: bool = False) -> bool:
+    ratio = _BOLD_RATIO if bold else _GLYPH_RATIO
+    longest = max((len(w) for t in texts for w in str(t).split()), default=0)
+    return longest * font_pt * ratio / 72.0 <= width_in
+
+
 def fit_font_size(texts: Sequence[str], width_in: float, height_in: float,
                   max_pt: float = MAX_BODY_PT, min_pt: float = MIN_BODY_PT,
-                  spacing_pt: float = 8.0) -> float:
+                  spacing_pt: float = 8.0, bold: bool = False) -> float:
     """
     Largest point size at which ``texts`` fit inside the given box.
 
@@ -117,7 +160,8 @@ def fit_font_size(texts: Sequence[str], width_in: float, height_in: float,
 
     size = max_pt
     while size > min_pt:
-        if block_height(items, width_in, size, spacing_pt) <= height_in:
+        if block_height(items, width_in, size, spacing_pt, bold) <= height_in and \
+                longest_word_fits(items, width_in, size, bold):
             return round(size, 1)
         size -= 0.5
     return min_pt
@@ -171,7 +215,8 @@ def split_text_image(area: Box, has_image: bool,
 
 __all__ = [
     "SLIDE_W", "SLIDE_H", "MARGIN_X", "HEADER_H", "CONTENT_TOP",
-    "TAKEAWAY_H", "QUIZ_BAND_H", "GAP",
+    "TAKEAWAY_H", "QUIZ_BAND_H", "GAP", "BOTTOM_MARGIN", "FOOTER_Y", "FOOTER_H",
+    "PAD", "GUTTER", "ICON_D", "BADGE_D", "paras_height", "longest_word_fits",
     "MAX_BODY_PT", "MIN_BODY_PT", "MAX_CARD_PT", "MIN_CARD_PT",
     "Box", "content_band", "quiz_band", "takeaway_band",
     "estimate_lines", "block_height", "fit_font_size",

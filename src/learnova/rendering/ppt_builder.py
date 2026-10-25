@@ -15,6 +15,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.oxml.xmlchemy import OxmlElement
 
 from learnova.rendering import layout as L
+from learnova.rendering.pptx_visuals import group as vis_group, groups_for, reset_groups
 from learnova.textutils import strip_inline_markdown
 from learnova.rendering.theme_engine import (
     get_theme, auto_detect_theme, select_slide_layout, resolve_theme,
@@ -43,16 +44,6 @@ def _readable(bg, prefer=None) -> RGBColor:
 
 def _tint(rgb, t: float) -> RGBColor:
     return RGBColor(int(rgb[0] + (255 - rgb[0]) * t), int(rgb[1] + (255 - rgb[1]) * t), int(rgb[2] + (255 - rgb[2]) * t))
-
-
-def _deco(slide, theme, corner: str = "tr") -> None:
-    """Canva-style corner decoration: two soft overlapping circles in the accent/primary tints."""
-    x = 11.6 if corner == "tr" else -0.7
-    y = -0.8
-    for d, col, dx, dy in ((2.2, _tint(theme.accent_rgb, 0.35), 0, 0), (1.3, _tint(theme.primary_rgb, 0.55), -0.5, 0.9)):
-        c = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x + dx), Inches(y + dy), Inches(d), Inches(d))
-        c.fill.solid(); c.fill.fore_color.rgb = col
-        c.line.fill.background()
 
 
 def SubElement(parent, tagname, **kwargs):
@@ -98,174 +89,15 @@ def _image_decision(orig: dict):
         # Policy must never cost us a figure — when in doubt, show it.
         return True, str(img.get("description", ""))[:200]
 
-def _pptx_family(slide, sp, theme, band) -> bool:
-    """
-    Draw the Deck Director's chosen visual family as native PowerPoint shapes so
-    the PPTX matches the web deck instead of always falling back to bullets.
-    Returns True if it drew something. Best-effort — any failure returns False
-    and the caller renders the plain bullet list.
-    """
+def _add_slide_transition(slide, name: str = "none"):
+    """Schema-correct slide transition (after clrMapOvr, before timing). 'none' writes nothing."""
     try:
-        family = getattr(sp, "family", "") or ""
-        data = getattr(sp, "data", {}) or {}
-        if not data:
-            return False
-        L_ = band.left + 0.4
-        W_ = band.width - 0.8
-        top = band.top + 0.15
-        h = band.height - 0.3
+        from learnova.rendering.pptx_animation import set_transition
 
-        def _box(x, y, w, hh, text, *, fill=None, bold=False, size=13, color=None, align=None):
-            shp = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(hh))
-            if fill is not None:
-                shp.fill.solid(); shp.fill.fore_color.rgb = fill
-                shp.line.color.rgb = theme.primary_rgb
-            tf = shp.text_frame; tf.word_wrap = True
-            tf.text = str(text)
-            p = tf.paragraphs[0]
-            p.font.size = Pt(size); p.font.bold = bold
-            p.font.color.rgb = color or theme.text_rgb
-            if align is not None:
-                p.alignment = align
-            return shp
-
-        # ── process / cycle — numbered stacked steps ─────────────────────────
-        if family in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "WORKED_EXAMPLE"}:
-            steps = data.get("steps") or data.get("stages") or [
-                r.get("step") for r in (data.get("rows") or []) if r.get("step")
-            ]
-            steps = [s for s in steps if str(s).strip()][:8]
-            if len(steps) < 2:
-                return False
-            reasons = {i: r.get("reason", "") for i, r in enumerate(data.get("rows") or [])}
-            row_h = min(0.9, h / len(steps))
-            for i, s in enumerate(steps):
-                y = top + i * row_h
-                _box(L_, y, 0.5, row_h - 0.08, str(i + 1), fill=theme.primary_rgb,
-                     bold=True, size=14, color=theme.accent_rgb, align=PP_ALIGN.CENTER)
-                label = str(s)
-                if reasons.get(i):
-                    label += f"   —  {reasons[i]}"
-                _box(L_ + 0.65, y, W_ - 0.65, row_h - 0.08, label, fill=theme.bg_rgb, size=12)
-            return True
-
-        # ── pros / cons — two columns ───────────────────────────────────────
-        if family == "COMPARE_VISUAL":
-            pros = [str(x) for x in (data.get("pros") or [])][:5]
-            cons = [str(x) for x in (data.get("cons") or [])][:5]
-            if not (pros and cons):
-                return False
-            cw = W_ / 2 - 0.15
-            _box(L_, top, cw, 0.4, "Advantages", bold=True, size=13, color=theme.primary_rgb)
-            _box(L_ + cw + 0.3, top, cw, 0.4, "Trade-offs", bold=True, size=13, color=theme.primary_rgb)
-            _box(L_, top + 0.45, cw, h - 0.5, "\n".join(f"•  {p}" for p in pros),
-                 fill=theme.bg_rgb, size=11)
-            _box(L_ + cw + 0.3, top + 0.45, cw, h - 0.5, "\n".join(f"•  {c}" for c in cons),
-                 fill=theme.bg_rgb, size=11)
-            return True
-
-        # ── pyramid — stacked bands, widest at the base ─────────────────────
-        if family == "HIERARCHY_NEST":
-            levels = [str(x) for x in (data.get("levels") or [])][:5]
-            if len(levels) < 3:
-                return False
-            row_h = min(0.8, h / len(levels))
-            for i, lv in enumerate(levels):
-                frac = 0.45 + (i / max(1, len(levels) - 1)) * 0.5
-                w = W_ * frac
-                _box(L_ + (W_ - w) / 2, top + i * row_h, w, row_h - 0.1, lv,
-                     fill=theme.primary_rgb, color=theme.accent_rgb, bold=True,
-                     size=12, align=PP_ALIGN.CENTER)
-            return True
-
-        # ── card grid ──────────────────────────────────────────────────────
-        if family == "LIST_STRUCTURED":
-            cards = data.get("cards") or []
-            cards = [c for c in cards if str(c.get("body", c)).strip()][:4]
-            if len(cards) < 3:
-                return False
-            cw = W_ / len(cards) - 0.2
-            for i, c in enumerate(cards):
-                x = L_ + i * (cw + 0.25)
-                head = str(c.get("heading", "")) if isinstance(c, dict) else ""
-                body = str(c.get("body", c)) if isinstance(c, dict) else str(c)
-                txt = (head + "\n" + body) if head else body
-                _box(x, top, cw, h * 0.8, txt, fill=theme.bg_rgb, size=11)
-            return True
-
-        # ── bar chart — horizontal bars ────────────────────────────────────
-        if family in {"CHART_CATEGORICAL", "CHART_RANKING", "CHART_PART_TO_WHOLE"}:
-            pts = []
-            for p in (data.get("points") or []):
-                try:
-                    pts.append((str(p.get("label", "")), float(p.get("value", 0))))
-                except (ValueError, TypeError):
-                    pass
-            pts = pts[:8]
-            if len(pts) < 2:
-                return False
-            mx = max(v for _, v in pts) or 1
-            row_h = min(0.55, h / len(pts))
-            for i, (lbl, val) in enumerate(pts):
-                y = top + i * row_h
-                _box(L_, y, W_ * 0.28, row_h - 0.06, lbl, size=11, align=PP_ALIGN.RIGHT)
-                bw = max(0.15, (W_ * 0.6) * val / mx)
-                bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE,
-                                             Inches(L_ + W_ * 0.3), Inches(y + 0.04),
-                                             Inches(bw), Inches(row_h - 0.14))
-                bar.fill.solid(); bar.fill.fore_color.rgb = theme.primary_rgb
-                bar.line.fill.background()
-                _box(L_ + W_ * 0.3 + bw + 0.05, y, W_ * 0.1, row_h - 0.06,
-                     ("%g" % val), size=10, color=theme.text_rgb)
-            return True
-
-        # ── timeline — dated rows ──────────────────────────────────────────
-        if family == "TIMELINE":
-            events = [e for e in (data.get("events") or []) if e.get("title")][:6]
-            if len(events) < 3:
-                return False
-            row_h = min(0.7, h / len(events))
-            for i, e in enumerate(events):
-                y = top + i * row_h
-                _box(L_, y, 1.2, row_h - 0.08, str(e.get("date", "")), bold=True,
-                     size=12, color=theme.primary_rgb)
-                _box(L_ + 1.35, y, W_ - 1.35, row_h - 0.08, str(e.get("title", "")),
-                     fill=theme.bg_rgb, size=11)
-            return True
-
-        # ── mind map — centre + chips ──────────────────────────────────────
-        if family == "MIND_MAP":
-            center = str(data.get("center", ""))
-            branches = [str(b) for b in (data.get("branches") or [])][:8]
-            if not center or len(branches) < 3:
-                return False
-            _box(L_ + W_ / 2 - 1.4, top, 2.8, 0.7, center, fill=theme.primary_rgb,
-                 color=theme.accent_rgb, bold=True, size=14, align=PP_ALIGN.CENTER)
-            per_row = 3
-            cw = W_ / per_row - 0.2
-            for i, br in enumerate(branches):
-                r, c = divmod(i, per_row)
-                _box(L_ + c * (cw + 0.25), top + 0.9 + r * 0.75, cw, 0.6, br,
-                     fill=theme.bg_rgb, size=11, align=PP_ALIGN.CENTER)
-            return True
-
-        return False
-    except Exception:
-        return False
-
-
-def _add_slide_transition(slide):
-    """Inject OpenXML transition tag for smooth slide entrance."""
-    try:
-        slide_elem = slide._element
-        transition = OxmlElement('p:transition')
-        transition.set('spd', 'med')
-        push = OxmlElement('p:push')
-        push.set('dir', 'l')
-        transition.append(push)
-        slide_elem.append(transition)
+        set_transition(slide, name)
     except Exception:
         pass
+
 
 def _add_header_bar(slide, title_text: str, theme: ColorPalette):
     header_bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(13.33), Inches(1.1))
@@ -276,30 +108,34 @@ def _add_header_bar(slide, title_text: str, theme: ColorPalette):
     strip.fill.solid(); strip.fill.fore_color.rgb = theme.accent_rgb
     strip.line.fill.background()
 
-    title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.1), Inches(12.3), Inches(0.9))
+    title_box = slide.shapes.add_textbox(Inches(L.MARGIN_X), Inches(0.1), Inches(L.SLIDE_W - 2 * L.MARGIN_X), Inches(0.9))
     tf = title_box.text_frame
     tf.word_wrap = True
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf.margin_left = tf.margin_right = 0
     tf.text = title_text
     p = tf.paragraphs[0]
-    p.font.size = Pt(L.fit_font_size([title_text], 12.3, 0.85, max_pt=30, min_pt=15))
+    p.font.size = Pt(L.fit_font_size([title_text], L.SLIDE_W - 2 * L.MARGIN_X, 0.85, max_pt=30, min_pt=15, bold=True))
     p.font.bold = True
     # accent text only when it genuinely contrasts with the bar; otherwise the readable colour
     p.font.color.rgb = _readable(theme.primary_rgb, prefer=theme.accent_rgb)
 
 
 def _add_footer(slide, n: int, total: int, theme: ColorPalette):
-    tb = slide.shapes.add_textbox(Inches(11.4), Inches(7.12), Inches(1.6), Inches(0.3))
-    tf = tb.text_frame
-    tf.text = f"{n} / {total}"
-    tf.paragraphs[0].alignment = PP_ALIGN.RIGHT
-    tf.paragraphs[0].font.size = Pt(10)
-    tf.paragraphs[0].font.color.rgb = theme.subtext_rgb
-    tb2 = slide.shapes.add_textbox(Inches(0.5), Inches(7.12), Inches(3), Inches(0.3))
-    tb2.text_frame.text = "Learnova"
-    tb2.text_frame.paragraphs[0].font.size = Pt(10)
-    tb2.text_frame.paragraphs[0].font.bold = True
-    tb2.text_frame.paragraphs[0].font.color.rgb = theme.subtext_rgb
+    """Footer band: identical position on every slide, text edges on the 0.5in margins."""
+    w = 3.0
+    for text, x, align, bold in (("Learnova", L.MARGIN_X, PP_ALIGN.LEFT, True),
+                                 (f"{n} / {total}", L.SLIDE_W - L.MARGIN_X - w, PP_ALIGN.RIGHT, False)):
+        tb = slide.shapes.add_textbox(Inches(x), Inches(L.FOOTER_Y), Inches(w), Inches(L.FOOTER_H))
+        tf = tb.text_frame
+        tf.margin_left = tf.margin_right = 0
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        tf.text = text
+        para = tf.paragraphs[0]
+        para.alignment = align
+        para.font.size = Pt(10)
+        para.font.bold = bold
+        para.font.color.rgb = theme.subtext_rgb
 
 
 def _add_takeaway_bar(slide, rows, theme: ColorPalette):
@@ -319,18 +155,19 @@ def _add_takeaway_bar(slide, rows, theme: ColorPalette):
         pass
     box.fill.solid(); box.fill.fore_color.rgb = fill
     box.line.fill.background()
-    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(band.left), Inches(band.top + 0.06),
-                                 Inches(0.09), Inches(max(0.1, band.height - 0.12)))
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(band.left), Inches(band.top + 0.14),
+                                 Inches(0.09), Inches(max(0.1, band.height - 0.28)))
     bar.fill.solid(); bar.fill.fore_color.rgb = theme.accent_rgb
     bar.line.fill.background()
 
     tf = box.text_frame
     tf.word_wrap = True
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-    tf.margin_left = Inches(0.25)
-    tf.margin_right = Inches(0.15)
+    tf.margin_left = Inches(L.PAD + 0.09)
+    tf.margin_right = Inches(L.PAD)
+    tf.margin_top = tf.margin_bottom = Inches(0.06)
     texts = [f"{lbl}:  {txt}" for lbl, txt in rows]
-    size = L.fit_font_size(texts, (band.width - 0.5) * 0.92, (band.height - 0.12) * 0.9, max_pt=15 if len(rows) == 1 else 12.5, min_pt=8.5, spacing_pt=2)
+    size = L.fit_font_size(texts, (band.width - 2 * L.PAD - 0.09) * 0.94, (band.height - 0.12) * 0.9, max_pt=16 if len(rows) == 1 else 13, min_pt=9, spacing_pt=2)
     ink = _readable(fill, prefer=theme.text_rgb)
     for i, (lbl, txt) in enumerate(rows):
         para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
@@ -355,7 +192,6 @@ def _add_figure_slide(prs, theme: ColorPalette, title_text: str, image_bytes: by
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = theme.bg_rgb
-        _add_slide_transition(slide)
         _add_header_bar(slide, f"{title_text} — Figure", theme)
 
         # Fit the image inside the content band, preserving aspect ratio, then
@@ -533,6 +369,7 @@ def _add_inline_quiz(slide, quiz: dict, theme: ColorPalette, has_takeaway: bool)
 def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentation",
                theme_id: str = "auto", theme_spec: dict | None = None,
                deck_plan=None) -> bytes:
+    reset_groups()
     theme = resolve_theme(topic_title, theme_id, theme_spec)
 
     # Deck Director → per-slide speaker notes (the PPTX notes pane). Best-effort.
@@ -585,6 +422,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
     # ── Content slides ────────────────────────────────────────────────────────
     prev_style = None
+    slide_meta = [{"slide": title_slide, "idx": None, "layout": "TITLE"}]
     for idx, data in enumerate(slides_data):
         orig = data.get("original", {})
         imp = data.get("improved", {})
@@ -594,9 +432,9 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = theme.bg_rgb
-        _add_slide_transition(slide)
 
         layout_type = imp.get("layout_type", "MINIMAL_TEXT").upper()
+        slide_meta.append({"slide": slide, "idx": idx, "layout": layout_type})
         style_pattern = select_slide_layout(idx, layout_type, prev_style)
         prev_style = style_pattern
 
@@ -642,115 +480,52 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
             _illo = imp.get("illustration") or None
             _draw_band = band
             if _illo and _illo.get("bytes"):
-                _pw = band.width * 0.3
-                _draw_band = L.Box(band.left, band.top, band.width - _pw - 0.25, band.height)
+                _pw = band.width * 0.26
+                _draw_band = L.Box(band.left, band.top, band.width - _pw - L.GUTTER, band.height)
             _family_drawn = draw_family(slide, _sp, theme, _draw_band)
             if _family_drawn and _illo and _illo.get("bytes"):
                 from learnova.rendering.pptx_visuals import _Canvas
 
-                _Canvas(slide, theme, band).picture(_illo["bytes"], band.left + band.width - _pw - 0.1, band.top + 0.12,
-                                                    _pw, band.height - 0.24)
+                with vis_group(slide):
+                    _Canvas(slide, theme, band).picture(_illo["bytes"], band.left + band.width - _pw, band.top, _pw, band.height)
 
         # ── 1. TABLE LAYOUT ──────────────────────────────────────────────────
         if _family_drawn:
             pass
         elif layout_type == "TABLE" and imp.get("table_headers") and imp.get("table_rows"):
+            from learnova.rendering.pptx_visuals import _Canvas, draw_table
+
             headers = imp.get("table_headers", [])
             rows = imp.get("table_rows", [])
 
             # Lead-in bullets sit above the grid; the table takes what is left,
             # so the two never overlap.
             lead = [str(b).strip() for b in (imp.get("bullets") or []) if str(b).strip()]
-            table_top = band.top
+            table_band = band
             if lead:
-                lead_h = min(band.height * 0.4,
-                             L.block_height(lead, band.width - 0.3, 13.0) + 0.1)
-                lead_box = slide.shapes.add_textbox(
-                    Inches(band.left), Inches(band.top),
-                    Inches(band.width), Inches(lead_h))
-                ltf = lead_box.text_frame
-                ltf.word_wrap = True
-                lead_pt = L.fit_font_size(lead, band.width - 0.3, lead_h,
-                                          max_pt=14, min_pt=9)
-                for i, line in enumerate(lead):
-                    lp = ltf.add_paragraph() if i else ltf.paragraphs[0]
-                    lp.text = line
-                    lp.font.size = Pt(lead_pt)
-                    lp.font.color.rgb = theme.text_rgb
-                table_top = band.top + lead_h + 0.12
-
+                lead_pt = L.fit_font_size(lead, band.width - 0.3, band.height * 0.3, max_pt=17, min_pt=11)
+                lead_h = min(band.height * 0.34, L.block_height(lead, band.width, lead_pt) + 0.1)
+                with vis_group(slide):
+                    lead_box = slide.shapes.add_textbox(Inches(band.left), Inches(band.top), Inches(band.width), Inches(lead_h))
+                    ltf = lead_box.text_frame
+                    ltf.word_wrap = True
+                    ltf.margin_left = ltf.margin_right = ltf.margin_top = ltf.margin_bottom = 0
+                    for i, line in enumerate(lead):
+                        lp = ltf.add_paragraph() if i else ltf.paragraphs[0]
+                        lp.text = line
+                        lp.font.size = Pt(lead_pt)
+                        lp.font.color.rgb = theme.text_rgb
+                top_off = lead_h + L.GUTTER
+                table_band = L.Box(band.left, band.top + top_off, band.width, band.height - top_off)
             if headers and rows:
-                num_rows = len(rows) + 1
-                num_cols = len(headers)
-                avail_h = max(0.6, band.top + band.height - table_top)
-                tbl_shape = slide.shapes.add_table(
-                    num_rows, num_cols,
-                    Inches(band.left), Inches(table_top),
-                    Inches(band.width), Inches(min(avail_h, num_rows * 0.42 + 0.3)))
-                tbl = tbl_shape.table
-
-                # Format Header Row
-                for c_idx, h_text in enumerate(headers):
-                    cell = tbl.cell(0, c_idx)
-                    cell.text = str(h_text)
-                    cell.fill.solid()
-                    cell.fill.fore_color.rgb = theme.primary_rgb
-                    for p in cell.text_frame.paragraphs:
-                        p.font.color.rgb = theme.accent_rgb
-                        p.font.bold = True
-                        p.font.size = Pt(14)
-
-                # Format Data Rows
-                for r_idx, row_vals in enumerate(rows):
-                    for c_idx, val in enumerate(row_vals):
-                        if c_idx < num_cols:
-                            cell = tbl.cell(r_idx + 1, c_idx)
-                            cell.text = str(val)
-                            cell.fill.solid()
-                            cell.fill.fore_color.rgb = theme.card_bg_rgb
-                            for p in cell.text_frame.paragraphs:
-                                p.font.size = Pt(12)
-                                p.font.color.rgb = theme.text_rgb
+                draw_table(_Canvas(slide, theme, table_band), headers, rows)
 
         # ── 2. METRIC STAT CALLOUT LAYOUT ─────────────────────────────────────
         elif layout_type == "METRIC":
-            metric_val = imp.get("metric_value", "100%")
-            metric_lbl = imp.get("metric_label", title_text)
-            metric_desc = imp.get("metric_desc", takeaway_text)
+            from learnova.rendering.pptx_visuals import draw_metric
 
-            m_w = min(9.33, band.width)
-            m_h = min(4.0, band.height)
-            box = slide.shapes.add_shape(
-                MSO_SHAPE.ROUNDED_RECTANGLE,
-                Inches(band.left + (band.width - m_w) / 2), Inches(band.top),
-                Inches(m_w), Inches(m_h))
-            box.fill.solid()
-            box.fill.fore_color.rgb = theme.primary_rgb
-            box.line.color.rgb = theme.accent_rgb
-            box.line.width = Pt(4)
-
-            mtf = box.text_frame
-            mtf.word_wrap = True
-
-            p1 = mtf.paragraphs[0]
-            p1.text = metric_val
-            p1.font.size = Pt(72)
-            p1.font.bold = True
-            p1.font.color.rgb = theme.accent_rgb
-            p1.alignment = PP_ALIGN.CENTER
-
-            p2 = mtf.add_paragraph()
-            p2.text = metric_lbl.upper()
-            p2.font.size = Pt(24)
-            p2.font.bold = True
-            p2.font.color.rgb = theme.subtext_rgb
-            p2.alignment = PP_ALIGN.CENTER
-
-            p3 = mtf.add_paragraph()
-            p3.text = metric_desc
-            p3.font.size = Pt(16)
-            p3.font.color.rgb = theme.text_rgb
-            p3.alignment = PP_ALIGN.CENTER
+            draw_metric(slide, theme, band, str(imp.get("metric_value", "100%")),
+                        str(imp.get("metric_label", title_text)), str(imp.get("metric_desc", takeaway_text)))
 
         # ── 3. INTERLEAVED QUIZ CHECKPOINT ────────────────────────────────────
         elif layout_type == "QUIZ":
@@ -759,183 +534,101 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
             correct_opt = str(imp.get("correct", "A")).strip()[:1].upper()
             explanation = str(imp.get("explanation", "")).strip()
             difficulty = str(imp.get("difficulty", "")).strip()
-            from learnova.rendering.pptx_visuals import _Canvas
+            from learnova.rendering.pptx_visuals import P, _Canvas
 
             qc = _Canvas(slide, theme, band)
-            # question card
-            qh = 1.35
-            qc.card(qc.x, qc.y, qc.w, qh, fill=_tint(theme.primary_rgb, 0.9), line=theme.primary_rgb, radius=0.1)
-            tag = qc.shape(MSO_SHAPE.ROUNDED_RECTANGLE, qc.x + 0.2, qc.y + 0.17, 2.6, 0.36, theme.primary_rgb, radius=0.5)
-            qc.text(0, 0, 0, 0, [(f"QUESTION  ·  {difficulty.upper() or 'CHECK'}", 10.5, True, _readable(theme.primary_rgb))],
-                    PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=tag)
-            qsz = qc.fit([q_text], qc.w - 0.6, qh - 0.7, 28, 16)
-            tb = slide.shapes.add_textbox(Inches(qc.x + 0.2), Inches(qc.y + 0.55), Inches(qc.w - 0.4), Inches(qh - 0.6))
-            tb.text_frame.word_wrap = True
-            tb.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-            r_ = tb.text_frame.paragraphs[0].add_run(); r_.text = q_text
-            r_.font.size = Pt(qsz); r_.font.bold = True; r_.font.color.rgb = _readable(_tint(theme.primary_rgb, 0.9), prefer=theme.primary_rgb)
+            PAD, GUT = L.PAD, L.GUTTER
+            # question card (stays visible)
+            qh = min(1.7, qc.h * 0.26)
+            qtint = _tint(theme.primary_rgb, 0.9)
+            with vis_group(slide):
+                qc.card(qc.x, qc.y, qc.w, qh, fill=qtint, line=theme.primary_rgb)
+                tag = qc.shape(MSO_SHAPE.ROUNDED_RECTANGLE, qc.x + PAD, qc.y + PAD * 0.75, 2.7, 0.36, theme.primary_rgb, radius=0.5)
+                qc.tb(0, 0, 0, 0, [P(f"QUESTION  ·  {difficulty.upper() or 'CHECK'}", 10.5, True, _readable(theme.primary_rgb))],
+                      MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=tag, inset=(0.05, 0, 0.05, 0))
+                tx, ty = qc.x + PAD, qc.y + PAD * 0.75 + 0.36 + 0.08
+                qsz = qc.fit([q_text], qc.w - 2 * PAD, qc.y + qh - PAD * 0.6 - ty, 28, 15, bold=True)
+                qc.tb(tx, ty, qc.w - 2 * PAD, qc.y + qh - PAD * 0.6 - ty,
+                      [P(q_text, qsz, True, _readable(qtint, prefer=theme.primary_rgb))], anchor=MSO_ANCHOR.MIDDLE)
 
-            # answer box height (revealed on the last click; shown in static exports)
-            ah = 0.95
-            gap = 0.22
-            top = qc.y + qh + gap
-            avail = qc.h - qh - gap - ah - gap
-            cw, ch = (qc.w - gap) / 2, (avail - gap) / 2
+            ah = min(1.15, qc.h * 0.2)
+            top = qc.y + qh + GUT
+            avail = qc.h - qh - GUT - ah - GUT
+            cw, ch = (qc.w - GUT) / 2, (avail - GUT) / 2
             letters = "ABCD"
-            for i, opt in enumerate(options):
-                r, k = divmod(i, 2)
-                x, y = qc.x + k * (cw + gap), top + r * (ch + gap)
-                qc.card(x, y, cw, ch, radius=0.1)
-                dd = min(0.62, ch * 0.5)
-                qc.badge(x + 0.2, y + (ch - dd) / 2, letters[i], d=dd)
-                osz = qc.fit([opt], cw - dd - 0.6, ch - 0.2, 22, 12)
-                ob = slide.shapes.add_textbox(Inches(x + dd + 0.4), Inches(y + 0.05), Inches(cw - dd - 0.55), Inches(ch - 0.1))
-                ob.text_frame.word_wrap = True
-                ob.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-                rr = ob.text_frame.paragraphs[0].add_run(); rr.text = opt
-                rr.font.size = Pt(osz); rr.font.color.rgb = theme.text_rgb
+            dd = min(L.BADGE_D + 0.1, ch * 0.5)
+            osz = min([qc.fit([o], cw - dd - 3 * PAD, ch - 0.2, 22, 12) for o in options] or [18])
+            with vis_group(slide):
+                for i, opt in enumerate(options):
+                    r, k = divmod(i, 2)
+                    x, y = qc.x + k * (cw + GUT), top + r * (ch + GUT)
+                    qc.card(x, y, cw, ch)
+                    qc.badge(x + PAD, y + (ch - dd) / 2, letters[i], d=dd)
+                    qc.tb(x + 2 * PAD + dd, y + 0.08, cw - dd - 3 * PAD, ch - 0.16, [P(opt, osz, False, theme.text_rgb)], anchor=MSO_ANCHOR.MIDDLE)
 
-            ans = qc.shape(MSO_SHAPE.ROUNDED_RECTANGLE, qc.x, qc.y + qc.h - ah, qc.w, ah, theme.primary_rgb, radius=0.12)
-            ink = _readable(theme.primary_rgb)
-            atf = ans.text_frame
-            atf.word_wrap = True
-            atf.vertical_anchor = MSO_ANCHOR.MIDDLE
-            atf.margin_left = Inches(0.3)
-            p1 = atf.paragraphs[0]
-            r1 = p1.add_run(); r1.text = f"Answer: {correct_opt}"
-            r1.font.size = Pt(18); r1.font.bold = True; r1.font.color.rgb = _readable(theme.primary_rgb, prefer=theme.accent_rgb)
-            if explanation:
-                p2 = atf.add_paragraph()
-                r2 = p2.add_run(); r2.text = explanation
-                r2.font.size = Pt(qc.fit([explanation], qc.w - 0.7, ah - 0.5, 15, 10.5)); r2.font.color.rgb = ink
+            # answer box — revealed on the last click (visible in static exports)
+            with vis_group(slide):
+                ans = qc.shape(MSO_SHAPE.ROUNDED_RECTANGLE, qc.x, qc.y + qc.h - ah, qc.w, ah, theme.primary_rgb, radius=0.12)
+                ink = _readable(theme.primary_rgb)
+                paras = [P(f"Answer: {correct_opt}", 20, True, _readable(theme.primary_rgb, prefer=theme.accent_rgb))]
+                if explanation:
+                    esz = qc.fit([explanation], qc.w - 2 * PAD, ah - 0.2 - 0.4, 16, 10.5)
+                    paras.append(P(explanation, esz, False, ink, 2))
+                qc.tb(0, 0, 0, 0, paras, MSO_ANCHOR.MIDDLE, PP_ALIGN.LEFT, shape=ans, inset=(PAD, 0.06, PAD, 0.06))
 
         # ── 4. FLOWCHART / PROCESS STEP CARDS ──────────────────────────────────
         elif layout_type == "FLOWCHART":
-            mermaid_code = imp.get("mermaid_code", "")
+            from learnova.rendering.pptx_visuals import draw_cards
+
             bullets = imp.get("bullets", [])
-
             steps = bullets if bullets else ["Step 1: Initiation", "Step 2: Execution", "Step 3: Completion"]
-            steps = [s for s in steps if str(s).strip()][:6]
-            cells = L.grid_cells(len(steps), band, max_per_row=4)
-            # One shared size so every card in the row reads evenly.
-            step_pt = min(
-                L.fit_font_size([s], c.width - 0.3, c.height - 0.9,
-                                max_pt=L.MAX_CARD_PT, min_pt=L.MIN_CARD_PT)
-                for s, c in zip(steps, cells)
-            ) if steps else L.MAX_CARD_PT
-
-            for idx, (step_text, cell) in enumerate(zip(steps, cells)):
-                card = slide.shapes.add_shape(
-                    MSO_SHAPE.ROUNDED_RECTANGLE,
-                    Inches(cell.left), Inches(cell.top),
-                    Inches(cell.width), Inches(cell.height))
-                card.fill.solid()
-                card.fill.fore_color.rgb = theme.primary_rgb if idx % 2 == 0 else theme.card_bg_rgb
-                card.line.color.rgb = theme.primary_rgb
-                card.line.width = Pt(2)
-
-                ctf = card.text_frame
-                ctf.word_wrap = True
-
-                heading, body = _split_card_label(step_text, f"STEP {idx + 1}")
-
-                sp1 = ctf.paragraphs[0]
-                sp1.text = heading
-                sp1.font.size = Pt(14)
-                sp1.font.bold = True
-                sp1.font.color.rgb = theme.accent_rgb if idx % 2 == 0 else theme.primary_rgb
-
-                sp2 = ctf.add_paragraph()
-                sp2.text = body
-                sp2.font.size = Pt(step_pt)
-                sp2.font.color.rgb = theme.text_rgb
+            steps = [s for s in steps if str(s).strip()][:8]
+            items = []
+            for n_, st in enumerate(steps):
+                head, body = _split_card_label(st, "")
+                items.append((head.title() if head else "", body))
+            if len(items) < 2 or not draw_cards(slide, theme, band, items, kind="process"):
+                draw_cards(slide, theme, band, items, kind="grid")
 
         # ── 5. CARD GRID LAYOUT ──────────────────────────────────────────────
         elif layout_type == "CARD_GRID":
-            bullets = imp.get("bullets", [])
+            from learnova.rendering.pptx_visuals import draw_cards
+
             # No placeholder cards: an empty grid used to render three boxes
             # literally reading "Pillar 1", "Pillar 2", "Pillar 3".
-            items = [b for b in (bullets or []) if str(b).strip()][:6]
-            cells = L.grid_cells(len(items), band, max_per_row=4)
-            card_pt = min(
-                L.fit_font_size([i], c.width - 0.3, c.height - 0.8,
-                                max_pt=L.MAX_CARD_PT, min_pt=L.MIN_CARD_PT)
-                for i, c in zip(items, cells)
-            )
-
-            for idx, (item_text, cell) in enumerate(zip(items, cells)):
-                card = slide.shapes.add_shape(
-                    MSO_SHAPE.ROUNDED_RECTANGLE,
-                    Inches(cell.left), Inches(cell.top),
-                    Inches(cell.width), Inches(cell.height))
-                card.fill.solid()
-                card.fill.fore_color.rgb = theme.card_bg_rgb
-                card.line.color.rgb = theme.primary_rgb
-                card.line.width = Pt(2)
-
-                ctf = card.text_frame
-                ctf.word_wrap = True
-
-                heading, body = _split_card_label(item_text, f"{idx + 1:02d}")
-
-                sp1 = ctf.paragraphs[0]
-                sp1.text = heading
-                sp1.font.size = Pt(14)
-                sp1.font.bold = True
-                sp1.font.color.rgb = theme.primary_rgb
-
-                sp2 = ctf.add_paragraph()
-                sp2.text = body
-                sp2.font.size = Pt(card_pt)
-                sp2.font.color.rgb = theme.text_rgb
-
-        # ── 5b. EXPANDED VISUAL FAMILY (from the Deck Director) ───────────────
-        elif _sp and getattr(_sp, "family", None) and getattr(_sp, "data", None) and \
-                _pptx_family(slide, _sp, theme, band):
-            pass  # drew a native structured visual; bullets are represented in it
+            items = [b for b in (imp.get("bullets") or []) if str(b).strip()][:6]
+            pairs = []
+            for it in items:
+                head, body = _split_card_label(it, "")
+                pairs.append((head.title() if head else "", body))
+            draw_cards(slide, theme, band, pairs, kind="grid")
 
         # ── 6. DEFAULT / MINIMAL TEXT + IMAGE COLUMN LAYOUT ───────────────────
         else:
+            from learnova.rendering.pptx_visuals import _Canvas, draw_bullets
+
             _show_img, _img_caption = _image_decision(orig)
             has_img = _show_img
             text_area, image_area = L.split_text_image(band, has_img)
 
             bullets = [str(b).replace("▪", "").strip()
                        for b in (imp.get("bullets") or []) if str(b).strip()]
-
-            body_box = slide.shapes.add_textbox(
-                Inches(text_area.left), Inches(text_area.top),
-                Inches(text_area.width), Inches(text_area.height))
-            btf = body_box.text_frame
-            btf.word_wrap = True
-
-            # One size for the whole list, chosen so every bullet fits the band.
-            body_pt = L.fit_font_size(bullets, text_area.width - 0.35,
-                                      text_area.height - 0.1,
-                                      max_pt=L.MAX_BODY_PT, min_pt=L.MIN_BODY_PT)
-
-            for i, clean_b in enumerate(bullets):
-                p = btf.add_paragraph() if i > 0 else btf.paragraphs[0]
-                p.text = clean_b
-                p.font.size = Pt(body_pt)
-                p.font.color.rgb = theme.text_rgb
-                p.space_after = Pt(max(4, body_pt * 0.45))
-                pPr = p._p.get_or_add_pPr()
-                SubElement(pPr, "a:buChar", char="•")
+            draw_bullets(slide, theme, text_area, bullets)
 
             if has_img:
                 try:
-                    slide.shapes.add_picture(
-                        io.BytesIO(orig["image"]["bytes"]),
-                        Inches(image_area.left), Inches(image_area.top),
-                        width=Inches(image_area.width))
+                    with vis_group(slide):
+                        _Canvas(slide, theme, band).picture(orig["image"]["bytes"], image_area.left, image_area.top,
+                                                            image_area.width, image_area.height)
                 except Exception:
                     pass
 
         if inline_quiz:
-            _add_inline_quiz(slide, inline_quiz, theme, bool(takeaway_text))
+            with vis_group(slide):
+                _add_inline_quiz(slide, inline_quiz, theme, bool(footer_rows))
 
-        _add_takeaway_bar(slide, footer_rows, theme)
+        with vis_group(slide):
+            _add_takeaway_bar(slide, footer_rows, theme)
 
         # A figure anchored to a non-MINIMAL layout gets its own slide, placed
         # immediately after so it stays with the content it belongs to.
@@ -943,26 +636,29 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         if layout_type != "MINIMAL_TEXT" and image and image.get("bytes"):
             _fig_show, _fig_caption = _image_decision(orig)
             if _fig_show:
-                _add_figure_slide(
+                if _add_figure_slide(
                     prs, theme, title_text, image["bytes"],
                     caption=(_fig_caption or image.get("description") or "")[:300],
-                )
+                ):
+                    slide_meta.append({"slide": prs.slides[len(prs.slides) - 1], "idx": None, "layout": "FIGURE",
+                                       "transition": "fade"})
 
     # ── Closing slide ─────────────────────────────────────────────────────────
     end_slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide_meta.append({"slide": end_slide, "idx": None, "layout": "END", "transition": "fade"})
     end_slide.background.fill.solid()
     end_slide.background.fill.fore_color.rgb = theme.primary_rgb
     for d, col, x, y in ((5.4, _tint(theme.accent_rgb, 0.1), -1.4, 4.6), (2.8, _tint(theme.primary_rgb, 0.25), 10.6, -0.9)):
         o = end_slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(d), Inches(d))
         o.fill.solid(); o.fill.fore_color.rgb = col
         o.line.fill.background()
-    tfe = end_slide.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11.3), Inches(1.6)).text_frame
+    tfe = end_slide.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11.33), Inches(1.6)).text_frame
     tfe.text = "Thank you"
     tfe.paragraphs[0].font.size = Pt(64)
     tfe.paragraphs[0].font.bold = True
     tfe.paragraphs[0].font.color.rgb = _readable(theme.primary_rgb)
     tfe.paragraphs[0].alignment = PP_ALIGN.CENTER
-    tq = end_slide.shapes.add_textbox(Inches(1), Inches(4.0), Inches(11.3), Inches(0.8)).text_frame
+    tq = end_slide.shapes.add_textbox(Inches(1), Inches(4.0), Inches(11.33), Inches(0.8)).text_frame
     tq.text = "Questions?"
     tq.paragraphs[0].font.size = Pt(26)
     tq.paragraphs[0].font.color.rgb = _readable(theme.primary_rgb, prefer=theme.accent_rgb)
@@ -970,43 +666,44 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
     _apply_theme_fonts(prs, theme)
 
-    # ── Optional per-shape entrance animations (LEARNOVA_PPTX_ANIM=1) ─────────
+    # ── Slide transitions (Deck Director) and click-build animations ─────────
     try:
         from learnova.rendering.pptx_animation import (
-            animations_enabled,
-            apply_click_builds,
-            strip_all_timing,
+            animations_enabled, apply_click_builds, merge_groups, set_transition, strip_all_timing,
         )
 
-        if animations_enabled():
-            content_slides = list(prs.slides)[1:-1]  # skip title + thank-you
-            deck_layouts = [
-                str((e.get("improved") or {}).get("layout_type", "")).upper()
-                for e in slides_data
-            ]
-            for idx, slide in enumerate(content_slides):
-                sp = deck_plan.by_index(idx) if deck_plan is not None else None
-                n_groups = len((getattr(sp, "animation", {}) or {}).get("steps", []) or []) if sp else 0
-                is_quiz = idx < len(deck_layouts) and deck_layouts[idx] == "QUIZ"
-                if is_quiz:
-                    # Question stays visible; options reveal one per click, the
-                    # answer + explanation box reveals last. Skip header(0),
-                    # title(1) and the question box(2).
-                    shape_ids = [s.shape_id for s in slide.shapes][6:12]
-                else:
-                    shape_ids = [s.shape_id for s in slide.shapes][5:11]
-                    if n_groups >= 2:
-                        shape_ids = shape_ids[: max(2, n_groups)]
-                apply_click_builds(slide, shape_ids)
+        for meta in slide_meta:
+            sp = deck_plan.by_index(meta["idx"]) if (deck_plan is not None and meta["idx"] is not None) else None
+            name = meta.get("transition") or (getattr(sp, "transition", "none") if sp else "none")
+            if meta["layout"] != "TITLE":
+                set_transition(meta["slide"], name)
 
-            # Validate: the file must still round-trip through python-pptx.
-            check = io.BytesIO()
-            prs.save(check)
-            check.seek(0)
-            try:
-                Presentation(check)
-            except Exception:
-                strip_all_timing(prs)
+        if animations_enabled():
+            for meta in slide_meta:
+                if meta["idx"] is None:
+                    continue
+                sp = deck_plan.by_index(meta["idx"]) if deck_plan is not None else None
+                groups = groups_for(meta["slide"])
+                if meta["layout"] == "QUIZ":
+                    # question visible; the four options together on click 1; the answer on the last click
+                    apply_click_builds(meta["slide"], groups, static_first=True)
+                    continue
+                anim = (getattr(sp, "animation", None) or {}) if sp else {}
+                if anim.get("mode") == "static":
+                    continue
+                n_steps = len(anim.get("steps") or [])
+                if n_steps >= 2 and len(groups) > n_steps:
+                    groups = merge_groups(groups, n_steps)
+                apply_click_builds(meta["slide"], groups, static_first=True)
+
+        # Validate: the file must still round-trip through python-pptx.
+        check = io.BytesIO()
+        prs.save(check)
+        check.seek(0)
+        try:
+            Presentation(check)
+        except Exception:
+            strip_all_timing(prs)
     except Exception:
         pass
 

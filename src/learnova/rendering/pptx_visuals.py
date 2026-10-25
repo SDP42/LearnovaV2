@@ -3,6 +3,15 @@ Native PowerPoint drawing for every visual family the Content Decision Engine ca
 choose. Shapes, tables and real chart objects — editable in PowerPoint, no
 screenshots — so the .pptx matches the web deck instead of falling back to bullets.
 
+Every drawer follows one grid (see ``layout``): content starts at the 0.5in margin,
+cards are separated by the 0.22in gutter, and every card/box uses the same 0.22in
+internal padding, icon disc and badge sizes. Type is fitted to the box (shared
+across sibling cards so a row reads evenly) and compositions are centred in the band
+so no visual leaves a big empty area or overflows.
+
+Each drawer records ordered *groups* of shape ids (a card = rectangle + text + icon;
+a timeline event; a table …). ``pptx_animation`` turns them into click builds.
+
 ``draw_family`` returns True if it drew something. Any family without a bespoke
 drawing is rendered as a card grid built from its text, so a visual slide never
 degrades to a plain bullet list.
@@ -10,21 +19,55 @@ degrades to a plain bullet list.
 
 from __future__ import annotations
 
+import io
 import math
-from typing import Any, Dict, List, Sequence, Tuple
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.oxml import parse_xml
 from pptx.util import Emu, Inches, Pt
 
 from learnova.logging_config import logger
 from learnova.rendering import layout as L
 from learnova.visuals.icons import icon_png, pick_icons
 
+PAD, GUT, ICON_D, BADGE_D = L.PAD, L.GUTTER, L.ICON_D, L.BADGE_D
+_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 
+
+# ── animation group registry ─────────────────────────────────────────────────
+_GROUPS: Dict[int, List[List[int]]] = {}
+
+
+def reset_groups() -> None:
+    _GROUPS.clear()
+
+
+def groups_for(slide) -> List[List[int]]:
+    """Ordered shape-id groups recorded for ``slide`` (empty if none)."""
+    return [list(g) for g in _GROUPS.get(slide.slide_id, [])]
+
+
+def add_group(slide, ids: Sequence[int]) -> None:
+    ids = [int(i) for i in ids]
+    if ids:
+        _GROUPS.setdefault(slide.slide_id, []).append(ids)
+
+
+@contextmanager
+def group(slide):
+    """Record every shape created inside the block as one animation group."""
+    n0 = len(slide.shapes)
+    yield
+    add_group(slide, [sh.shape_id for sh in list(slide.shapes)[n0:]])
+
+
+# ── colour helpers ───────────────────────────────────────────────────────────
 def _blend(rgb: RGBColor, t: float) -> RGBColor:
     """Mix ``rgb`` toward white by ``t`` (0 = rgb, 1 = white)."""
     r, g, b = rgb[0], rgb[1], rgb[2]
@@ -36,23 +79,53 @@ def _on(rgb: RGBColor) -> RGBColor:
     return RGBColor(0x10, 0x14, 0x24) if lum > 150 else RGBColor(0xFF, 0xFF, 0xFF)
 
 
+def _readable_accent(theme) -> RGBColor:
+    """Accent colour for text on a white card — falls back to the primary when the accent is too pale."""
+    a = theme.accent_rgb
+    lum = 0.299 * a[0] + 0.587 * a[1] + 0.114 * a[2]
+    return theme.primary_rgb if lum > 150 else a
+
+
+def _hex(rgb: RGBColor) -> str:
+    return "%02X%02X%02X" % (rgb[0], rgb[1], rgb[2])
+
+
+class P(NamedTuple):
+    """One paragraph: text, size (pt), bold, colour, space-before (pt), hanging bullet."""
+    text: str
+    size: float
+    bold: bool = False
+    color: Optional[RGBColor] = None
+    before: float = 0.0
+    bullet: bool = False
+
+
+def _bullet(p, color: RGBColor, indent_in: float = 0.3) -> None:
+    pPr = p._p.get_or_add_pPr()
+    pPr.set("marL", str(int(Inches(indent_in))))
+    pPr.set("indent", str(-int(Inches(indent_in))))
+    pPr.append(parse_xml(f'<a:buClr xmlns:a="{_A}"><a:srgbClr val="{_hex(color)}"/></a:buClr>'))
+    pPr.append(parse_xml(f'<a:buFont xmlns:a="{_A}" typeface="Arial"/>'))
+    pPr.append(parse_xml(f'<a:buChar xmlns:a="{_A}" char="•"/>'))
+
+
 class _Canvas:
     def __init__(self, slide, theme, band, reserve: float = 0.0):
         self.s, self.t = slide, theme
-        self.x = band.left + 0.3
-        self.y = band.top + 0.1
-        self.w = band.width - 0.6
-        self.h = band.height - 0.2 - reserve
+        self.x, self.y = band.left, band.top
+        self.w, self.h = band.width, band.height - reserve
         self.tint = _blend(theme.primary_rgb, 0.9)
-        # type scale: body text grows to fill roomy slides, shrinks when a quiz/takeaway squeezes the band
-        self.k = max(0.62, min(1.28, self.h / 4.2))
 
-    # -- primitives -----------------------------------------------------------
-    def shape(self, kind, x, y, w, h, fill=None, line=None, line_w=0.75, radius=0.12):
+    # -- grouping --------------------------------------------------------------
+    def group(self):
+        return group(self.s)
+
+    # -- primitives --------------------------------------------------------------
+    def shape(self, kind, x, y, w, h, fill=None, line=None, line_w=1.0, radius=0.1):
         shp = self.s.shapes.add_shape(kind, Inches(x), Inches(y), Inches(max(0.05, w)), Inches(max(0.05, h)))
         if kind == MSO_SHAPE.ROUNDED_RECTANGLE:
             try:
-                shp.adjustments[0] = radius
+                shp.adjustments[0] = min(0.5, radius)
             except Exception:
                 pass
         if fill is None:
@@ -68,62 +141,75 @@ class _Canvas:
         shp.shadow.inherit = False
         return shp
 
-    def card(self, x, y, w, h, fill=None, line=None, radius=0.1):
+    def card(self, x, y, w, h, fill=None, line=None, radius=0.07):
+        # radius is an absolute corner size so small and large cards share one visual radius
+        r = radius / max(0.3, min(w, h)) * 2.2
         return self.shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h, fill or self.t.card_bg_rgb,
-                          line or _blend(self.t.primary_rgb, 0.7), radius=radius)
+                          line or _blend(self.t.primary_rgb, 0.72), radius=r)
 
-    def text(self, x, y, w, h, runs: Sequence[Tuple[str, float, bool, RGBColor]], align=PP_ALIGN.LEFT,
-             anchor=MSO_ANCHOR.TOP, shape=None):
+    def accent_bar(self, x, y, h, w=0.09, color=None):
+        return self.shape(MSO_SHAPE.RECTANGLE, x, y, w, h, color or self.t.accent_rgb)
+
+    def tb(self, x, y, w, h, paras: Sequence[P], anchor=MSO_ANCHOR.TOP, align=PP_ALIGN.LEFT, shape=None,
+           inset: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0), bullet_color=None):
+        """Text box (or text inside ``shape``) with explicit insets, so text edges sit exactly on the grid."""
         shp = shape or self.s.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
         tf = shp.text_frame
         tf.word_wrap = True
         tf.vertical_anchor = anchor
-        tf.margin_left = tf.margin_right = Inches(0.08)
-        tf.margin_top = tf.margin_bottom = Inches(0.04)
+        tf.margin_left, tf.margin_top, tf.margin_right, tf.margin_bottom = (Inches(v) for v in inset)
         first = True
-        for txt, size, bold, color in runs:
+        for para in paras:
+            if not str(para.text).strip():
+                continue
             p = tf.paragraphs[0] if first else tf.add_paragraph()
+            if para.before and not first:
+                p.space_before = Pt(para.before)
             first = False
             p.alignment = align
+            if para.bullet:
+                _bullet(p, bullet_color or self.t.accent_rgb)
             r = p.add_run()
-            r.text = str(txt)
-            r.font.size = Pt(max(8, round(size * self.k, 1)))
-            r.font.bold = bold
-            r.font.color.rgb = color
+            r.text = str(para.text)
+            r.font.size = Pt(round(para.size, 1))
+            r.font.bold = para.bold
+            r.font.color.rgb = para.color or self.t.text_rgb
         return shp
 
-    def fit(self, texts, w, h, mx=24.0, mn=10.0, spacing=6.0) -> float:
-        """Largest point size at which ``texts`` fill a w×h box without overflowing (then the type scale ``k`` is NOT applied)."""
-        return L.fit_font_size([t for t in texts if t], max(0.3, w), max(0.2, h), max_pt=mx, min_pt=mn, spacing_pt=spacing)
+    def text(self, x, y, w, h, runs, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP, shape=None):
+        """Back-compat: runs are ``(text, size, bold, colour)`` tuples."""
+        paras = [P(t, s, b, col, 4 if i else 0) for i, (t, s, b, col) in enumerate(runs)]
+        return self.tb(x, y, w, h, paras, anchor, align, shape, inset=(PAD * 0.5, 0.05, PAD * 0.5, 0.05) if shape else (0, 0, 0, 0))
 
-    def runs_fit(self, x, y, w, h, head, body, hmax=26, bmax=19, anchor=MSO_ANCHOR.TOP, align=PP_ALIGN.LEFT,
-                 head_color=None, body_color=None):
-        """Heading + body sized so the pair fills the box (heading ≈ 1.35× body)."""
-        iw, ih = (w - 0.2) * 0.9, (h - 0.12) * 0.94   # safety margin: real glyphs run wider than the estimate
-        bsz = self.fit([body], iw, ih * (0.62 if head else 1.0), bmax, 10.5) if body else 0
-        hsz = min(hmax, max(13.0, (bsz * 1.35) if body else self.fit([head], iw, ih, hmax, 13)))
-        hsz = min(hsz, self.fit([head], iw, ih * 0.45 if body else ih, hmax, 12)) if head else 0
-        shp = self.s.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
-        tf = shp.text_frame
-        tf.word_wrap = True
-        tf.vertical_anchor = anchor
-        tf.margin_left = tf.margin_right = Inches(0.1)
-        tf.margin_top = tf.margin_bottom = Inches(0.05)
-        first = True
-        for txt, size, bold, color in ((head, hsz, True, head_color or self.t.primary_rgb), (body, bsz, False, body_color or self.t.text_rgb)):
-            if not txt:
-                continue
-            para = tf.paragraphs[0] if first else tf.add_paragraph()
-            if not first:
-                para.space_before = Pt(5)
-            first = False
-            para.alignment = align
-            r = para.add_run()
-            r.text = str(txt)
-            r.font.size = Pt(size)
-            r.font.bold = bold
-            r.font.color.rgb = color
-        return shp
+    def fit(self, texts, w, h, mx=24.0, mn=10.0, spacing=6.0, bold=False) -> float:
+        """Largest point size at which ``texts`` fill a w×h box without overflowing."""
+        return L.fit_font_size([t for t in texts if t], max(0.3, w), max(0.2, h), max_pt=mx, min_pt=mn,
+                               spacing_pt=spacing, bold=bold)
+
+    def fit_paras(self, make: Callable[[float], List[P]], w, h, hi=24.0, lo=10.0) -> float:
+        """Largest base size ``b`` (0.5pt steps) at which ``make(b)`` fits w×h; never below ``lo``."""
+        b = hi
+        while b > lo:
+            ps = make(b)
+            if L.paras_height([(p.text, p.size, p.bold, p.before) for p in ps], w) <= h and \
+                    L.longest_word_fits([p.text for p in ps], w, min(p.size for p in ps), any(p.bold for p in ps)):
+                return b
+            b -= 0.5
+        return lo
+
+    def pair(self, head: str, body: str, b: float, hs: float = 1.2, head_color=None, body_color=None,
+             lone_bold: Optional[bool] = None) -> List[P]:
+        """Heading + body as paragraphs. A lone short phrase is a bold heading; a lone sentence is body text."""
+        hc, bc = head_color or self.t.primary_rgb, body_color or self.t.text_rgb
+        head, body = (head or "").strip(), (body or "").strip()
+        if head and body:
+            return [P(head, b * hs, True, hc), P(body, b, False, bc, 5)]
+        t = head or body
+        if lone_bold is None:
+            lone_bold = len(t) <= 46
+        if lone_bold:
+            return [P(t, b * hs, True, hc)]
+        return [P(t, b, False, bc)]
 
     def icon_circle(self, x, y, d, name, fill=None, color=None):
         """A tinted disc with a concept icon (PNG) centred in it."""
@@ -131,41 +217,56 @@ class _Canvas:
         self.shape(MSO_SHAPE.OVAL, x, y, d, d, fill)
         hexc = "#%02x%02x%02x" % tuple((color or self.t.primary_rgb)[i] for i in range(3))
         try:
-            self.s.shapes.add_picture(__import__("io").BytesIO(icon_png(name, hexc, 192)), Inches(x + d * 0.2), Inches(y + d * 0.2),
+            self.s.shapes.add_picture(io.BytesIO(icon_png(name, hexc, 192)), Inches(x + d * 0.2), Inches(y + d * 0.2),
                                       Inches(d * 0.6), Inches(d * 0.6))
         except Exception:
             pass
 
     def picture(self, png: bytes, x, y, w, h):
         """Place a PNG so it covers the (x, y, w, h) box without distortion (centre-cropped)."""
-        import io
-
         from PIL import Image
 
         im = Image.open(io.BytesIO(png))
         iw, ih = im.size
         box_ratio, img_ratio = w / h, iw / ih
         if img_ratio > box_ratio:   # too wide → crop sides
-            nw = int(ih * box_ratio); l = (iw - nw) // 2
+            nw = int(ih * box_ratio)
+            l = (iw - nw) // 2
             im = im.crop((l, 0, l + nw, ih))
         else:
-            nh = int(iw / box_ratio); t = (ih - nh) // 2
+            nh = int(iw / box_ratio)
+            t = (ih - nh) // 2
             im = im.crop((0, t, iw, t + nh))
-        buf = io.BytesIO(); im.save(buf, "PNG"); buf.seek(0)
+        buf = io.BytesIO()
+        im.save(buf, "PNG")
+        buf.seek(0)
         return self.s.shapes.add_picture(buf, Inches(x), Inches(y), Inches(w), Inches(h))
 
-    def badge(self, x, y, n, d=0.42, fill=None):
+    def badge(self, x, y, n, d=BADGE_D, fill=None):
         fill = fill or self.t.primary_rgb
         shp = self.shape(MSO_SHAPE.OVAL, x, y, d, d, fill)
-        self.text(0, 0, 0, 0, [(str(n), 13, True, _on(fill))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=shp)
+        self.tb(0, 0, 0, 0, [P(str(n), max(11, d * 26), True, _on(fill))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=shp)
         return shp
 
-
-def _readable_accent(theme) -> RGBColor:
-    """Accent colour for text on a white card — falls back to the primary when the accent is too pale."""
-    a = theme.accent_rgb
-    lum = 0.299 * a[0] + 0.587 * a[1] + 0.114 * a[2]
-    return theme.primary_rgb if lum > 150 else a
+    # -- composition helpers ---------------------------------------------------
+    def cells(self, n: int, cols: int, gut: float = GUT, max_ch: Optional[float] = None,
+              area: Optional[Tuple[float, float, float, float]] = None):
+        """Cards tiling the area: rows balanced, last row's cards widened to fill it, grid centred vertically."""
+        ax, ay, aw, ah = area or (self.x, self.y, self.w, self.h)
+        cols = max(1, min(cols, n))
+        rows = math.ceil(n / cols)
+        base, extra = divmod(n, rows)
+        counts = [base + 1 if r < extra else base for r in range(rows)]
+        ch = (ah - gut * (rows - 1)) / rows
+        if max_ch and ch > max_ch:
+            ch = max_ch
+        oy = (ah - (ch * rows + gut * (rows - 1))) / 2
+        out = []
+        for r, cnt in enumerate(counts):
+            cw = (aw - gut * (cnt - 1)) / cnt
+            for k in range(cnt):
+                out.append((ax + k * (cw + gut), ay + oy + r * (ch + gut), cw, ch))
+        return out, ch
 
 
 def _pt(n_chars: int, base: float, lo: float, scale: float = 1.0) -> float:
@@ -184,39 +285,99 @@ def _flatten(data: Any, out: List[str]) -> None:
             _flatten(v, out)
 
 
+def _same(a: str, b: str) -> bool:
+    return a.strip().lower().rstrip(". ") == b.strip().lower().rstrip(". ")
+
+
+def _lone_bold(items: Sequence[Tuple[str, str]]) -> bool:
+    """Single-text cards are bold headings only when EVERY such card is a short phrase (one style per slide)."""
+    singles = [(h or b) for h, b in items if not (h and b)]
+    return bool(singles) and all(len(t) <= 46 for t in singles)
+
+
+def _shared(fits: Sequence[float]) -> float:
+    """Common type size for sibling cards: the smallest fit, but one outlier may not drag the rest below 70% of the median."""
+    srt = sorted(fits)
+    med = srt[len(srt) // 2]
+    return max(min(fits), 0.7 * med)
+
+
+def _auto_cols(n: int, w: float, min_cw: float = 3.3) -> int:
+    fit = max(1, int((w + GUT) // (min_cw + GUT)))
+    return max(1, min(n, fit, 4 if n == 4 and fit >= 4 else 3))
+
+
+# ── card grid (icons / badges) ───────────────────────────────────────────────
 def _grid(c: _Canvas, items: List[Tuple[str, str]], numbered: bool = False, cols: int = 0, icons: bool = True) -> None:
-    """Cards that tile the whole canvas (no leftover whitespace); each carries an icon and fitted text."""
+    """Cards tiling the canvas; each carries an icon (or badge) and text fitted to one shared size."""
     n = len(items)
-    cols = cols or (1 if n == 1 else 2 if n in (2, 4) else 3)
-    rows = math.ceil(n / cols)
-    gap = 0.24
-    cw = (c.w - gap * (cols - 1)) / cols
-    ch = (c.h - gap * (rows - 1)) / rows
-    names = pick_icons(" ".join(h + " " + b for h, b in items), n + 3)
+    clean: List[Tuple[str, str]] = []
+    for head, body in items:
+        if body and (body.lower().startswith(head.lower().rstrip('. ')) or _same(head, body)):
+            head, body = body, ""   # the heading was just the opening words — show the sentence once
+        clean.append((head, body))
+    lead = ICON_D + 0.16
+    has_lead = icons or numbered
+    lb = _lone_bold(clean)
+
+    def plan(nc: int):
+        cells, ch_full = c.cells(n, nc)
+        horiz = ch_full <= 2.45 and min(w for _, _, w, _ in cells) >= 3.0
+
+        def text_box(cell):
+            x, y, w, h = cell
+            if horiz:
+                return w - 2 * PAD - ICON_D - 0.2, h - 0.16
+            return w - 2 * PAD, h - 2 * PAD - (lead if has_lead else 0)
+        fits = [c.fit_paras(lambda b, hd=hd, bd=bd: c.pair(hd, bd, b, lone_bold=lb), *text_box(cell), 26, 10.5)
+                for (hd, bd), cell in zip(clean, cells)]
+        return cells, ch_full, horiz, text_box, _shared(fits), fits
+
+    if cols:
+        cands = [cols]
+    else:
+        cands = [k for k in range(1, min(n, 4) + 1) if (c.w - GUT * (k - 1)) / k >= 2.7] or [1]
+    best = None
+    for k in cands:
+        pl = plan(k)
+        score = min(pl[5]) * 0.5 + pl[4] * 0.5 - (0.0 if n % math.ceil(n / k) == 0 or n % k == 0 else 0.8)
+        if best is None or score > best[0] + 0.01:
+            best = (score, k, pl)
+    cols = best[1]
+    cells, ch_full, horiz, text_box, b, fits = best[2]
+    sz = [min(f, b) for f in fits]   # every card at the shared size; an outlier keeps its own smaller fit
+    # shrink card height to the content when the content is much smaller than the band
+    need = max(L.paras_height([(p.text, p.size, p.bold, p.before) for p in c.pair(h_, bd_, z, lone_bold=lb)], text_box(cells[0])[0])
+               for (h_, bd_), z in zip(clean, sz))
+    need_h = (need + 0.16 if horiz else need + 2 * PAD + (lead if has_lead else 0))
+    max_ch = max(need_h * 1.28, ch_full * 0.62, 1.3) if need_h < ch_full else None
+    if max_ch:
+        cells, ch_full = c.cells(n, cols, max_ch=max_ch)
     used: List[str] = []
-    for i, (head, body) in enumerate(items):
-        if body and body.lower().rstrip('. ').startswith(head.lower().rstrip('. ')):
-            head, body = body, ""   # the heading was just the opening words — show the sentence once, large
-        r, k = divmod(i, cols)
-        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
-        c.card(x, y, cw, ch, radius=0.08)
-        horiz = cw > 3.4 and ch < 2.2
-        d = min(0.78, ch * 0.34, cw * 0.28)
-        if icons:
-            mine = pick_icons(head + " " + body, 6)
-            name = next((m for m in mine if m not in used), mine[0])
-            used.append(name)
-            c.icon_circle(x + 0.2, y + 0.2, d, name)
-        elif numbered:
-            c.badge(x + 0.2, y + 0.2, i + 1, d=d)
-        top_off = 0.0 if horiz else (d + 0.3 if (icons or numbered) else 0.1)
-        left_off = (d + 0.4) if horiz and (icons or numbered) else 0.1
-        c.runs_fit(x + left_off, y + (0.15 if horiz else top_off), cw - left_off - 0.1, ch - (0.3 if horiz else top_off) - 0.1, head, body,
-                   anchor=MSO_ANCHOR.MIDDLE if horiz or not (icons or numbered) else MSO_ANCHOR.TOP)
+    for i, ((head, body), (x, y, cw, ch)) in enumerate(zip(clean, cells)):
+        with c.group():
+            c.card(x, y, cw, ch)
+            if icons:
+                mine = pick_icons(head + " " + body, 6)
+                name = next((m for m in mine if m not in used), mine[0])
+                used.append(name)
+                if horiz:
+                    c.icon_circle(x + PAD, y + (ch - ICON_D) / 2, ICON_D, name)
+                else:
+                    c.icon_circle(x + PAD, y + PAD, ICON_D, name)
+            elif numbered:
+                c.badge(x + PAD, y + (ch - BADGE_D) / 2 if horiz else y + PAD, i + 1)
+            if horiz:
+                tx = x + PAD + (ICON_D if icons else BADGE_D) + 0.2
+                c.tb(tx, y + 0.08, x + cw - PAD - tx, ch - 0.16, c.pair(head, body, sz[i], lone_bold=lb), anchor=MSO_ANCHOR.MIDDLE)
+            else:
+                ty = y + PAD + (lead if has_lead else 0)
+                c.tb(x + PAD, ty, cw - 2 * PAD, y + ch - PAD - ty, c.pair(head, body, sz[i], lone_bold=lb),
+                     anchor=MSO_ANCHOR.TOP if has_lead else MSO_ANCHOR.MIDDLE)
 
 
 # ── family drawers ────────────────────────────────────────────────────────────
-def _process(c: _Canvas, data, cyclic: bool) -> bool:
+def _process(c: _Canvas, data, cyclic: bool, foot_text: str = "") -> bool:
     raw = data.get("stages") or data.get("steps") or []
     items = []
     for st in raw[:8]:
@@ -226,26 +387,53 @@ def _process(c: _Canvas, data, cyclic: bool) -> bool:
             items.append((str(st), ""))
     if len(items) < 2:
         return False
+    return _flow(c, items, cyclic, foot_text or ("↻  and the cycle repeats" if cyclic else ""))
+
+
+def _flow(c: _Canvas, items: List[Tuple[str, str]], cyclic: bool = False, foot_text: str = "") -> bool:
     n = len(items)
     per = n if n <= 4 else math.ceil(n / 2)
+    foot = 0.5 if foot_text else 0.0
+    arrow_gap = 0.42
+    area_h = c.h - foot
     rows = math.ceil(n / per)
-    gap = 0.42
-    foot = 0.5 if cyclic else 0.0
-    cw = (c.w - gap * (per - 1)) / per
-    ch = (c.h - foot - 0.3 * (rows - 1)) / rows
+    items = [(h, "" if _same(h, d) else d) for h, d in items]
+    cw = (c.w - arrow_gap * (per - 1)) / per
+    ch_full = (area_h - GUT * (rows - 1)) / rows
+
+    horiz = ch_full < 2.4 or cw < 2.4
+
+    def tbox(h_full):
+        if horiz:
+            return cw - 2 * PAD - BADGE_D - 0.18, h_full - 2 * PAD
+        return cw - 2 * PAD, h_full - 2 * PAD - BADGE_D - 0.16
+    lb = _lone_bold(items)
+    fits = [c.fit_paras(lambda b, h_=h, d_=d: c.pair(h_, d_, b, lone_bold=lb), *tbox(ch_full), 30, 10.5) for h, d in items]
+    b = _shared(fits)
+    sz = [min(f, b) for f in fits]
+    tw0 = tbox(ch_full)[0]
+    need = max(L.paras_height([(p.text, p.size, p.bold, p.before) for p in c.pair(h, d, z, lone_bold=lb)], tw0) for (h, d), z in zip(items, sz))
+    need_h = need + 2 * PAD + (0 if horiz else BADGE_D + 0.16)
+    ch = min(ch_full, max(need_h * 1.3, ch_full * 0.6, 1.4))
+    total = rows * ch + GUT * (rows - 1) + foot
+    oy = max(0.0, (c.h - total) / 2)
     for i, (lab, det) in enumerate(items):
         r, k = divmod(i, per)
-        x, y = c.x + k * (cw + gap), c.y + r * (ch + 0.3)
-        c.card(x, y, cw, ch, radius=0.08)
-        d = min(0.62, ch * 0.28)
-        c.badge(x + 0.2, y + 0.2, i + 1, d=d)
-        if det and det.strip().lower() == lab.strip().lower():
-            det = ""
-        c.runs_fit(x + 0.05, y + d + 0.3, cw - 0.1, ch - d - 0.4, lab, det, hmax=22, bmax=16)
-        if k < per - 1 and i < n - 1:
-            c.shape(MSO_SHAPE.RIGHT_ARROW, x + cw + 0.04, y + ch / 2 - 0.17, gap - 0.08, 0.34, c.t.accent_rgb)
-    if cyclic:
-        c.text(c.x, c.y + c.h - 0.46, c.w, 0.42, [("↻  and the cycle repeats", 15, True, c.t.primary_rgb)], PP_ALIGN.CENTER)
+        x, y = c.x + k * (cw + arrow_gap), c.y + oy + r * (ch + GUT)
+        with c.group():
+            if k > 0:   # connector arrow travels with the step it leads into
+                c.shape(MSO_SHAPE.RIGHT_ARROW, x - arrow_gap + 0.06, y + ch / 2 - 0.17, arrow_gap - 0.12, 0.34, c.t.accent_rgb)
+            c.card(x, y, cw, ch)
+            if horiz:
+                c.badge(x + PAD, y + (ch - BADGE_D) / 2, i + 1)
+                c.tb(x + PAD + BADGE_D + 0.18, y + PAD, tw0, ch - 2 * PAD, c.pair(lab, det, sz[i], lone_bold=lb), anchor=MSO_ANCHOR.MIDDLE)
+            else:
+                c.badge(x + PAD, y + PAD, i + 1)
+                c.tb(x + PAD, y + PAD + BADGE_D + 0.16, cw - 2 * PAD, ch - 2 * PAD - BADGE_D - 0.16, c.pair(lab, det, sz[i], lone_bold=lb))
+    if foot_text:
+        with c.group():
+            c.tb(c.x, c.y + oy + total - foot + 0.06, c.w, foot - 0.06,
+                 [P(foot_text, 16, True, _readable_accent(c.t))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER)
     return True
 
 
@@ -254,14 +442,27 @@ def _worked(c: _Canvas, data) -> bool:
     rows = [r for r in rows if str(r.get("step", "")).strip()][:8]
     if len(rows) < 2:
         return False
-    rh = min(0.85, c.h / len(rows))
-    for i, r in enumerate(rows):
-        y = c.y + i * rh
-        c.badge(c.x, y + 0.05, i + 1, d=min(0.4, rh - 0.12))
-        runs = [(r["step"], 14, True, c.t.primary_rgb)]
-        if str(r.get("reason", "")).strip():
-            runs.append((r["reason"], 11, False, c.t.text_rgb))
-        c.text(c.x + 0.6, y, c.w - 0.6, rh - 0.05, runs, anchor=MSO_ANCHOR.MIDDLE)
+    n = len(rows)
+    gap = GUT * 0.6
+    rh_full = (c.h - gap * (n - 1)) / n
+    tw = c.w - 3 * PAD - BADGE_D
+    pairs = [(str(r["step"]), str(r.get("reason", "")).strip()) for r in rows]
+    # step is the lead (bold), reason is the explanation
+    def make(b, st, rs):
+        ps = [P(st, b * 1.15, True, c.t.primary_rgb)]
+        if rs:
+            ps.append(P(rs, b, False, c.t.text_rgb, 3))
+        return ps
+    b = min(c.fit_paras(lambda s, st=st, rs=rs: make(s, st, rs), tw, rh_full - 0.16, 26, 10.5) for st, rs in pairs)
+    need = max(L.paras_height([(p.text, p.size, p.bold, p.before) for p in make(b, st, rs)], tw) for st, rs in pairs)
+    rh = min(rh_full, max(need + 0.3, 0.7, rh_full * 0.7))
+    oy = (c.h - (rh * n + gap * (n - 1))) / 2
+    for i, (st, rs) in enumerate(pairs):
+        y = c.y + oy + i * (rh + gap)
+        with c.group():
+            c.card(c.x, y, c.w, rh)
+            c.badge(c.x + PAD, y + (rh - BADGE_D) / 2, i + 1)
+            c.tb(c.x + 2 * PAD + BADGE_D, y + 0.08, tw, rh - 0.16, make(b, st, rs), anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -271,62 +472,114 @@ def _timeline(c: _Canvas, data) -> bool:
         return False
     n = len(ev)
     cy = c.y + c.h / 2
-    c.shape(MSO_SHAPE.RECTANGLE, c.x, cy - 0.025, c.w, 0.05, _blend(c.t.primary_rgb, 0.4))
     step = c.w / n
-    cw, ch = min(step * 1.7, 2.7), min(1.9, (c.h - 0.9) / 2)
+    cw = min(step * 1.9, 3.3)
+    ch = (c.h / 2) - 0.45
+    ch = min(ch, 2.6)
+    tw, th = cw - 2 * PAD, ch - 2 * PAD
+    def make(b, e): return [P(str(e.get("date", "")), b * 1.35, True, _readable_accent(c.t)), P(str(e.get("title", "")), b, False, c.t.text_rgb, 3)]
+    b = min(c.fit_paras(lambda s, e=e: make(s, e), tw, th, 22, 10.5) for e in ev)
+    with c.group():
+        c.shape(MSO_SHAPE.RECTANGLE, c.x, cy - 0.03, c.w, 0.06, _blend(c.t.primary_rgb, 0.4))
     for i, e in enumerate(ev):
         cx = c.x + step * (i + 0.5)
-        c.shape(MSO_SHAPE.OVAL, cx - 0.11, cy - 0.11, 0.22, 0.22, c.t.accent_rgb, c.t.primary_rgb, 2)
         up = i % 2 == 0
-        y = cy - 0.3 - ch if up else cy + 0.3
         x = min(max(c.x, cx - cw / 2), c.x + c.w - cw)
-        c.card(x, y, cw, ch)
-        c.text(x, y, cw, ch, [(e.get("date", ""), 20, True, c.t.primary_rgb),
-                              (e.get("title", ""), _pt(len(str(e.get("title", ""))), 14, 10.5), False, c.t.text_rgb)],
-               PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+        y = cy - 0.4 - ch if up else cy + 0.4
+        with c.group():
+            c.shape(MSO_SHAPE.RECTANGLE, cx - 0.015, (y + ch) if up else cy, 0.03, 0.4 if up else (y - cy), _blend(c.t.primary_rgb, 0.4))
+            c.shape(MSO_SHAPE.OVAL, cx - 0.14, cy - 0.14, 0.28, 0.28, c.t.accent_rgb, c.t.primary_rgb, 2.25)
+            c.card(x, y, cw, ch)
+            c.tb(x + PAD, y + PAD, tw, th, make(b, e), anchor=MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def draw_table(c: _Canvas, heads: Sequence[Any], rows: Sequence[Sequence[Any]]) -> bool:
+    heads, rows = list(heads), [list(r) for r in rows][:8]
+    if len(heads) < 2 or len(rows) < 1:
+        return False
+    ncol = len(heads)
+    nrow = len(rows) + 1
+    cell_w = c.w / ncol
+    pad_x = 0.16
+    longest_per_row = [max((str(x) for x in r), key=len, default="") for r in rows]
+    # the table fills the band but rows never exceed a comfortable height
+    head_h = min(0.75, c.h / nrow)
+    rh = min(1.15, (c.h - head_h) / len(rows))
+    body_pt = min(c.fit([lg], cell_w - 2 * pad_x, rh - 0.14, 20, 10) for lg in longest_per_row)
+    # tall table cells (wrapping) may need more height than rh — grow rows to what the text needs
+    need = [max(L.estimate_lines(str(x), cell_w - 2 * pad_x, body_pt) for x in r) * body_pt * 1.3 / 72 + 0.22 for r in rows]
+    heights = [max(rh, nd) for nd in need]
+    total = head_h + sum(heights)
+    if total > c.h:   # scale back down if growing overshot the band
+        k = (c.h - head_h) / sum(heights)
+        heights = [h * k for h in heights]
+        total = c.h
+    oy = (c.h - total) / 2
+    with c.group():
+        gf = c.s.shapes.add_table(nrow, ncol, Inches(c.x), Inches(c.y + oy), Inches(c.w), Inches(total))
+        tbl = gf.table
+        tbl.rows[0].height = Inches(head_h)
+        for i, h in enumerate(heights):
+            tbl.rows[i + 1].height = Inches(h)
+        head_pt = min(20, max(12, body_pt + 3))
+        for j, h in enumerate(heads):
+            cell = tbl.cell(0, j)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = c.t.primary_rgb
+            cell.margin_left = cell.margin_right = Inches(pad_x)
+            cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+            cell.text = str(h)
+            for p in cell.text_frame.paragraphs:
+                p.alignment = PP_ALIGN.LEFT
+                for r in p.runs:
+                    r.font.size = Pt(head_pt)
+                    r.font.bold = True
+                    r.font.color.rgb = _on(c.t.primary_rgb)
+        for i, row in enumerate(rows, start=1):
+            for j in range(ncol):
+                cell = tbl.cell(i, j)
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = c.t.card_bg_rgb if i % 2 else _blend(c.t.primary_rgb, 0.92)
+                cell.margin_left = cell.margin_right = Inches(pad_x)
+                cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+                cell.text = str((row + [""] * ncol)[j])
+                for p in cell.text_frame.paragraphs:
+                    p.alignment = PP_ALIGN.LEFT
+                    for r in p.runs:
+                        r.font.size = Pt(body_pt)
+                        r.font.bold = j == 0
+                        r.font.color.rgb = c.t.primary_rgb if j == 0 else c.t.text_rgb
     return True
 
 
 def _compare_table(c: _Canvas, data) -> bool:
-    heads, rows = data.get("headers") or [], data.get("rows") or []
-    if len(heads) < 2 or len(rows) < 2:
-        return False
-    rows = rows[:7]
-    gf = c.s.shapes.add_table(len(rows) + 1, len(heads), Inches(c.x), Inches(c.y + 0.05), Inches(c.w),
-                              Inches(c.h - 0.1))
-    tbl = gf.table
-    for j, h in enumerate(heads):
-        cell = tbl.cell(0, j)
-        cell.fill.solid(); cell.fill.fore_color.rgb = c.t.primary_rgb
-        cell.text = str(h)
-        for p in cell.text_frame.paragraphs:
-            for r in p.runs:
-                r.font.size = Pt(22); r.font.bold = True; r.font.color.rgb = _on(c.t.primary_rgb)
-    ncol = len(heads)
-    rh = (c.h - 0.1) / (len(rows) + 1)
-    longest = max((str(x) for r in rows for x in r), key=len, default="")
-    body_pt = c.fit([longest], max(0.6, c.w / ncol - 0.35), max(0.3, rh - 0.1), 18, 8.5)
-    for i, row in enumerate(rows, start=1):
-        for j in range(len(heads)):
-            cell = tbl.cell(i, j)
-            cell.fill.solid(); cell.fill.fore_color.rgb = c.t.card_bg_rgb if i % 2 else _blend(c.t.primary_rgb, 0.92)
-            cell.text = str((list(row) + [""] * len(heads))[j])
-            for p in cell.text_frame.paragraphs:
-                for r in p.runs:
-                    r.font.size = Pt(body_pt); r.font.color.rgb = c.t.text_rgb; cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-    return True
+    return draw_table(c, data.get("headers") or [], data.get("rows") or [])
 
 
 def _pros_cons(c: _Canvas, data) -> bool:
-    pros, cons = [str(x) for x in data.get("pros") or []][:5], [str(x) for x in data.get("cons") or []][:5]
+    pros, cons = [str(x) for x in data.get("pros") or []][:6], [str(x) for x in data.get("cons") or []][:6]
     if not (pros and cons):
         return False
-    cw = c.w / 2 - 0.15
-    for k, (title, items, col) in enumerate((("Advantages", pros, RGBColor(0x1A, 0x7F, 0x4B)), ("Trade-offs", cons, RGBColor(0xB2, 0x3B, 0x3B)))):
-        x = c.x + k * (cw + 0.3)
-        c.card(x, c.y + 0.1, cw, c.h - 0.2, line=col)
-        c.text(x + 0.1, c.y + 0.18, cw - 0.2, 0.5, [(title.upper(), 15, True, col)])
-        c.text(x + 0.1, c.y + 0.75, cw - 0.2, c.h - 1.0, [("•  " + t, 13, False, c.t.text_rgb) for t in items])
+    cw = (c.w - GUT) / 2
+    head_h = 0.55
+    tw = cw - 2 * PAD - 0.3
+    th = c.h - 2 * PAD - head_h - 0.15
+    cols = (("Advantages", pros, RGBColor(0x1A, 0x7F, 0x4B)), ("Trade-offs", cons, RGBColor(0xB2, 0x3B, 0x3B)))
+    def make(b, items, col): return [P(t, b, False, c.t.text_rgb, 8, True) for t in items]
+    b = min(c.fit_paras(lambda s, it=it, col=col: make(s, it, col), tw, th, 30, 10.5) for _, it, col in cols)
+    need = max(L.paras_height([(p.text, p.size, p.bold, p.before) for p in make(b, it, col)], tw) for _, it, col in cols)
+    ch_all = min(c.h, max(need + 2 * PAD + head_h + 0.15 + 0.3, c.h * 0.6))
+    oy = (c.h - ch_all) / 2
+    th = ch_all - 2 * PAD - head_h - 0.15
+    for k, (title, items, col) in enumerate(cols):
+        x = c.x + k * (cw + GUT)
+        with c.group():
+            c.card(x, c.y + oy, cw, ch_all, line=col)
+            hd = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, x + PAD, c.y + oy + PAD, cw - 2 * PAD, head_h, col, radius=0.25)
+            c.tb(0, 0, 0, 0, [P(title.upper(), 15, True, RGBColor(255, 255, 255))], MSO_ANCHOR.MIDDLE, PP_ALIGN.LEFT, shape=hd,
+                 inset=(0.18, 0.02, 0.1, 0.02))
+            c.tb(x + PAD, c.y + oy + PAD + head_h + 0.15, cw - 2 * PAD, th, make(b, items, col), anchor=MSO_ANCHOR.TOP, bullet_color=col)
     return True
 
 
@@ -335,16 +588,18 @@ def _references(c: _Canvas, data) -> bool:
     if not items:
         return False
     cols = 2 if len(items) > 4 else 1
-    rows = math.ceil(len(items) / cols)
-    gap = 0.16
-    cw = (c.w - gap * (cols - 1)) / cols
-    ch = min(1.15, (c.h - gap * (rows - 1)) / rows)
-    for i, t in enumerate(items):
-        r, k = divmod(i, cols)
-        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
-        c.card(x, y, cw, ch, radius=0.12)
-        c.badge(x + 0.12, y + (ch - 0.4) / 2, i + 1, d=0.4)
-        c.runs_fit(x + 0.6, y, cw - 0.7, ch, "", t, bmax=14, anchor=MSO_ANCHOR.MIDDLE)
+    cells, ch_full = c.cells(len(items), cols, gut=GUT * 0.7)
+    tw = min(w for _, _, w, _ in cells) - 3 * PAD - BADGE_D * 0.8
+    d = min(BADGE_D, ch_full - 0.2)
+    b = min(c.fit_paras(lambda s, t=t: [P(t, s, False, c.t.text_rgb)], tw, ch_full - 0.2, 24, 10) for t in items)
+    need = max(L.paras_height([(t, b, False, 0)], tw) for t in items) + 0.3
+    if need < ch_full * 0.7:
+        cells, ch_full = c.cells(len(items), cols, gut=GUT * 0.7, max_ch=max(need * 1.3, 0.8))
+    for i, (t, (x, y, cw, ch)) in enumerate(zip(items, cells)):
+        with c.group():
+            c.card(x, y, cw, ch)
+            c.badge(x + PAD, y + (ch - d) / 2, i + 1, d=d)
+            c.tb(x + 2 * PAD + d, y + 0.08, cw - 3 * PAD - d, ch - 0.16, [P(t, b, False, c.t.text_rgb)], anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -352,15 +607,19 @@ def _matrix(c: _Canvas, data) -> bool:
     q = (data.get("quadrants") or data.get("cells") or [])[:4]
     if len(q) < 3:
         return False
-    gap = 0.2
-    cw, ch = (c.w - gap) / 2, (c.h - gap) / 2
+    cw, ch = (c.w - GUT) / 2, (c.h - GUT) / 2
+    tw, th = cw - 2 * PAD, ch - 2 * PAD
+    def make(b, qd):
+        items = [str(t) for t in (qd.get("items") or [])][:4]
+        return [P(str(qd.get("title", "")), b * 1.2, True, c.t.primary_rgb)] + [P(t, b, False, c.t.text_rgb, 4, True) for t in items]
+    b = min(c.fit_paras(lambda s, qd=qd: make(s, qd), tw, th, 28, 10.5) for qd in q)
     for i, qd in enumerate(q):
         r, k = divmod(i, 2)
-        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
-        c.card(x, y, cw, ch, fill=_blend(c.t.primary_rgb, 0.88 - 0.05 * i))
-        items = [str(t) for t in (qd.get("items") or [])]
-        c.text(x + 0.1, y + 0.1, cw - 0.2, ch - 0.2, [(qd.get("title", ""), 15, True, c.t.primary_rgb)] + [(t, 12, False, c.t.text_rgb) for t in items[:3]],
-               anchor=MSO_ANCHOR.MIDDLE)
+        x, y = c.x + k * (cw + GUT), c.y + r * (ch + GUT)
+        with c.group():
+            c.card(x, y, cw, ch, fill=_blend(c.t.primary_rgb, 0.9 - 0.04 * i))
+            c.accent_bar(x, y + PAD, ch - 2 * PAD, 0.09)
+            c.tb(x + PAD, y + PAD, tw, th, make(b, qd), anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -369,22 +628,33 @@ def _layers(c: _Canvas, data) -> bool:
     if len(lv) < 3:
         return False
     n = len(lv)
-    gap = 0.12
-    rh = (c.h - gap * (n - 1)) / n
-    for i, it in enumerate(lv):
-        label, detail = (it.get("label", ""), it.get("detail", "")) if isinstance(it, dict) else (str(it), "")
-        frac = 1.0 - i * (0.22 / max(1, n - 1))
+    rows = []
+    for it in lv:
+        label, detail = (str(it.get("label", "")), str(it.get("detail", ""))) if isinstance(it, dict) else (str(it), "")
+        rows.append((label, "" if _same(label, detail) else detail))
+    gap = GUT * 0.6
+    rh_full = (c.h - gap * (n - 1)) / n
+    narrow = 0.18
+    min_w = c.w * (1 - narrow)
+    has_detail = any(d for _, d in rows)
+    lw = min(3.6, min_w * 0.32) if has_detail else min_w - 2 * PAD
+    dw = min_w - lw - 3 * PAD
+    sl = c.fit_paras(lambda s: [P(max(rows, key=lambda r: len(r[0]))[0], s, True)], lw, rh_full - 0.16, 24, 11)
+    sd = c.fit_paras(lambda s: [P(max(rows, key=lambda r: len(r[1]))[1], s, False)], dw, rh_full - 0.16, 20, 10.5) if has_detail else 0
+    rh = min(rh_full, 1.25)
+    oy = (c.h - (rh * n + gap * (n - 1))) / 2
+    for i, (label, detail) in enumerate(rows):
+        frac = 1.0 - i * (narrow / max(1, n - 1))
         w = c.w * frac
+        x = c.x + (c.w - w) / 2
+        y = c.y + oy + i * (rh + gap)
         fill = _blend(c.t.primary_rgb, 0.8 - 0.8 * (i / max(1, n - 1)))
-        y = c.y + i * (rh + gap)
-        shp = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x + (c.w - w) / 2, y, w, rh, fill, radius=0.18)
         fg = _on(fill)
-        if detail and detail.strip().lower() == label.strip().lower():
-            detail = ""
-        lw = min(3.0, w * 0.28)
-        c.runs_fit(c.x + (c.w - w) / 2 + 0.1, y, lw, rh, label, "", hmax=24, head_color=fg, anchor=MSO_ANCHOR.MIDDLE)
-        if detail:
-            c.runs_fit(c.x + (c.w - w) / 2 + lw + 0.1, y, w - lw - 0.3, rh, "", detail, bmax=17, body_color=fg, anchor=MSO_ANCHOR.MIDDLE)
+        with c.group():
+            c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, rh, fill, radius=0.18 / max(0.4, rh) * 0.3)
+            c.tb(x + PAD, y + 0.06, lw if has_detail else w - 2 * PAD, rh - 0.12, [P(label, sl, True, fg)], anchor=MSO_ANCHOR.MIDDLE)
+            if detail:
+                c.tb(x + PAD + lw + PAD, y + 0.06, w - lw - 3 * PAD, rh - 0.12, [P(detail, sd, False, fg)], anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -392,11 +662,18 @@ def _venn(c: _Canvas, data) -> bool:
     items = [str(x) for x in data.get("items") or []][:8]
     if len(items) < 3:
         return False
-    d = min(c.h * 0.85, c.w * 0.38)
+    d = min(c.h * 0.92, c.w * 0.4)
     top = c.y + (c.h - d) / 2
-    c.shape(MSO_SHAPE.OVAL, c.x, top, d, d, _blend(c.t.primary_rgb, 0.7), c.t.primary_rgb, 1.5)
-    c.shape(MSO_SHAPE.OVAL, c.x + d * 0.6, top, d, d, _blend(c.t.accent_rgb, 0.7), c.t.accent_rgb, 1.5)
-    c.text(c.x + d * 1.75, c.y, c.w - d * 1.75, c.h, [("•  " + t, 13, False, c.t.text_rgb) for t in items], anchor=MSO_ANCHOR.MIDDLE)
+    with c.group():
+        c.shape(MSO_SHAPE.OVAL, c.x, top, d, d, _blend(c.t.primary_rgb, 0.7), c.t.primary_rgb, 1.5)
+        c.shape(MSO_SHAPE.OVAL, c.x + d * 0.58, top, d, d, _blend(c.t.accent_rgb, 0.7), c.t.accent_rgb, 1.5)
+    px = c.x + d * 1.58 + GUT
+    pw = c.x + c.w - px
+    tw, th = pw - 2 * PAD, c.h - 2 * PAD
+    b = c.fit_paras(lambda s: [P(t, s, False, c.t.text_rgb, 8, True) for t in items], tw, th, 22, 10.5)
+    with c.group():
+        c.card(px, c.y, pw, c.h)
+        c.tb(px + PAD, c.y + PAD, tw, th, [P(t, b, False, c.t.text_rgb, 8, True) for t in items], anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -405,30 +682,28 @@ def _stat_tiles(c: _Canvas, data) -> bool:
     if not tiles:
         return False
     n = len(tiles)
-    cols = n if n <= 2 else 2 if n == 4 and c.w < 8 else n
-    rows = math.ceil(n / cols)
-    gap = 0.25
-    cw = (c.w - gap * (cols - 1)) / cols
-    ch = (c.h - gap * (rows - 1)) / rows
+    cols = n if n <= 3 else (4 if c.w > 11 else 2)
+    cells, ch_full = c.cells(n, cols)
     names = pick_icons(" ".join(str(t.get("label", "")) for t in tiles), n + 2)
-    for i, t in enumerate(tiles):
-        r, k = divmod(i, cols)
-        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
-        c.card(x, y, cw, ch, radius=0.08)
-        d = min(0.6, ch * 0.2)
-        c.icon_circle(x + 0.2, y + 0.18, d, names[i % len(names)], fill=_blend(c.t.accent_rgb, 0.7), color=_readable_accent(c.t))
+    tw = min(w for _, _, w, _ in cells) - 2 * PAD
+    th = ch_full - 2 * PAD - ICON_D - 0.12
+    def make(vsz, t):
         val = str(t.get("value", ""))
-        vsz = c.fit([val], cw - 0.3, ch * 0.34, 54, 24)
         det = str(t.get("detail", ""))
-        runs = [(val, vsz, True, c.t.primary_rgb), (str(t.get("label", "")).upper(), 13, True, _readable_accent(c.t))]
-        if det and det.lower() != str(t.get("label", "")).lower():
-            runs.append((det, c.fit([det], cw - 0.3, ch * 0.28, 15, 10), False, c.t.text_rgb))
-        tb = c.s.shapes.add_textbox(Inches(x + 0.1), Inches(y + d + 0.25), Inches(cw - 0.2), Inches(ch - d - 0.35))
-        tf = tb.text_frame; tf.word_wrap = True; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        for j, (txt, sz, bold, col) in enumerate(runs):
-            para = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
-            para.alignment = PP_ALIGN.LEFT
-            rr = para.add_run(); rr.text = txt; rr.font.size = Pt(sz); rr.font.bold = bold; rr.font.color.rgb = col
+        lbl = str(t.get("label", ""))
+        ps = [P(val, vsz, True, c.t.primary_rgb), P(lbl.upper(), max(12, vsz * 0.34), True, _readable_accent(c.t), 2)]
+        if det and not _same(det, lbl):
+            ps.append(P(det, max(12, vsz * 0.3), False, c.t.text_rgb, 4))
+        return ps
+    vsz = min(c.fit_paras(lambda s, t=t: make(s, t), tw, th, 60, 22) for t in tiles)
+    need = max(L.paras_height([(p.text, p.size, p.bold, p.before) for p in make(vsz, t)], tw) for t in tiles) + 2 * PAD + ICON_D + 0.12
+    if need < ch_full:
+        cells, ch_full = c.cells(n, cols, max_ch=max(need * 1.25, ch_full * 0.6))
+    for i, (t, (x, y, cw, ch)) in enumerate(zip(tiles, cells)):
+        with c.group():
+            c.card(x, y, cw, ch)
+            c.icon_circle(x + PAD, y + PAD, ICON_D, names[i % len(names)], fill=_blend(c.t.accent_rgb, 0.7), color=_readable_accent(c.t))
+            c.tb(x + PAD, y + PAD + ICON_D + 0.12, cw - 2 * PAD, ch - 2 * PAD - ICON_D - 0.12, make(vsz, t), anchor=MSO_ANCHOR.BOTTOM)
     return True
 
 
@@ -436,38 +711,47 @@ def _cause_effect(c: _Canvas, data) -> bool:
     nodes = (data.get("nodes") or [])[:6]
     if len(nodes) < 3:
         return False
-    n = len(nodes)
-    arrow_h = 0.24
-    foot = 0.4 if data.get("loop") else 0.0
-    nh = (c.h - arrow_h * (n - 1) - foot) / n
-    for i, nd in enumerate(nodes):
-        y = c.y + i * (nh + arrow_h)
-        c.card(c.x, y, c.w, nh, radius=0.12)
-        d = min(0.6, nh * 0.6)
-        c.badge(c.x + 0.2, y + (nh - d) / 2, i + 1, d=d)
-        det = str(nd.get("detail", ""))
-        if det.strip().lower() == str(nd.get("label", "")).strip().lower():
-            det = ""
-        c.runs_fit(c.x + d + 0.35, y + 0.04, c.w - d - 0.5, nh - 0.08, nd.get("label", ""), det, hmax=20, bmax=15, anchor=MSO_ANCHOR.MIDDLE)
-        if i < n - 1:
-            c.shape(MSO_SHAPE.DOWN_ARROW, c.x + c.w / 2 - 0.13, y + nh + 0.01, 0.26, arrow_h - 0.02, c.t.accent_rgb)
-    if data.get("loop"):
-        c.text(c.x, c.y + c.h - 0.4, c.w, 0.38, [("↺  and the effect feeds back into the cause", 13, True, _readable_accent(c.t))], PP_ALIGN.CENTER)
-    return True
+    items = [(str(nd.get("label", "")), str(nd.get("detail", ""))) for nd in nodes]
+    return _flow(c, items, False, "↺  and the effect feeds back into the cause" if data.get("loop") else "")
+
+
+def _stack_height(parts: Sequence[float], gap: float) -> float:
+    return sum(parts) + gap * (len(parts) - 1)
 
 
 def _formula(c: _Canvas, data) -> bool:
     f = str(data.get("formula", "")).strip()
     if not f:
         return False
-    notes = [str(x) for x in data.get("notes") or []][:3]
-    oy = max(0.0, (c.h - 4.1 * c.k) / 2)
-    c.text(c.x, c.y + oy, c.w, 0.45, [(str(data.get("term", "")).upper(), 14, True, c.t.accent_rgb)])
-    c.text(c.x, c.y + oy + 0.45, c.w, 1.0, [(str(data.get("statement", "")), 20, False, c.t.text_rgb)])
-    box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y + oy + 1.55 * c.k, c.w, 1.6 * c.k, c.t.primary_rgb)
-    c.text(0, 0, 0, 0, [(f, 38, True, _on(c.t.primary_rgb))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=box)
+    notes = [str(x) for x in data.get("notes") or []][:4]
+    term, statement = str(data.get("term", "")), str(data.get("statement", ""))
+    gap = 0.2
+    term_h = 0.4 if term else 0.0
+    st_sz = c.fit([statement], c.w, 1.1, 24, 14) if statement else 0
+    st_h = (L.block_height([statement], c.w, st_sz) + 0.05) if statement else 0.0
+    notes_h_avail = max(0.8, c.h - term_h - st_h - 1.5 - gap * 3) if notes else 0.0
+    n_sz = c.fit(notes, c.w - 0.3, notes_h_avail, 18, 11, spacing=8) if notes else 0
+    n_h = (L.block_height(notes, c.w - 0.3, n_sz, 8) + 0.1) if notes else 0.0
+    fixed = [h for h in (term_h, st_h, n_h) if h]
+    box_h = min(2.4, max(1.4, c.h - sum(fixed) - gap * len(fixed)))
+    parts = [h for h in (term_h, st_h, box_h, n_h) if h]
+    y = c.y + max(0.0, (c.h - _stack_height(parts, gap)) / 2)
+    if term:
+        with c.group():
+            c.tb(c.x, y, c.w, term_h, [P(term.upper(), 15, True, _readable_accent(c.t))], MSO_ANCHOR.MIDDLE)
+        y += term_h + gap
+    if statement:
+        with c.group():
+            c.tb(c.x, y, c.w, st_h, [P(statement, st_sz, False, c.t.text_rgb)], MSO_ANCHOR.TOP)
+        y += st_h + gap
+    with c.group():
+        box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, y, c.w, box_h, c.t.primary_rgb, radius=0.25 / max(0.5, box_h) * 0.6)
+        fsz = c.fit([f], c.w - 2 * PAD - 0.4, box_h - 0.3, 48, 20, bold=True)
+        c.tb(0, 0, 0, 0, [P(f, fsz, True, _on(c.t.primary_rgb))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=box, inset=(PAD, 0.1, PAD, 0.1))
+    y += box_h + gap
     if notes:
-        c.text(c.x, c.y + oy + 3.3 * c.k, c.w, max(0.6, c.h - oy - 3.3 * c.k), [("•  " + t, 15, False, c.t.text_rgb) for t in notes])
+        with c.group():
+            c.tb(c.x, y, c.w, n_h, [P(t, n_sz, False, c.t.text_rgb, 8, True) for t in notes])
     return True
 
 
@@ -476,11 +760,39 @@ def _definition(c: _Canvas, data) -> bool:
     if not (term and meaning):
         return False
     notes = [str(x) for x in data.get("notes") or []][:4]
-    oy = max(0.0, (c.h - 4.0 * c.k) / 2)
-    box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y + oy, c.w, 2.4 * c.k, _blend(c.t.primary_rgb, 0.9), c.t.primary_rgb, 1.5)
-    c.text(0, 0, 0, 0, [(term, 32, True, c.t.primary_rgb), (meaning, 20, False, c.t.text_rgb)], PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=box)
+    gap = GUT
+    note_cols = notes
+    # definition card
+    tw = c.w - 2 * PAD - 0.2
+    box_max = c.h * (0.62 if notes else 1.0)
+    def make(b): return [P(term, b * 1.7, True, c.t.primary_rgb), P(meaning, b, False, c.t.text_rgb, 8)]
+    b = c.fit_paras(make, tw, box_max - 2 * PAD, 26, 12)
+    need = L.paras_height([(p.text, p.size, p.bold, p.before) for p in make(b)], tw) + 2 * PAD
+    box_h = min(box_max, max(need * 1.15, 2.0)) if notes else min(box_max, max(need * 1.4, c.h * 0.7))
+    # notes row: small cards under the definition
+    cols = min(len(notes), 3) if notes else 0
+    note_h = 0.0
+    nsz = 0.0
     if notes:
-        c.text(c.x, c.y + oy + 2.6 * c.k, c.w, max(0.6, c.h - oy - 2.6 * c.k), [("•  " + t, 16, False, c.t.text_rgb) for t in notes])
+        note_h = min(c.h - box_h - gap, 2.0)
+        ncw = (c.w - gap * (cols - 1)) / cols if len(notes) <= 3 else (c.w - gap) / 2
+        nsz = c.fit_paras(lambda s: [P(t, s, False, c.t.text_rgb) for t in notes[:1]] and [P(max(notes, key=len), s, False)], ncw - 2 * PAD, (note_h if len(notes) <= 3 else (note_h - gap) / 2) - 2 * PAD, 18, 10.5)
+    total = box_h + (gap + note_h if notes else 0)
+    y = c.y + max(0.0, (c.h - total) / 2)
+    with c.group():
+        c.card(c.x, y, c.w, box_h, fill=_blend(c.t.primary_rgb, 0.9), line=c.t.primary_rgb, radius=0.1)
+        c.accent_bar(c.x, y + PAD, box_h - 2 * PAD, 0.1)
+        c.tb(c.x + PAD + 0.2, y + PAD, tw, box_h - 2 * PAD, make(b), anchor=MSO_ANCHOR.MIDDLE)
+    if notes:
+        y2 = y + box_h + gap
+        if len(notes) <= 3:
+            cells = [(c.x + k * ((c.w - gap * (cols - 1)) / cols + gap), y2, (c.w - gap * (cols - 1)) / cols, note_h) for k in range(len(notes))]
+        else:
+            cells, _ = c.cells(len(notes), 2, area=(c.x, y2, c.w, note_h))
+        for t, (x, yy, cw, ch) in zip(notes, cells):
+            with c.group():
+                c.card(x, yy, cw, ch)
+                c.tb(x + PAD, yy + PAD, cw - 2 * PAD, ch - 2 * PAD, [P(t, nsz, False, c.t.text_rgb)], anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -488,11 +800,19 @@ def _quote(c: _Canvas, data) -> bool:
     t = str(data.get("text", ""))
     if not t:
         return False
-    box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y + 0.4, c.w, c.h - 0.8, _blend(c.t.primary_rgb, 0.9))
-    runs = [("“" + t + "”", 26, True, c.t.primary_rgb)]
-    if data.get("attribution"):
-        runs.append(("— " + str(data["attribution"]), 14, False, c.t.text_rgb))
-    c.text(0, 0, 0, 0, runs, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=box)
+    attr = str(data.get("attribution") or "")
+    tw, th = c.w - 2 * PAD - 0.5, c.h - 2 * PAD - (0.6 if attr else 0)
+    b = c.fit_paras(lambda s: [P("“" + t + "”", s, True, c.t.primary_rgb)], tw, th, 34, 14)
+    need = L.paras_height([("“" + t + "”", b, True, 0)], tw) + (0.6 if attr else 0) + 2 * PAD
+    bh = min(c.h, max(need * 1.25, c.h * 0.55))
+    y = c.y + (c.h - bh) / 2
+    with c.group():
+        c.card(c.x, y, c.w, bh, fill=_blend(c.t.primary_rgb, 0.9), line=_blend(c.t.primary_rgb, 0.6))
+        c.accent_bar(c.x, y + PAD, bh - 2 * PAD, 0.12)
+        paras = [P("“" + t + "”", b, True, c.t.primary_rgb)]
+        if attr:
+            paras.append(P("— " + attr, max(13, b * 0.5), False, c.t.text_rgb, 10))
+        c.tb(c.x + PAD + 0.3, y + PAD, tw, bh - 2 * PAD, paras, anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -501,13 +821,21 @@ def _funnel(c: _Canvas, data) -> bool:
     if len(st) < 3:
         return False
     n = len(st)
-    rh = min(0.95, c.h / n - 0.1)
-    for i, s_ in enumerate(st):
-        w = c.w * (1.0 - i * (0.58 / max(1, n - 1)))
+    gap = GUT * 0.5
+    rh_full = (c.h - gap * (n - 1)) / n
+    rh = min(rh_full, 1.1)
+    oy = (c.h - (rh * n + gap * (n - 1))) / 2
+    narrow = 0.4
+    labels = [f"{s_.get('value', '')}   {s_.get('label', '')}".strip() for s_ in st]
+    min_w = c.w * (1 - narrow * (n - 1) / max(1, n - 1))
+    b = min(c.fit([lb], c.w * (1 - narrow) - 2 * PAD, rh - 0.14, 24, 11, bold=True) for lb in labels)
+    for i, (s_, lb) in enumerate(zip(st, labels)):
+        w = c.w * (1.0 - i * (narrow / max(1, n - 1)))
         fill = _blend(c.t.primary_rgb, 0.05 + 0.5 * i / max(1, n - 1))
-        y = c.y + (c.h - (rh + 0.1) * n) / 2 + i * (rh + 0.1)
-        shp = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x + (c.w - w) / 2, y, w, rh, fill)
-        c.text(0, 0, 0, 0, [(f"{s_.get('value', '')}   {s_.get('label', '')}", 15, True, _on(fill))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=shp)
+        y = c.y + oy + i * (rh + gap)
+        with c.group():
+            shp = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x + (c.w - w) / 2, y, w, rh, fill, radius=0.15)
+            c.tb(0, 0, 0, 0, [P(lb, b, True, _on(fill))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=shp, inset=(PAD, 0.04, PAD, 0.04))
     return True
 
 
@@ -525,31 +853,42 @@ def _chart(c: _Canvas, data, kind: str) -> bool:
     cd.categories = [l for l, _ in pts]
     cd.add_series("Value", [v for _, v in pts])
     ctype = {"pie": XL_CHART_TYPE.PIE, "line": XL_CHART_TYPE.LINE_MARKERS, "bar": XL_CHART_TYPE.BAR_CLUSTERED}[kind]
-    gf = c.s.shapes.add_chart(ctype, Inches(c.x), Inches(c.y), Inches(c.w), Inches(c.h), cd)
-    ch = gf.chart
-    ch.has_legend = kind == "pie"
-    if kind == "pie":
-        ch.legend.position = XL_LEGEND_POSITION.RIGHT
-        ch.legend.include_in_layout = False
-    plot = ch.plots[0]
-    plot.has_data_labels = True
-    plot.data_labels.font.size = Pt(12)
-    if kind == "pie":
-        for i in range(len(pts)):
-            pt = plot.series[0].points[i]
-            pt.format.fill.solid()
-            pt.format.fill.fore_color.rgb = _blend(c.t.primary_rgb, 0.0 if i == 0 else min(0.75, 0.18 * i))
-    else:
-        ser = plot.series[0]
-        if kind == "bar":
-            ser.format.fill.solid()
-            ser.format.fill.fore_color.rgb = c.t.primary_rgb
+    with c.group():
+        c.card(c.x, c.y, c.w, c.h)
+        inset = 0.15
+        gf = c.s.shapes.add_chart(ctype, Inches(c.x + inset), Inches(c.y + inset), Inches(c.w - 2 * inset), Inches(c.h - 2 * inset), cd)
+        ch = gf.chart
+        ch.has_legend = kind == "pie"
+        ch.font.size = Pt(14)
+        ch.font.color.rgb = c.t.text_rgb
+        if kind == "pie":
+            ch.legend.position = XL_LEGEND_POSITION.RIGHT
+            ch.legend.include_in_layout = False
+            ch.legend.font.size = Pt(15)
+        plot = ch.plots[0]
+        plot.has_data_labels = True
+        plot.data_labels.font.size = Pt(14)
+        plot.data_labels.font.bold = True
+        if kind == "pie":
+            for i in range(len(pts)):
+                pt = plot.series[0].points[i]
+                pt.format.fill.solid()
+                pt.format.fill.fore_color.rgb = _blend(c.t.primary_rgb, 0.0 if i == 0 else min(0.75, 0.18 * i))
         else:
-            ser.format.line.color.rgb = c.t.primary_rgb
-            ser.format.line.width = Pt(3)
-        ch.category_axis.tick_labels.font.size = Pt(12)
-        ch.value_axis.tick_labels.font.size = Pt(11)
-        ch.value_axis.has_major_gridlines = False
+            ser = plot.series[0]
+            if kind == "bar":
+                ser.format.fill.solid()
+                ser.format.fill.fore_color.rgb = c.t.primary_rgb
+                plot.gap_width = 60
+                ch.category_axis.reverse_order = True
+            else:
+                ser.format.line.color.rgb = c.t.primary_rgb
+                ser.format.line.width = Pt(3.5)
+                ser.smooth = False
+            ch.category_axis.tick_labels.font.size = Pt(14)
+            ch.value_axis.tick_labels.font.size = Pt(13)
+            ch.value_axis.has_major_gridlines = True
+            ch.value_axis.major_gridlines.format.line.color.rgb = _blend(c.t.primary_rgb, 0.85)
     return True
 
 
@@ -566,22 +905,24 @@ def _function_plot(c: _Canvas, data) -> bool:
     ymin, ymax = min(y for _, y in pts), max(y for _, y in pts)
     if ymax == ymin:
         ymax += 1
-    px, py, pw, ph = c.x + 0.4, c.y + 0.3, c.w - 0.8, c.h - 0.9
-    c.shape(MSO_SHAPE.RECTANGLE, px, py, pw, ph, _blend(c.t.primary_rgb, 0.95), _blend(c.t.primary_rgb, 0.6))
-    if ymin < 0 < ymax:
-        yy = py + ph * (1 - (0 - ymin) / (ymax - ymin))
-        c.shape(MSO_SHAPE.RECTANGLE, px, yy - 0.01, pw, 0.02, c.t.text_rgb)
-    if a < 0 < b:
-        xx = px + pw * (0 - a) / (b - a)
-        c.shape(MSO_SHAPE.RECTANGLE, xx - 0.01, py, 0.02, ph, c.t.text_rgb)
-    coords = [(Inches(px + pw * (x - a) / (b - a)), Inches(py + ph * (1 - (y - ymin) / (ymax - ymin)))) for x, y in pts]
-    fb = c.s.shapes.build_freeform(Emu(int(coords[0][0])), Emu(int(coords[0][1])), scale=1.0)
-    fb.add_line_segments([(Emu(int(x)), Emu(int(y))) for x, y in coords[1:]], close=False)
-    curve = fb.convert_to_shape()
-    curve.fill.background()
-    curve.line.color.rgb = c.t.primary_rgb
-    curve.line.width = Pt(3.5)
-    c.text(px, py + ph + 0.05, pw, 0.4, [(f"y = {expr}", 14, True, c.t.primary_rgb)], PP_ALIGN.CENTER)
+    px, py, pw, ph = c.x + PAD, c.y + PAD, c.w - 2 * PAD, c.h - 2 * PAD - 0.5
+    with c.group():
+        c.card(c.x, c.y, c.w, c.h)
+        c.shape(MSO_SHAPE.RECTANGLE, px, py, pw, ph, _blend(c.t.primary_rgb, 0.95), _blend(c.t.primary_rgb, 0.6))
+        if ymin < 0 < ymax:
+            yy = py + ph * (1 - (0 - ymin) / (ymax - ymin))
+            c.shape(MSO_SHAPE.RECTANGLE, px, yy - 0.01, pw, 0.02, c.t.text_rgb)
+        if a < 0 < b:
+            xx = px + pw * (0 - a) / (b - a)
+            c.shape(MSO_SHAPE.RECTANGLE, xx - 0.01, py, 0.02, ph, c.t.text_rgb)
+        coords = [(Inches(px + pw * (x - a) / (b - a)), Inches(py + ph * (1 - (y - ymin) / (ymax - ymin)))) for x, y in pts]
+        fb = c.s.shapes.build_freeform(Emu(int(coords[0][0])), Emu(int(coords[0][1])), scale=1.0)
+        fb.add_line_segments([(Emu(int(x)), Emu(int(y))) for x, y in coords[1:]], close=False)
+        curve = fb.convert_to_shape()
+        curve.fill.background()
+        curve.line.color.rgb = c.t.primary_rgb
+        curve.line.width = Pt(3.5)
+        c.tb(px, py + ph + 0.05, pw, 0.4, [P(f"y = {expr}", 16, True, c.t.primary_rgb)], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER)
     return True
 
 
@@ -591,15 +932,91 @@ def _mind_map(c: _Canvas, data) -> bool:
     if not center or len(br) < 3:
         return False
     cx, cy = c.x + c.w / 2, c.y + c.h / 2
-    hub = c.shape(MSO_SHAPE.OVAL, cx - 1.1, cy - 0.6, 2.2, 1.2, c.t.primary_rgb)
-    c.text(0, 0, 0, 0, [(center, 15, True, _on(c.t.primary_rgb))], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE, shape=hub)
-    rx, ry = c.w / 2 - 1.3, c.h / 2 - 0.55
-    for i, b in enumerate(br):
+    bw = min(3.3, c.w / 3.4)
+    bh = min(1.1, c.h / 3.6)
+    hub_w, hub_h = min(3.0, c.w * 0.26), min(1.5, c.h * 0.26)
+    rx, ry = c.w / 2 - bw / 2, c.h / 2 - bh / 2
+    pos = []
+    for i in range(len(br)):
         ang = 2 * math.pi * i / len(br) - math.pi / 2
-        x, y = cx + rx * math.cos(ang), cy + ry * math.sin(ang)
-        c.card(x - 1.2, y - 0.4, 2.4, 0.8)
-        c.text(x - 1.2, y - 0.4, 2.4, 0.8, [(b, 12, False, c.t.text_rgb)], PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+        pos.append((cx + rx * math.cos(ang), cy + ry * math.sin(ang)))
+    b = min(c.fit([t], bw - 2 * PAD * 0.7, bh - 0.16, 16, 10) for t in br)
+    with c.group():
+        for x, y in pos:   # spokes sit behind everything else
+            ln = c.s.shapes.add_connector(1, Inches(cx), Inches(cy), Inches(x), Inches(y))
+            ln.line.color.rgb = _blend(c.t.primary_rgb, 0.5)
+            ln.line.width = Pt(2)
+        hub = c.shape(MSO_SHAPE.OVAL, cx - hub_w / 2, cy - hub_h / 2, hub_w, hub_h, c.t.primary_rgb)
+        hsz = c.fit([center], hub_w * 0.75, hub_h * 0.7, 22, 11, bold=True)
+        c.tb(0, 0, 0, 0, [P(center, hsz, True, _on(c.t.primary_rgb))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=hub, inset=(0.1, 0.05, 0.1, 0.05))
+    for t, (x, y) in zip(br, pos):
+        with c.group():
+            c.card(x - bw / 2, y - bh / 2, bw, bh)
+            c.tb(x - bw / 2 + PAD * 0.7, y - bh / 2 + 0.08, bw - PAD * 1.4, bh - 0.16, [P(t, b, False, c.t.text_rgb)], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER)
     return True
+
+
+# ── generic entry points used by ppt_builder ─────────────────────────────────
+def draw_cards(slide, theme, band, items: List[Tuple[str, str]], kind: str = "grid", numbered: bool = False) -> bool:
+    """Card grid or arrow-linked process from ``(heading, body)`` pairs (heading may be empty)."""
+    items = [(h, b) for h, b in items if (h or b).strip()]
+    if not items:
+        return False
+    c = _Canvas(slide, theme, band)
+    if kind == "process" and len(items) >= 2:
+        return _flow(c, items)
+    _grid(c, items, numbered=numbered, icons=not numbered)
+    return True
+
+
+def draw_bullets(slide, theme, band, bullets: List[str]) -> bool:
+    """Bullets as full-width rows (accent bar + hanging-indent bullet text), one animation group per bullet."""
+    bullets = [b for b in bullets if b.strip()][:9]
+    if not bullets:
+        return False
+    c = _Canvas(slide, theme, band)
+    n = len(bullets)
+    gap = GUT * 0.6
+    rh_full = (c.h - gap * (n - 1)) / n
+    tw = c.w - 2 * PAD - 0.3
+    b = c.fit_paras(lambda s: [P(max(bullets, key=len), s, False)], tw - 0.3, rh_full - 0.16, 26, 11)
+    need = max(L.paras_height([(t, b, False, 0)], tw - 0.3) for t in bullets) + 0.3
+    rh = min(rh_full, max(need * 1.15, 0.75, rh_full * 0.6), 1.6)
+    oy = (c.h - (rh * n + gap * (n - 1))) / 2
+    for i, t in enumerate(bullets):
+        y = c.y + oy + i * (rh + gap)
+        with c.group():
+            c.card(c.x, y, c.w, rh, fill=_blend(theme.primary_rgb, 0.93), line=_blend(theme.primary_rgb, 0.8))
+            c.accent_bar(c.x, y + 0.14, rh - 0.28, 0.09)
+            c.tb(c.x + PAD + 0.12, y + 0.08, tw, rh - 0.16, [P(t, b, False, theme.text_rgb, 0, True)], anchor=MSO_ANCHOR.MIDDLE)
+    return True
+
+
+def draw_metric(slide, theme, band, value: str, label: str, desc: str) -> bool:
+    c = _Canvas(slide, theme, band)
+    h = min(c.h, 4.8)
+    y = c.y + (c.h - h) / 2
+    with c.group():
+        box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, y, c.w, h, theme.primary_rgb, theme.accent_rgb, 3, radius=0.12 / max(0.5, h) * 2)
+        tw, th = c.w - 2 * PAD - 0.6, h - 2 * PAD
+        vc = theme.accent_rgb if _lum(theme.accent_rgb, theme.primary_rgb) else _on(theme.primary_rgb)
+        def make(v): return [P(value, v, True, vc),
+                             P(label.upper(), max(14, v * 0.3), True, _on(theme.primary_rgb), 8),
+                             P(desc, max(13, v * 0.22), False, _on(theme.primary_rgb), 8)]
+        v = c.fit_paras(make, tw, th, 96, 36)
+        c.tb(0, 0, 0, 0, make(v), MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=box, inset=(PAD + 0.3, PAD, PAD + 0.3, PAD))
+    return True
+
+
+def _lum(a: RGBColor, bg: RGBColor) -> bool:
+    def l(rgb):
+        ch = []
+        for v in (rgb[0], rgb[1], rgb[2]):
+            x = v / 255.0
+            ch.append(x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+    hi, lo = sorted((l(a), l(bg)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05) >= 3.0
 
 
 def draw_family(slide, sp, theme, band) -> bool:
@@ -608,7 +1025,8 @@ def draw_family(slide, sp, theme, band) -> bool:
     if not data:
         return False
     notes = [str(n) for n in ((getattr(sp, "params", None) or {}).get("notes") or []) if str(n).strip()]
-    c = _Canvas(slide, theme, band, reserve=0.75 if notes else 0.0)
+    note_h = 0.7
+    c = _Canvas(slide, theme, band, reserve=(note_h + GUT) if notes else 0.0)
     try:
         if family in {"PROCESS_LINEAR", "PROCESS_CYCLIC"}:
             ok = _process(c, data, family == "PROCESS_CYCLIC")
@@ -659,7 +1077,7 @@ def draw_family(slide, sp, theme, band) -> bool:
             items = [(str(x.get("text", x)) if isinstance(x, dict) else str(x), "") for x in (data.get("items") or [])[:8]]
             ok = len(items) >= 2
             if ok:
-                _grid(c, [(t, "") for t, _ in items], numbered=False, cols=2 if len(items) > 4 else 1, icons=True)
+                _grid(c, [(t, "") for t, _ in items], numbered=True, cols=2 if len(items) > 4 else 1, icons=False)
         else:
             ok = False
         if not ok:  # any other family: a card grid from its text — still a visual, never bullets
@@ -670,8 +1088,13 @@ def draw_family(slide, sp, theme, band) -> bool:
                 return False
             _grid(c, [(t[:60], t if len(t) > 60 else "") for t in flat], icons=True)
         if notes:
-            box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, band.top + band.height - 0.85, c.w, 0.7, _blend(theme.accent_rgb, 0.85), None)
-            c.text(0, 0, 0, 0, [(" ".join(notes)[:420], 14, False, theme.text_rgb)], PP_ALIGN.LEFT, MSO_ANCHOR.MIDDLE, shape=box)
+            with group(slide):
+                box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, band.left, band.top + band.height - note_h, band.width, note_h,
+                              _blend(theme.accent_rgb, 0.85), None, radius=0.2)
+                text = " ".join(notes)[:420]
+                nsz = c.fit([text], band.width - 2 * PAD - 0.1, note_h - 0.12, 15, 10)
+                c.tb(0, 0, 0, 0, [P(text, nsz, False, theme.text_rgb)], MSO_ANCHOR.MIDDLE, PP_ALIGN.LEFT, shape=box,
+                     inset=(PAD, 0.05, PAD, 0.05))
         return True
     except Exception as exc:  # best-effort: never break deck export
         logger.warning("pptx visual %s failed: %s", family, exc)

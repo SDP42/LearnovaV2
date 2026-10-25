@@ -1,134 +1,142 @@
 """
-Per-shape entrance animations for the generated PPTX.
+Slide transitions and click-build entrance animations for the generated PPTX.
 
-python-pptx has no animation API, so this injects a ``<p:timing>`` element into
-the slide XML directly — a click-triggered *fade-in* entrance for each shape (or
-group of shapes), in order, so the deck builds one idea per click, matching the
-web deck's progressive reveal.
+python-pptx has no API for either, so both are injected into the slide XML. The
+CT_Slide schema order is strict::
 
-Malformed timing XML makes PowerPoint refuse to open the file, so this is:
+    cSld, clrMapOvr, transition, timing, extLst
 
-* **opt-in** — only runs when ``LEARNOVA_PPTX_ANIM=1``;
-* **guarded** — any failure leaves the slide untouched;
-* **validated** — ``build_pptx`` re-parses the finished file and drops all
-  timing if it does not round-trip.
+A ``<p:transition>`` appended at the end of the slide (or a ``<p:timing>`` before
+it) makes PowerPoint offer to "repair" the file, so both helpers insert at the
+schema-correct position. Only classic OOXML transition elements are used.
 
-Only the well-trodden "appear/fade on click" preset is used
-(``presetClass="entr" presetID="10"``).
+Animations are driven by *groups*: ordered lists of shape ids recorded by
+``pptx_visuals`` (a card = its rectangle + text + icon, a timeline event, a table
+...). The first group is already visible; each later group fades in on click.
+
+Opt out of animation with ``LEARNOVA_PPTX_ANIM=0``. ``build_pptx`` re-parses the
+saved file and strips all timing if it does not round-trip.
 """
 
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import List, Optional, Sequence
 
 from lxml import etree
 
 _P = "http://schemas.openxmlformats.org/presentationml/2006/main"
 
+# Reveal.js name → classic PowerPoint transition element (all valid in the base schema).
+_TRANSITION_XML = {
+    "fade": "<p:fade/>",
+    "slide": '<p:push dir="l"/>',
+    "convex": '<p:cover dir="r"/>',
+    "concave": '<p:pull dir="r"/>',
+    "zoom": '<p:zoom dir="in"/>',
+}
+
 
 def animations_enabled() -> bool:
-    """
-    Click-to-build entrance animations are ON by default so an exported PPTX
-    reveals one idea per click like the web deck. ``build_pptx`` re-parses the
-    finished file and strips all timing if it does not round-trip, so a bad
-    build degrades to a static (but valid) deck rather than a broken file.
-    Set ``LEARNOVA_PPTX_ANIM=0`` to force static.
-    """
+    """Click-to-build animations are ON by default; ``LEARNOVA_PPTX_ANIM=0`` forces a static deck."""
     return os.getenv("LEARNOVA_PPTX_ANIM", "1").lower() in {"1", "true", "yes", "on"}
 
 
-def _click_par(shape_id: int, tn_id: int, first: bool) -> str:
-    """One click step: fade a shape in. ``tn_id`` is the starting cTn id (uses 4)."""
-    a, b, c, d = tn_id, tn_id + 1, tn_id + 2, tn_id + 3
-    # First step starts on the sequence begin; later steps wait for a click.
-    start = '<p:cond delay="0"/>' if first else '<p:cond delay="0"/>'
-    return f"""
-    <p:par>
-      <p:cTn id="{a}" fill="hold">
-        <p:stCondLst><p:cond delay="indefinite"/></p:stCondLst>
-        <p:childTnLst>
-          <p:par>
-            <p:cTn id="{b}" fill="hold">
-              <p:stCondLst>{start}</p:stCondLst>
-              <p:childTnLst>
-                <p:par>
-                  <p:cTn id="{c}" presetID="10" presetClass="entr" presetSubtype="0"
-                         fill="hold" grpId="0" nodeType="clickEffect">
-                    <p:stCondLst><p:cond delay="0"/></p:stCondLst>
-                    <p:childTnLst>
-                      <p:set>
-                        <p:cBhvr>
-                          <p:cTn id="{d}" dur="1" fill="hold">
-                            <p:stCondLst><p:cond delay="0"/></p:stCondLst>
-                          </p:cTn>
-                          <p:tgtEl><p:spTgt spid="{shape_id}"/></p:tgtEl>
-                          <p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>
-                        </p:cBhvr>
-                        <p:to><p:strVal val="visible"/></p:to>
-                      </p:set>
-                      <p:animEffect transition="in" filter="fade">
-                        <p:cBhvr>
-                          <p:cTn id="{d + 1}" dur="400"/>
-                          <p:tgtEl><p:spTgt spid="{shape_id}"/></p:tgtEl>
-                        </p:cBhvr>
-                      </p:animEffect>
-                    </p:childTnLst>
-                  </p:cTn>
-                </p:par>
-              </p:childTnLst>
-            </p:cTn>
-          </p:par>
-        </p:childTnLst>
-      </p:cTn>
-    </p:par>"""
+# ── transitions ──────────────────────────────────────────────────────────────
+def _insert_before_successors(sld, new_el, successors: Sequence[str]) -> None:
+    """Insert ``new_el`` before the first existing successor element, else append."""
+    for child in sld:
+        if etree.QName(child).localname in successors:
+            child.addprevious(new_el)
+            return
+    sld.append(new_el)
 
 
-def apply_click_builds(slide, shape_ids: List[int]) -> bool:
+def set_transition(slide, name: Optional[str]) -> bool:
+    """Write the slide transition for ``name`` (a SlidePlan.transition). 'none'/unknown → no transition."""
+    sld = slide._element
+    for old in sld.findall(f"{{{_P}}}transition"):
+        sld.remove(old)
+    inner = _TRANSITION_XML.get(str(name or "none").lower())
+    if not inner:
+        return False
+    el = etree.fromstring(f'<p:transition xmlns:p="{_P}" spd="med">{inner}</p:transition>')
+    _insert_before_successors(sld, el, ("timing", "extLst"))
+    return True
+
+
+# ── click builds ─────────────────────────────────────────────────────────────
+def _effect(spid: int, tn: int, node: str) -> str:
+    return (
+        f'<p:par><p:cTn id="{tn}" presetID="10" presetClass="entr" presetSubtype="0" fill="hold" nodeType="{node}">'
+        f'<p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>'
+        f'<p:set><p:cBhvr><p:cTn id="{tn + 1}" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>'
+        f'<p:tgtEl><p:spTgt spid="{spid}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr>'
+        f'<p:to><p:strVal val="visible"/></p:to></p:set>'
+        f'<p:animEffect transition="in" filter="fade"><p:cBhvr><p:cTn id="{tn + 2}" dur="450"/>'
+        f'<p:tgtEl><p:spTgt spid="{spid}"/></p:tgtEl></p:cBhvr></p:animEffect>'
+        f'</p:childTnLst></p:cTn></p:par>'
+    )
+
+
+def _click_par(group: Sequence[int], tn: int) -> tuple[str, int]:
+    """One click: every shape of ``group`` fades in together. Returns (xml, next free id)."""
+    outer, inner = tn, tn + 1
+    tn += 2
+    effects = []
+    for k, spid in enumerate(group):
+        effects.append(_effect(spid, tn, "clickEffect" if k == 0 else "withEffect"))
+        tn += 3
+    xml = (f'<p:par><p:cTn id="{outer}" fill="hold"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst><p:childTnLst>'
+           f'<p:par><p:cTn id="{inner}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>'
+           f'{"".join(effects)}</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>')
+    return xml, tn
+
+
+def merge_groups(groups: Sequence[Sequence[int]], steps: int) -> List[List[int]]:
+    """Fold ``groups`` into ``steps`` consecutive chunks (a plan with fewer steps than shapes)."""
+    n = len(groups)
+    if steps < 1 or steps >= n:
+        return [list(g) for g in groups]
+    out: List[List[int]] = []
+    for i in range(steps):
+        lo, hi = round(i * n / steps), round((i + 1) * n / steps)
+        merged = [sid for g in groups[lo:hi] for sid in g]
+        if merged:
+            out.append(merged)
+    return out
+
+
+def apply_click_builds(slide, groups: Sequence[Sequence[int]], static_first: bool = True) -> bool:
     """
-    Add a click-sequence fade entrance for ``shape_ids`` (in order) to ``slide``.
+    Fade each group in on successive clicks. With ``static_first`` the first group is
+    simply visible on arrival (progressive reveal); otherwise every group needs a click.
 
-    Returns True if timing was added. Safe: on any error the slide is unchanged.
+    Returns True if timing was added. On any error the slide is left unchanged.
     """
-    ids = [i for i in shape_ids if isinstance(i, int) and i > 0]
-    if len(ids) < 2:
+    clean = [[i for i in g if isinstance(i, int) and i > 0] for g in groups]
+    clean = [g for g in clean if g]
+    clicks = clean[1:] if static_first else clean
+    if not clicks:
         return False
     try:
-        sp_tree = slide._element  # <p:sld>
-        # Remove any existing timing.
-        for old in sp_tree.findall(f"{{{_P}}}timing"):
-            sp_tree.remove(old)
-
-        tn_id = 4
+        sld = slide._element
+        for old in sld.findall(f"{{{_P}}}timing"):
+            sld.remove(old)
+        tn = 3
         pars = []
-        for k, sid in enumerate(ids):
-            pars.append(_click_par(sid, tn_id, first=(k == 0)))
-            tn_id += 6
+        for g in clicks:
+            xml, tn = _click_par(g, tn)
+            pars.append(xml)
 
-        timing_xml = f"""<p:timing xmlns:p="{_P}">
-  <p:tnLst>
-    <p:par>
-      <p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">
-        <p:childTnLst>
-          <p:seq concurrent="1" nextAc="seek">
-            <p:cTn id="2" dur="indefinite" nodeType="mainSeq">
-              <p:childTnLst>{''.join(pars)}
-              </p:childTnLst>
-            </p:cTn>
-            <p:prevCondLst>
-              <p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond>
-            </p:prevCondLst>
-            <p:nextCondLst>
-              <p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond>
-            </p:nextCondLst>
-          </p:seq>
-        </p:childTnLst>
-      </p:cTn>
-    </p:par>
-  </p:tnLst>
-</p:timing>"""
-        timing = etree.fromstring(timing_xml)
-        sp_tree.append(timing)
+        timing_xml = (
+            f'<p:timing xmlns:p="{_P}"><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>'
+            f'<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>{"".join(pars)}</p:childTnLst></p:cTn>'
+            f'<p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>'
+            f'<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst></p:seq>'
+            f'</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>'
+        )
+        _insert_before_successors(sld, etree.fromstring(timing_xml), ("extLst",))
         return True
     except Exception:
         return False
@@ -142,4 +150,4 @@ def strip_all_timing(prs) -> None:
             el.remove(t)
 
 
-__all__ = ["animations_enabled", "apply_click_builds", "strip_all_timing"]
+__all__ = ["animations_enabled", "set_transition", "apply_click_builds", "merge_groups", "strip_all_timing"]
