@@ -302,8 +302,12 @@ def _add_footer(slide, n: int, total: int, theme: ColorPalette):
     tb2.text_frame.paragraphs[0].font.color.rgb = theme.subtext_rgb
 
 
-def _add_takeaway_bar(slide, takeaway_text: str, theme: ColorPalette):
-    if not takeaway_text:
+def _add_takeaway_bar(slide, rows, theme: ColorPalette):
+    """Footer callout. ``rows`` is a string (plain takeaway) or [[label, text], …] (takeaway, key terms, example)."""
+    if isinstance(rows, str):
+        rows = [["Key takeaway", rows]] if rows else []
+    rows = [r for r in rows if r and str(r[1]).strip()]
+    if not rows:
         return
     band = L.takeaway_band()
     fill = _tint(theme.accent_rgb, 0.78)
@@ -320,17 +324,21 @@ def _add_takeaway_bar(slide, takeaway_text: str, theme: ColorPalette):
     bar.fill.solid(); bar.fill.fore_color.rgb = theme.accent_rgb
     bar.line.fill.background()
 
-    ttk = box.text_frame
-    ttk.word_wrap = True
-    ttk.vertical_anchor = MSO_ANCHOR.MIDDLE
-    ttk.margin_left = Inches(0.25)
-    ttk.paragraphs[0].alignment = PP_ALIGN.LEFT
-    run = ttk.paragraphs[0].add_run()
-    run.text = f"Key takeaway:  {takeaway_text}"
-    run.font.color.rgb = _readable(fill, prefer=theme.text_rgb)
-    run.font.size = Pt(L.fit_font_size(
-        [run.text], band.width - 0.45, band.height - 0.15, max_pt=15, min_pt=9))
-    run.font.bold = True
+    tf = box.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf.margin_left = Inches(0.25)
+    tf.margin_right = Inches(0.15)
+    texts = [f"{lbl}:  {txt}" for lbl, txt in rows]
+    size = L.fit_font_size(texts, (band.width - 0.5) * 0.92, (band.height - 0.12) * 0.9, max_pt=15 if len(rows) == 1 else 12.5, min_pt=8.5, spacing_pt=2)
+    ink = _readable(fill, prefer=theme.text_rgb)
+    for i, (lbl, txt) in enumerate(rows):
+        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        para.alignment = PP_ALIGN.LEFT
+        r1 = para.add_run(); r1.text = f"{lbl}:  "
+        r1.font.bold = True; r1.font.size = Pt(size); r1.font.color.rgb = _readable(fill, prefer=theme.primary_rgb)
+        r2 = para.add_run(); r2.text = str(txt)
+        r2.font.size = Pt(size); r2.font.color.rgb = ink; r2.font.bold = len(rows) == 1
 
 def _add_figure_slide(prs, theme: ColorPalette, title_text: str, image_bytes: bytes,
                       caption: str = "") -> bool:
@@ -602,8 +610,14 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
             takeaway_text = str(_sp.params["takeaway"] or "").strip()  # the visual's own synthesis wins
         elif len(takeaway_text) > 190:
             takeaway_text = ""
+        footer_rows = []
+        if _sp is not None and (getattr(_sp, "params", None) or {}).get("footer"):
+            footer_rows = [r for r in _sp.params["footer"] if r and str(r[1]).strip()]
+            takeaway_text = footer_rows[0][1] if footer_rows else ""
+        elif takeaway_text:
+            footer_rows = [["Key takeaway", takeaway_text]]
         if layout_type == "QUIZ":
-            takeaway_text = ""  # the answer/explanation box owns the bottom of a checkpoint slide
+            takeaway_text, footer_rows = "", []  # the answer/explanation box owns the bottom of a checkpoint slide
         if _sp and getattr(_sp, "speaker_notes", ""):
             try:
                 slide.notes_slide.notes_text_frame.text = _sp.speaker_notes
@@ -612,7 +626,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
         # Geometry is derived per slide: the body shrinks when a takeaway bar
         # or a checkpoint band is also being drawn, so nothing overlaps.
-        band = L.content_band(has_takeaway=bool(takeaway_text),
+        band = L.content_band(has_takeaway=bool(footer_rows),
                               has_quiz=bool(inline_quiz))
 
         _add_header_bar(slide, title_text, theme)
@@ -921,7 +935,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         if inline_quiz:
             _add_inline_quiz(slide, inline_quiz, theme, bool(takeaway_text))
 
-        _add_takeaway_bar(slide, takeaway_text, theme)
+        _add_takeaway_bar(slide, footer_rows, theme)
 
         # A figure anchored to a non-MINIMAL layout gets its own slide, placed
         # immediately after so it stays with the content it belongs to.

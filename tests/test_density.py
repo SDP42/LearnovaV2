@@ -269,6 +269,7 @@ class TestPipelineDensity:
         result = generate(
             from_typed_text(source, "Density"),
             PipelineConfig(
+                content_mode="compress",  # these tests exercise the legacy density budget
                 text_density=density,
                 build_pptx=False,
                 build_html=False,

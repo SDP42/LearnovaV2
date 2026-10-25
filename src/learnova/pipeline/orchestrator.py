@@ -92,8 +92,9 @@ class PipelineConfig:
     # Pedagogical enrichment (examples, analogies, revision points). LLM-backed,
     # so it is skipped automatically at low density or with no provider.
     enable_enhancement: bool = True
-    # "compress" suits a 200-page PDF; "expand" suits a short typed syllabus.
-    content_mode: str = "compress"
+    # "preserve" (default): keep every word, then split long sections / enrich short ones — nothing is summarised.
+    # "compress" is the legacy summarising path; "expand" teaches a short typed outline step by step.
+    content_mode: str = "preserve"
 
 
 @dataclass
@@ -393,6 +394,33 @@ def generate(
 
     # 5. Layout classification (LLM, with heuristic fallback inside)
     def _layout():
+        if config.content_mode == "preserve":
+            # No summarising. Keep the whole text, then plan each slide's size (split long, flag short),
+            # recover tables, and add student aids (key terms from the document's own definitions, prompts, glossary).
+            from learnova.pipeline.enrich import enrich_deck as _enrich_deck
+            from learnova.pipeline.planner import plan_slides, preserve_chunks
+            from learnova.pipeline.table_pages import paginate_tables
+
+            result.improved = preserve_chunks(result.chunks)
+            paginate_tables(result.improved)
+            plan_slides(result.improved)
+            stats = _enrich_deck(result.improved)
+            try:
+                from learnova.ai import assist
+
+                if assist.llm_available():
+                    thin = [{"id": i, "title": str((e.get("improved") or {}).get("title") or ""), "text": str((e.get("original") or {}).get("text") or "")}
+                            for i, e in enumerate(result.improved) if (e.get("improved") or {}).get("short") and "[TABLE DATA]" not in str((e.get("original") or {}).get("text") or "")]
+                    for sid, extra in assist.enrich_slides(thin).items():
+                        imp = result.improved[sid]["improved"]
+                        if extra.get("example"):
+                            imp["example"] = extra["example"]
+                        for t in extra.get("terms", []):
+                            imp.setdefault("key_terms", []).append(t)
+            except Exception:
+                logger.exception("LLM enrichment failed")
+            logger.info("preserve mode: %d slides, %s", len(result.improved), stats)
+            return len(result.improved)
         result.improved = improve_chunks(result.chunks)
 
         # Carry the enumeration-split metadata onto the improved slide, and turn
@@ -484,9 +512,10 @@ def generate(
     def _visual_plan():
         return enrich_deck(result.improved)
 
+    _preserve = config.content_mode == "preserve"
     runner.run(
         "visual_plan", _visual_plan,
-        skip=not config.enable_visual_planner, skip_reason="disabled",
+        skip=(not config.enable_visual_planner) or _preserve, skip_reason="superseded by the content engine" if _preserve else "disabled",
     )
 
     # 6a. Visual data — for slides whose chosen visual needs structured data
@@ -513,7 +542,7 @@ def generate(
     _do_expand = (
         config.content_mode == "expand"
         or str(config.text_density).lower() == "teaching"
-    )
+    ) and config.content_mode != "preserve"
 
     def _expand():
         from learnova.pipeline.expander import expand_deck
@@ -543,8 +572,8 @@ def generate(
 
     runner.run(
         "enhance", _enhance,
-        skip=not (config.enable_enhancement and profile.include_enhancement),
-        skip_reason=("disabled" if not config.enable_enhancement
+        skip=_preserve or not (config.enable_enhancement and profile.include_enhancement),
+        skip_reason=("handled by the planner's enrichment" if _preserve else "disabled" if not config.enable_enhancement
                      else f"density '{profile.id}' omits enrichment"),
     )
 
@@ -590,7 +619,7 @@ def generate(
                 imp["takeaway"] = cand[:1].upper() + cand[1:]
         return f"{before} -> {len(result.improved)} slides"
 
-    runner.run("density", _density)
+    runner.run("density", _density, skip=_preserve, skip_reason="preserve mode keeps every word; the planner splits instead")
 
     # Long tables become continuation slides (header repeated) before checkpoints are placed.
     try:

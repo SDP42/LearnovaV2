@@ -144,6 +144,15 @@ def build_analysis(result: Any) -> Dict[str, Any]:
 
     content = [s for s in slides if s["kind"] == "content"]
     n = max(1, len(content))
+    # PPTEval-style scorecard (deterministic): content fidelity, design balance, coherence
+    balanced = sum(1 for s in content if 18 <= s["after"]["words"] <= 115 or s["after"]["family"] in {"COMPARE_TABLE", "REFERENCES"})
+    titles = [s["title"].lower() for s in content]
+    unique = len(set(titles)) / max(1, len(titles))
+    aids = sum(1 for e in deck if isinstance(e.get("improved"), dict) and (e["improved"].get("key_terms") or e["improved"].get("is_overview") or e["improved"].get("is_glossary")))
+    q_content = round(100 * kept_facts / tot_facts) if tot_facts else 100
+    q_design = round((100 * vis_after / n + 100 * balanced / n) / 2)
+    q_coherence = round((100 * unique + min(100, 100 * aids / max(1, n) * 2)) / 2)
+    quality = {"content": q_content, "design": q_design, "coherence": q_coherence, "overall": round((q_content + q_design + q_coherence) / 3)}
     return {
         "summary": {
             "source_name": getattr(result, "source_name", ""),
@@ -154,8 +163,12 @@ def build_analysis(result: Any) -> Dict[str, Any]:
             "visual_coverage_before_pct": round(100 * vis_before / n), "visual_coverage_after_pct": round(100 * vis_after / n),
             "distinct_visual_types": len(families), "visual_types": families,
             "illustrations": illos, "facts_total": tot_facts, "facts_kept": kept_facts,
-            "fact_retention_pct": round(100 * kept_facts / max(1, tot_facts)),
+            "fact_retention_pct": round(100 * kept_facts / tot_facts) if tot_facts else 100,
             "engagement_score": int((getattr(result, "scores", {}) or {}).get("overall_score", 0) or 0),
+            "quality": quality,
+            "student_aids": {"key_term_slides": sum(1 for e in deck if isinstance(e.get("improved"), dict) and e["improved"].get("key_terms")),
+                             "overview_slides": sum(1 for e in deck if isinstance(e.get("improved"), dict) and e["improved"].get("is_overview")),
+                             "glossary_slides": sum(1 for e in deck if isinstance(e.get("improved"), dict) and e["improved"].get("is_glossary"))},
         },
         "slides": slides,
     }

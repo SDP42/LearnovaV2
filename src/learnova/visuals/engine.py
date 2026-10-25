@@ -508,6 +508,10 @@ def det_chart(title: str, sents: List[str]) -> Det:
 def det_stats(title: str, sents: List[str]) -> Det:
     if sum(1 for s in sents if re.search(r"[A-Za-z0-9)]\s*=\s*[A-Za-z0-9(]", s)) >= 1:
         return None  # equations are not statistics
+    # sentences that are really table rows (many bare numbers, pipes, marks/hours columns) are not statistics
+    sents = [x for x in sents if len(_numbers(x)) <= 3 and "|" not in x and not re.search(r"\b(?:marks|term test|hrs?\.?|duration|credits?)\b.*\d.*\d.*\d", x, re.I)]
+    if not sents:
+        return None
     tiles = []
     for s in sents:
         nums = _numbers(s)
@@ -593,10 +597,14 @@ def det_cause_effect(title: str, sents: List[str]) -> Det:
 
 
 def det_labelled(title: str, sents: List[str], raw: str) -> Det:
-    items = []
+    items, seen = [], set()
     for ln in re.split(r"\n|(?<=[.!?])\s+", raw):
         m = re.match(r"^\s*(?:[-*•]\s*)?([A-Z][\w /&-]{1,32}?):\s+(.{8,})$", ln.strip())
         if m:
+            key = (m.group(1).strip().lower(), re.sub(r"\W+", "", m.group(2).lower())[:60])
+            if key in seen:  # the director passes the text and its bullets together
+                continue
+            seen.add(key)
             items.append({"heading": _cap(m.group(1)), "body": _strip_end(m.group(2))})
     if len(items) >= 3 and not re.match(r"(?i)^(advantages?|disadvantages?|pros?|cons?)$", items[0]["heading"]):
         return "LIST_STRUCTURED", "cards", 0.86, {"cards": items[:6]}, f"{len(items)} labelled pillars"

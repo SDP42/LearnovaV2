@@ -252,7 +252,7 @@ class GenerateRequest(BaseModel):
     enable_illustrations: bool = True
     build_pptx: bool = True
     build_html: bool = True
-    content_mode: str = "compress"
+    content_mode: str = "preserve"
     text_density: str = "medium"
     enable_enhancement: bool = True
     markdown: Optional[str] = None

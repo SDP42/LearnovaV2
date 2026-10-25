@@ -173,3 +173,35 @@ def improve_prompt(text: str) -> Dict[str, Any]:
     if "\n" not in text and len(text) < 120:
         hints.append("A bulleted list of topics gives the best structure.")
     return {"text": text, "llm": False, "hints": hints}
+
+
+def enrich_slides(items: List[Dict[str, str]], max_slides: int = 15) -> Dict[int, Dict[str, Any]]:
+    """
+    ONE request that adds understanding to thin slides: a short worked example and plain-language definitions of the
+    technical terms used. ``items``: [{"id", "title", "text"}]. Returns {id: {"example": str, "terms": [{term, definition}]}}.
+    """
+    if not items or not llm_available():
+        return {}
+    system = ("You help students understand lecture slides. For each slide return (a) one concrete example or analogy "
+              "(max 28 words) that makes the idea tangible and is consistent with the slide, and (b) up to 2 technical terms "
+              "from the slide with a plain-language definition (max 18 words each). Never contradict or replace the slide's "
+              "content; if unsure, return an empty example. Reply ONLY with a JSON array "
+              "[{\"id\":0,\"example\":\"...\",\"terms\":[{\"term\":\"...\",\"definition\":\"...\"}]}].")
+    prompt = "\n\n".join(f"### id={s['id']} · {s['title']}\n{s['text'][:600]}" for s in items[:max_slides])
+    try:
+        raw = get_router().generate(prompt, system_prompt=system, task=TASK_IMPROVE, temperature=0.3, max_tokens=1800, timeout=45.0)
+    except Exception as exc:
+        logger.info("assist.enrich_slides failed: %s", exc)
+        return {}
+    out: Dict[int, Dict[str, Any]] = {}
+    for item in _json_block(raw) or []:
+        try:
+            sid = int(item["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        ex = str(item.get("example") or "").strip()
+        terms = [{"term": str(t["term"]).strip()[:40], "definition": str(t["definition"]).strip()[:140]}
+                 for t in (item.get("terms") or []) if isinstance(t, dict) and t.get("term") and t.get("definition")][:2]
+        if (ex and len(ex.split()) <= 45) or terms:
+            out[sid] = {"example": ex if len(ex.split()) <= 45 else "", "terms": terms}
+    return out

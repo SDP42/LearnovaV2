@@ -268,6 +268,19 @@ def build_speaker_notes(imp: Dict[str, Any], animation: Dict[str, Any],
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def footer_rows(imp: Dict[str, Any], takeaway: str) -> List[List[str]]:
+    """[[label, text], …] shown under a slide: takeaway, key terms from the document's own definitions, an example."""
+    rows: List[List[str]] = []
+    if takeaway:
+        rows.append(["Key takeaway", takeaway])
+    kt = imp.get("key_terms") or []
+    if kt:
+        rows.append(["Key terms", "  ·  ".join(f"{t['term']} — {t['definition']}" for t in kt[:3])])
+    if imp.get("example"):
+        rows.append(["Example", str(imp["example"])])
+    return rows
+
+
 def _residual_notes(text: str, data: Dict[str, Any], limit: int = 3) -> List[str]:
     """Sentences the chosen visual does not carry — kept as notes so no fact is lost."""
     from learnova.visuals.engine import split_sentences
@@ -411,7 +424,8 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             family, variant, data = vdata["family"], vdata.get("variant", "llm"), vdata["data"]
             treatment = _FAMILY_TO_TREATMENT.get(family, family)
             visual_reason, engine_conf = "chosen by the AI assistant (the rules were unsure)", 0.9
-            params = {"notes": _residual_notes(vms_source, data), "takeaway": str(imp.get("takeaway_llm") or "")}
+            _tk = str(imp.get("takeaway_llm") or "")
+            params = {"notes": _residual_notes(vms_source, data), "takeaway": _tk, "footer": footer_rows(imp, _tk)}
         if not user_forced and not hard_layout and existing_layout != "QUIZ" and not llm_data:
             from learnova.visuals import decide
 
@@ -420,7 +434,8 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             family, variant, data = dec.family, dec.variant, dec.data
             visual_reason, visual_alts = dec.reason, dec.alternatives
             engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
-            params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": str(imp.get("takeaway_llm") or dec.takeaway)}
+            _tk = str(imp.get("takeaway_llm") or dec.takeaway)
+            params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk)}
         animation = plan_animation_steps(
             bullets, treatment, family, takeaway=str(imp.get("takeaway", ""))
         )
@@ -446,6 +461,8 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             source_text=str((original or {}).get("text") or ""),
         )
 
+        if imp.get("think"):
+            notes = (notes + "\n" if notes else "") + f"Ask the class: {imp['think']}"
         plan.slides.append(SlidePlan(
             index=i, title=title, treatment=treatment, family=family, variant=variant,
             params=params, data=data,

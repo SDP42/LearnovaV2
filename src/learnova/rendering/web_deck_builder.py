@@ -515,12 +515,21 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             </div>
             """
 
-        # Takeaway section
-        takeaway_html = f"""
-        <div style="background:{theme.primary_hex}; color:{on_primary}; border-left:4px solid {theme.accent_hex}; padding:12px; font-size:0.9rem; margin-top:20px; text-align:left; border-radius:4px;">
-            <strong>Key Takeaway:</strong> {takeaway_text}
-        </div>
-        """ if takeaway_text else ""
+        # Footer: takeaway + key terms + example (rows from the Deck Director; falls back to the plain takeaway)
+        _rows = list(((getattr(_sp0, "params", None) or {}).get("footer")) or []) if _sp0 is not None else []
+        if not _rows and takeaway_text:
+            _rows = [["Key takeaway", takeaway_text]]
+        takeaway_html = ""
+        if _rows:
+            _body = "".join(
+                f'<div style="margin:3px 0;"><strong style="color:{theme.accent_hex if lbl != "Key terms" else theme.accent_hex};'
+                f'text-transform:uppercase;font-size:.72rem;letter-spacing:.06em;margin-right:8px;">{html.escape(str(lbl))}</strong>'
+                f'{html.escape(str(txt))}</div>' for lbl, txt in _rows
+            )
+            takeaway_html = (
+                f'<div style="background:{theme.primary_hex};color:{on_primary};border-left:4px solid {theme.accent_hex};'
+                f'padding:10px 14px;font-size:{0.9 if len(_rows) == 1 else 0.8}rem;margin-top:16px;text-align:left;border-radius:8px;line-height:1.4;">{_body}</div>'
+            )
 
         # Body layout. A text slide that also has a figure puts the text in a
         # left column and the figure in a right rail, so neither is squashed and
