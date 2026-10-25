@@ -9,6 +9,41 @@ to a keyword heuristic. Keys improve the writing; they are not a dependency.
 
 ---
 
+
+## ⚡ MVP quick start
+
+```bash
+pip install -r requirements.txt
+./scripts/dev.sh            # API :8000 + web app :5173 (creates .env on first run)
+```
+
+Open <http://localhost:5173> → **Continue with mobile** → enter any number. In dev mode
+(`OTP_DEV_MODE=1`, the default) the code is shown on the screen and printed in the API log, so no SMS
+account is needed. Then **Create** → paste a syllabus (try `demo/sample_syllabus.md`) → Generate →
+**Preview**, **Present** (presenter console), **Before vs after**, and download the **.pptx**.
+
+No internet or API keys? `python scripts/demo_deck.py` builds the demo deck offline into `demo/output/`
+(PPTX + web deck + before/after JSON), so a presentation never depends on live generation.
+
+**What makes this MVP different from "paste text, get bullets":**
+
+| | |
+|---|---|
+| **Every slide is a visual** | A deterministic *Content Decision Engine* (`src/learnova/visuals/engine.py`) reads each slide and chooses process / cycle / timeline / comparison table / pros-cons / 2×2 matrix / layered stack / funnel / stat tiles / charts / definition & formula callouts / cause-effect / checklist / key-point cards — and builds the data to draw it. No slide is plain text. |
+| **Nothing important is lost** | Visuals are lossless by default; sentences a visual can't carry are kept as notes under it, and a fact-retention check (figures, dates, formulae, terms) is reported per slide. |
+| **Illustrations where they help** | `ai/image_gen.py` decides *when* a picture adds meaning (concept slides yes; charts/tables/timelines/quizzes no; paced, never back-to-back) and draws theme-coloured illustrations from open-source Lucide icons — offline. Optional Gemini image model via `LEARNOVA_IMAGE_AI=1`. |
+| **Looks like a designed deck** | Bright Canva-style themes, fitted text in every box, native editable PowerPoint shapes/tables/charts, designed title & checkpoint slides, speaker notes. |
+| **Quizzes that always appear** | Checkpoint questions are generated offline from the same structured data (dates, step order, definitions, figures, formulae). The LLM path is opt-in (`LEARNOVA_QUIZ_LLM=1`). |
+| **Before vs after** | Per-slide comparison with the visual chosen *and why*, word change, and fact retention. `GET /api/decks/{id}/analysis`. |
+| **Fewer API calls** | The engine decides visuals and builds data locally; the LLM is only used when it is unsure. Identical LLM requests are cached on disk (`LEARNOVA_LLM_CACHE=0` to disable); the frontend caches decks/analysis. |
+| **Real login** | Mobile number + OTP, SQLite (`.data/learnova.db`), hashed codes and session tokens, rate limits, account deletion, backups (`scripts/backup_db.py`). |
+
+**Measured accuracy** (`python -m learnova.evaluation.visual_accuracy`, gold sets in `tests/fixtures/`):
+the original selector scored **31.6 %** strict (right visual, actually drawn, with data) on the first set.
+The engine scores 100 % on the three sets used to build it. The *honest* number for unseen content is the
+first score of a blind set before fixing anything: **87.1 %** (27/31). Messy real-world PDFs will score lower —
+add failures to `tests/fixtures/gold_*.json` and the regression tests in `tests/test_visual_accuracy.py` keep them fixed.
+
 ## 🚀 What it does
 
 1. **Ingest** a `.pptx`, a `.pdf`, or a typed syllabus.
@@ -161,18 +196,17 @@ pipeline still produces a deck using heuristic layout classification.
 | `GROQ_API_KEY` | Layout, diagrams, enhancement | No | Free tier; `gsk_…`. TPM ceiling is 6 000 — the enhancement stage can trip it |
 | `NVIDIA_API_KEY` | Rewriting + quizzes, and 429 failover for everything | No | build.nvidia.com, `nvapi-…` |
 | `GEMINI_API_KEY` | Image OCR / vision descriptions | No | Needed for **scanned** PDFs, which are otherwise rejected |
-| `VITE_CLERK_PUBLISHABLE_KEY` | Sign-in + per-user deck library | For accounts | `pk_…`, safe in the browser |
-| `CLERK_SECRET_KEY` | Server-side Clerk calls | For accounts | `sk_…` — **never** put this in `frontend/.env` |
+| `OTP_SECRET` | HMAC key for OTP hashes | Production | long random string |
+| `OTP_DEV_MODE` | Echo the OTP in the API response | Dev only | `1` by default — set `0` in production |
+| `OTP_SMS_PROVIDER` | `console` (log) or `twilio` | Production | with `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` |
+| `LEARNOVA_AUTH` | `off` = anonymous single user | No | for the `VITE_DEMO=1` frontend or tests |
 
 > A Gemini key that authenticates can still return `429 RESOURCE_EXHAUSTED` on
 > every generation call: listing models does not consume `generateContent`
 > quota, so a key can look valid and have none. If every call 429s with no
 > retry delay, the project needs billing or free-tier quota enabled.
 
-The frontend reads its Clerk key from **`frontend/.env`** (`VITE_` prefix — Vite
-does not expose bare or `NEXT_PUBLIC_` names to the browser). The project-root
-`.env` holds the backend copy. Without Clerk configured the API runs in
-anonymous single-user mode, so local development still works.
+Auth data lives in a SQLite file (`.data/learnova.db`, override with `LEARNOVA_DB_PATH`). Back it up with `python scripts/backup_db.py`.
 
 ### 3. Run
 
@@ -354,10 +388,7 @@ are stripped, otherwise each one becomes a junk slide.
 
 ## 🔐 Accounts & the deck library
 
-Sign-in is handled by **Clerk**. The React app sends Clerk's session JWT as
-`Authorization: Bearer …`; the API verifies its RS256 signature against Clerk's
-published JWKS. **The user id is never taken from the client** — otherwise
-changing a header would expose someone else's decks.
+Sign-in is **mobile number + one-time code** (`src/learnova/auth/phone.py`). The code is 6 digits, valid 5 minutes, 5 attempts, single use, stored only as an HMAC; sessions are opaque 256-bit tokens stored hashed (30 days). The React app sends the token as `Authorization: Bearer …`. **The user id is never taken from the client** — otherwise changing a header would expose someone else's decks. Per-IP rate limits and security headers are on by default; `DELETE /api/auth/account` erases the user and their decks.
 
 Every generated deck is written to `.data/users/<user_id>/<deck_id>/`
 (markdown + PPTX + HTML + metadata) and listed under **My Decks**. Requests for

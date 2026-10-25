@@ -481,24 +481,39 @@ def _tint(theme, a: str = "14") -> str:
     return f"{theme.primary_hex}{a}"
 
 
+def _icon_chip(theme, text: str, used: list, size: int = 42) -> str:
+    """A tinted disc holding a concept icon (Lucide, inline SVG) chosen from the card's text."""
+    try:
+        from learnova.visuals.icons import icon_svg_inline, pick_icons
+
+        mine = pick_icons(text, 6)
+        name = next((m for m in mine if m not in used), mine[0])
+        used.append(name)
+        return (f'<span style="width:{size}px;height:{size}px;border-radius:50%;background:{theme.primary_hex}1f;'
+                f'display:grid;place-items:center;flex:none;">{icon_svg_inline(name, theme.primary_hex, int(size * 0.58))}</span>')
+    except Exception:
+        return ""
+
+
 def _key_points(data: Dict[str, Any], theme) -> Optional[str]:
     cards = data.get("cards") or []
     if len(cards) < 2:
         return None
+    used: list = []
     n = len(cards[:6])
     cols = 2 if n in (2, 4) else 3
     cells = ""
     for i, c in enumerate(cards[:6]):
         head = _esc(str(c.get("heading", "")))
         body = _esc(str(c.get("body", "")))
-        if body.strip().lower() == head.strip().lower():
-            body = ""
+        if body.strip().lower().rstrip(". ").startswith(head.strip().lower().rstrip(". ")):
+            head, body = body, ""   # heading was only the opening words: show the sentence once, large
         cells += (
             f'<div data-el="el.{i}" data-build="{i}" style="background:{theme.card_bg_hex};border-radius:18px;'
             f'padding:20px 20px 18px;border:1px solid {_tint(theme, "22")};box-shadow:0 8px 22px {_tint(theme)};'
             f'display:flex;flex-direction:column;justify-content:center;gap:10px;">'
-            f'<span style="width:38px;height:38px;border-radius:12px;background:{theme.primary_hex};color:{_on(theme)};'
-            f'display:grid;place-items:center;font-weight:800;">{i + 1}</span>'
+            + (_icon_chip(theme, head + " " + body, used) or f'<span style="width:38px;height:38px;border-radius:12px;background:{theme.primary_hex};color:{_on(theme)};display:grid;place-items:center;font-weight:800;">{i + 1}</span>') +
+            f''
             f'<div style="font-weight:800;font-size:1.3rem;color:{theme.primary_hex};line-height:1.2;">{head}</div>'
             + (f'<div style="font-size:1.05rem;line-height:1.5;color:{theme.text_hex};">{body}</div>' if body else "")
             + "</div>"

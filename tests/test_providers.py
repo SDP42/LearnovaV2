@@ -81,3 +81,23 @@ def test_gemini_embedding_provider():
     assert isinstance(embeddings[0], list)
     assert len(embeddings[0]) > 0
     assert isinstance(embeddings[0][0], float)
+
+
+def test_router_caches_identical_requests(tmp_path, monkeypatch):
+    """The same prompt is paid for once; failures are not cached."""
+    from learnova.providers import router as r
+
+    monkeypatch.setattr(r, "_llm_cache_dir", lambda: tmp_path)
+    monkeypatch.setenv("LEARNOVA_LLM_CACHE", "1")
+    calls = []
+
+    class P:
+        def generate(self, prompt, system_prompt=None, **kw):
+            calls.append(prompt)
+            return "answer"
+
+    router = r.LLMRouter([("fake", P())])
+    assert router.generate("hello", task=None) == "answer"
+    assert router.generate("hello", task=None) == "answer"
+    assert router.generate("other", task=None) == "answer"
+    assert calls == ["hello", "other"]

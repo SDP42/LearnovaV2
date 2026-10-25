@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound.jsx";
 import Legal from "./pages/Legal.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Audience from "./pages/Audience.jsx";
+import Compare from "./pages/Compare.jsx";
 import Create from "./pages/Create.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import DeckLibrary from "./pages/DeckLibrary.jsx";
@@ -112,6 +113,7 @@ export default function App() {
         <Route path="/app" element={<Protected><Dashboard /></Protected>} />
         <Route path="/app/create" element={<Protected><Create /></Protected>} />
         <Route path="/app/preview/:jobId" element={<Protected><Preview /></Protected>} />
+        <Route path="/app/compare/:jobId" element={<Protected><Compare /></Protected>} />
         <Route path="/app/present/:jobId" element={<Protected><Present /></Protected>} />
         <Route path="/app/audience/:jobId" element={<Protected><Audience /></Protected>} />
         <Route path="/app/export/:jobId" element={<Protected><Export /></Protected>} />

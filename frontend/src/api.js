@@ -32,6 +32,71 @@ async function json(response) {
   return response.status === 204 ? null : response.json();
 }
 
+// ── Stale-while-revalidate cache (memory + sessionStorage, ~5 min TTL) ────
+// Cached data is returned instantly; once older than the TTL it is refreshed
+// in the background so the next call sees fresh data.
+const TTL = 5 * 60 * 1000;
+const mem = new Map();
+const inflight = new Map();
+const SS = "learnova-cache:";
+function cacheGet(key) {
+  if (mem.has(key)) return mem.get(key);
+  try {
+    const raw = sessionStorage.getItem(SS + key);
+    if (raw) {
+      const e = JSON.parse(raw);
+      mem.set(key, e);
+      return e;
+    }
+  } catch {
+    /* storage unavailable */
+  }
+  return null;
+}
+function cacheSet(key, data) {
+  const e = { t: Date.now(), data };
+  mem.set(key, e);
+  try {
+    sessionStorage.setItem(SS + key, JSON.stringify(e));
+  } catch {
+    /* quota / disabled */
+  }
+}
+/** Drop every cached key starting with one of the prefixes (all keys if none). */
+export function invalidateCache(...prefixes) {
+  const hit = (k) => !prefixes.length || prefixes.some((p) => k.startsWith(p));
+  for (const [k, e] of [...mem]) {
+    if (!hit(k)) continue;
+    if (k.startsWith("blob:") && e.data) URL.revokeObjectURL(e.data);
+    mem.delete(k);
+  }
+  try {
+    for (const k of Object.keys(sessionStorage)) if (k.startsWith(SS) && hit(k.slice(SS.length))) sessionStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+}
+const invalidateDeck = (id) => invalidateCache(`deck:${id}`, `analysis:${id}`, `blob:${id}`, "decks");
+async function swr(key, fetcher, persist = true) {
+  const hit = cacheGet(key);
+  const refresh = () => {
+    if (!inflight.has(key))
+      inflight.set(
+        key,
+        fetcher()
+          .then((d) => {
+            persist ? cacheSet(key, d) : mem.set(key, { t: Date.now(), data: d });
+            return d;
+          })
+          .finally(() => inflight.delete(key))
+      );
+    return inflight.get(key);
+  };
+  if (!hit) return refresh();
+  if (Date.now() - hit.t > TTL) refresh().catch(() => {});
+  return hit.data;
+}
+
 // ── Phone + OTP auth ──────────────────────────────────────────────────────
 const post = async (url, body, token) =>
   json(
@@ -97,6 +162,7 @@ export async function getConfig() {
 
 // ── Jobs ──────────────────────────────────────────────────────────────────
 export async function uploadDocument(file, textbookMode = false) {
+  invalidateCache();
   const form = new FormData();
   form.append("file", file);
   form.append("textbook_mode", String(textbookMode));
@@ -110,6 +176,7 @@ export async function uploadDocument(file, textbookMode = false) {
 }
 
 export async function createTypedJob(text, title) {
+  invalidateCache();
   return json(
     await fetch(`${BASE}/api/jobs/typed`, {
       method: "POST",
@@ -140,6 +207,7 @@ export async function saveMarkdown(id, markdown) {
 }
 
 export async function startGenerate(id, options) {
+  invalidateDeck(id);
   return json(
     await fetch(`${BASE}/api/jobs/${id}/generate`, {
       method: "POST",
@@ -149,17 +217,30 @@ export async function startGenerate(id, options) {
   );
 }
 
-export async function getDeck(id) {
-  // A fresh generation is a live job; a deck opened from the library is not.
-  const h = await authHeaders();
-  const jobResp = await fetch(`${BASE}/api/jobs/${id}/deck`, { headers: h });
-  if (jobResp.ok) return jobResp.json();
-  return json(await fetch(`${BASE}/api/decks/${id}/deck`, { headers: h }));
+export function getDeck(id) {
+  return swr(`deck:${id}`, async () => {
+    // A fresh generation is a live job; a deck opened from the library is not.
+    const h = await authHeaders();
+    const jobResp = await fetch(`${BASE}/api/jobs/${id}/deck`, { headers: h });
+    if (jobResp.ok) return jobResp.json();
+    return json(await fetch(`${BASE}/api/decks/${id}/deck`, { headers: h }));
+  });
+}
+
+/** Before/after analysis for a deck; rejects with an Error whose .status is 404 when none exists. */
+export function getAnalysis(id) {
+  return swr(`analysis:${id}`, async () => {
+    const h = await authHeaders();
+    let r = await fetch(`${BASE}/api/decks/${id}/analysis`, { headers: h });
+    if (!r.ok) r = await fetch(`${BASE}/api/jobs/${id}/analysis`, { headers: h });
+    if (r.status === 404) throw Object.assign(new Error("No analysis for this deck"), { status: 404 });
+    return json(r);
+  });
 }
 
 // ── Saved deck library ────────────────────────────────────────────────────
-export async function listMyDecks() {
-  return json(await fetch(`${BASE}/api/decks`, { headers: await authHeaders() }));
+export function listMyDecks() {
+  return swr("decks", async () => json(await fetch(`${BASE}/api/decks`, { headers: await authHeaders() })));
 }
 
 export async function getDeckMarkdown(deckId) {
@@ -169,12 +250,14 @@ export async function getDeckMarkdown(deckId) {
 }
 
 export async function deleteDeck(deckId) {
-  return json(
+  const r = await json(
     await fetch(`${BASE}/api/decks/${deckId}`, {
       method: "DELETE",
       headers: await authHeaders(),
     })
   );
+  invalidateDeck(deckId);
+  return r;
 }
 
 // ── Deck editor ───────────────────────────────────────────────────────────
@@ -191,7 +274,7 @@ export async function saveDeckSlides(deckId, slides, note = "edited") {
       headers: await authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ slides, note }),
     })
-  );
+  ).finally(() => invalidateDeck(deckId));
 }
 
 export async function restoreDeckVersion(deckId, v) {
@@ -200,7 +283,7 @@ export async function restoreDeckVersion(deckId, v) {
       method: "POST",
       headers: await authHeaders(),
     })
-  );
+  ).finally(() => invalidateDeck(deckId));
 }
 
 export async function slideImageUrl(deckId, slide) {
@@ -217,6 +300,7 @@ export async function saveSlideImage(deckId, slide, blob) {
     headers: await authHeaders({ "Content-Type": blob.type || "image/png" }),
     body: blob,
   });
+  invalidateDeck(deckId);
   return json(r);
 }
 
@@ -310,13 +394,20 @@ export async function artifactObjectUrl(path) {
 
 /**
  * Object URL for a deck artifact by id, trying the live-job path then the
- * saved-library path. Caller must URL.revokeObjectURL() when done.
+ * saved-library path. Cached per deck id (revoked on invalidation), so callers
+ * must NOT revoke it.
  */
-export async function deckArtifactUrl(id, artifact) {
-  const h = await authHeaders();
-  for (const path of [`/api/jobs/${id}/download/${artifact}`, `/api/decks/${id}/download/${artifact}`]) {
-    const r = await fetch(`${BASE}${path}`, { headers: h });
-    if (r.ok) return URL.createObjectURL(await r.blob());
-  }
-  throw new Error("Could not load the presentation");
+export function deckArtifactUrl(id, artifact) {
+  return swr(
+    `blob:${id}:${artifact}`,
+    async () => {
+      const h = await authHeaders();
+      for (const path of [`/api/jobs/${id}/download/${artifact}`, `/api/decks/${id}/download/${artifact}`]) {
+        const r = await fetch(`${BASE}${path}`, { headers: h });
+        if (r.ok) return URL.createObjectURL(await r.blob());
+      }
+      throw new Error("Could not load the presentation");
+    },
+    false
+  );
 }

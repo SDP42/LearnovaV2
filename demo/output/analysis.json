@@ -1,0 +1,602 @@
+{
+  "summary": {
+    "source_name": "Learnova Demo Deck",
+    "slides_before": 8,
+    "slides_after": 8,
+    "checkpoints": 2,
+    "words_before": 297,
+    "words_after": 393,
+    "words_change_pct": 32,
+    "visual_slides_before": 0,
+    "visual_slides_after": 8,
+    "visual_coverage_before_pct": 0,
+    "visual_coverage_after_pct": 100,
+    "distinct_visual_types": 7,
+    "visual_types": {
+      "Process flow": 1,
+      "Timeline": 1,
+      "Comparison table": 1,
+      "Stat tiles": 1,
+      "Formula callout": 2,
+      "Layered stack": 1,
+      "Key-point cards": 1
+    },
+    "illustrations": 2,
+    "facts_total": 18,
+    "facts_kept": 18,
+    "fact_retention_pct": 100,
+    "engagement_score": 82
+  },
+  "slides": [
+    {
+      "index": 0,
+      "kind": "content",
+      "title": "Photosynthesis Process",
+      "before": {
+        "title": "Photosynthesis Process",
+        "text": "Photosynthesis happens in stages. First, chlorophyll absorbs sunlight in the thylakoid membranes. Next, water molecules are split to release oxygen and electrons. Then the energy is stored in ATP and NADPH. Finally, the Calvin cycle uses ATP and carbon dioxide to build glucose.",
+        "words": 43,
+        "sentences": [
+          "Photosynthesis happens in stages.",
+          "First, chlorophyll absorbs sunlight in the thylakoid membranes.",
+          "Next, water molecules are split to release oxygen and electrons.",
+          "Then the energy is stored in ATP and NADPH.",
+          "Finally, the Calvin cycle uses ATP and carbon dioxide to build glucose."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "Photosynthesis Process",
+        "bullets": [
+          "Photosynthesis happens in stages",
+          "First, chlorophyll absorbs sunlight in the thylakoid membranes",
+          "Next, water molecules are split to release oxygen and electrons",
+          "Then the energy is stored in ATP and NADPH",
+          "Finally, the Calvin cycle uses ATP and carbon dioxide to build glucose"
+        ],
+        "takeaway": "5 steps \u2014 from \u201cPhotosynthesis happens in stages\u201d to \u201cThe Calvin cycle uses ATP\u201d.",
+        "notes": [],
+        "words": 55,
+        "family": "PROCESS_LINEAR",
+        "family_label": "Process flow",
+        "variant": "flowchart",
+        "reason": "5 sequenced steps",
+        "alternatives": [
+          [
+            "Process flow",
+            0.7
+          ]
+        ],
+        "confidence": 0.9,
+        "data_preview": {
+          "kind": "stages",
+          "count": 5,
+          "sample": [
+            {
+              "label": "Photosynthesis happens in stages",
+              "detail": "Photosynthesis happens in stages"
+            },
+            {
+              "label": "Chlorophyll absorbs sunlight",
+              "detail": "chlorophyll absorbs sunlight in the thylakoid membranes"
+            },
+            {
+              "label": "Water molecules are split",
+              "detail": "water molecules are split to release oxygen and electrons"
+            }
+          ]
+        },
+        "has_illustration": false,
+        "illustration_reason": "no room beside the visual",
+        "illustration_icons": [],
+        "transition": "slide"
+      },
+      "change": {
+        "words_delta": 12,
+        "words_delta_pct": 28,
+        "facts_total": 1,
+        "facts_kept": 1,
+        "facts_missing": [],
+        "visual": "text only \u2192 Process flow"
+      }
+    },
+    {
+      "index": 1,
+      "kind": "content",
+      "title": "History of Computing",
+      "before": {
+        "title": "History of Computing",
+        "text": "In 1936 Alan Turing described the universal machine. In 1945 ENIAC became the first general purpose electronic computer. In 1971 Intel released the first microprocessor. In 1991 the World Wide Web opened to the public. In 2007 the iPhone launched the smartphone era.",
+        "words": 43,
+        "sentences": [
+          "In 1936 Alan Turing described the universal machine.",
+          "In 1945 ENIAC became the first general purpose electronic computer.",
+          "In 1971 Intel released the first microprocessor.",
+          "In 1991 the World Wide Web opened to the public.",
+          "In 2007 the iPhone launched the smartphone era."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "History of Computing",
+        "bullets": [
+          "In 1936 Alan Turing described the universal machine",
+          "In 1945 ENIAC became the first general purpose electronic computer",
+          "In 1971 Intel released the first microprocessor",
+          "In 1991 the World Wide Web opened to the public",
+          "In 2007 the iPhone launched the smartphone era"
+        ],
+        "takeaway": "5 milestones between 1936 and 2007.",
+        "notes": [],
+        "words": 46,
+        "family": "TIMELINE",
+        "family_label": "Timeline",
+        "variant": "dated",
+        "reason": "5 dated events",
+        "alternatives": [],
+        "confidence": 0.9,
+        "data_preview": {
+          "kind": "events",
+          "count": 5,
+          "sample": [
+            {
+              "date": "1936",
+              "title": "Alan Turing described the universal machine"
+            },
+            {
+              "date": "1945",
+              "title": "ENIAC became the first general purpose electronic computer"
+            },
+            {
+              "date": "1971",
+              "title": "Intel released the first microprocessor"
+            }
+          ]
+        },
+        "has_illustration": false,
+        "illustration_reason": "the timeline visual is the content \u2014 an image would only crowd it",
+        "illustration_icons": [],
+        "transition": "convex"
+      },
+      "change": {
+        "words_delta": 3,
+        "words_delta_pct": 7,
+        "facts_total": 8,
+        "facts_kept": 8,
+        "facts_missing": [],
+        "visual": "text only \u2192 Timeline"
+      }
+    },
+    {
+      "index": 2,
+      "kind": "content",
+      "title": "Supervised vs Unsupervised Learning",
+      "before": {
+        "title": "Supervised vs Unsupervised Learning",
+        "text": "Supervised learning uses labelled data, while unsupervised learning finds patterns in unlabelled data. Supervised models predict outputs such as prices or classes. Unsupervised models group similar items, for example customers. Supervised learning needs costly labels, whereas unsupervised learning needs none but is harder to evaluate.",
+        "words": 45,
+        "sentences": [
+          "Supervised learning uses labelled data, while unsupervised learning finds patterns in unlabelled data.",
+          "Supervised models predict outputs such as prices or classes.",
+          "Unsupervised models group similar items, for example customers.",
+          "Supervised learning needs costly labels, whereas unsupervised learning needs none but is harder to evaluate."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "Supervised vs Unsupervised Learning",
+        "bullets": [
+          "Supervised learning uses labelled data, while unsupervised learning finds patterns in unlabelled data",
+          "Supervised models predict outputs such as prices or classes",
+          "Unsupervised models group similar items, for example customers",
+          "Supervised learning needs costly labels, whereas unsupervised learning needs none but is harder to evaluate"
+        ],
+        "takeaway": "Key difference \u2014 Supervised: Uses labelled data  |  Unsupervised: Finds patterns in unlabelled data",
+        "notes": [],
+        "words": 62,
+        "family": "COMPARE_TABLE",
+        "family_label": "Comparison table",
+        "variant": "comparison",
+        "reason": "Supervised compared with Unsupervised",
+        "alternatives": [],
+        "confidence": 0.88,
+        "data_preview": {
+          "kind": "rows",
+          "count": 3,
+          "sample": [
+            [
+              "Uses labelled data",
+              "Finds patterns in unlabelled data"
+            ],
+            [
+              "Predict outputs such as prices or classes",
+              "Group similar items, for example customers"
+            ],
+            [
+              "Needs costly labels",
+              "Needs none but is harder to evaluate"
+            ]
+          ]
+        },
+        "has_illustration": false,
+        "illustration_reason": "the compare table visual is the content \u2014 an image would only crowd it",
+        "illustration_icons": [],
+        "transition": "convex"
+      },
+      "change": {
+        "words_delta": 17,
+        "words_delta_pct": 38,
+        "facts_total": 0,
+        "facts_kept": 0,
+        "facts_missing": [],
+        "visual": "text only \u2192 Comparison table"
+      }
+    },
+    {
+      "index": 3,
+      "kind": "quiz",
+      "title": "Checkpoint 1",
+      "quiz": {
+        "question": "Which statement describes Supervised?",
+        "options": [
+          "Uses labelled data",
+          "Group similar items, for example customers",
+          "Next, water molecules are split to release oxygen and electrons",
+          "Finds patterns in unlabelled data"
+        ],
+        "correct": "A",
+        "explanation": "Supervised: Uses labelled data. Unsupervised: Finds patterns in unlabelled data.",
+        "difficulty": "apply"
+      }
+    },
+    {
+      "index": 4,
+      "kind": "content",
+      "title": "Market Results Q3",
+      "before": {
+        "title": "Market Results Q3",
+        "text": "Revenue grew 24% year over year to $4.2 million. Customer retention reached 93%. Churn fell from 7% to 4%. The company added 1,200 new customers, a 15% increase over Q2.",
+        "words": 30,
+        "sentences": [
+          "Revenue grew 24% year over year to $4.2 million.",
+          "Customer retention reached 93%.",
+          "Churn fell from 7% to 4%.",
+          "The company added 1,200 new customers, a 15% increase over Q2."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "Market Results Q3",
+        "bullets": [
+          "Revenue grew 24% year over year to $4.2 million",
+          "Customer retention reached 93%",
+          "Churn fell from 7% to 4%",
+          "The company added 1,200 new customers, a 15% increase over Q2"
+        ],
+        "takeaway": "Headline: 24% \u2014 revenue grew year over year.",
+        "notes": [
+          "The company added 1,200 new customers, a 15% increase over Q2."
+        ],
+        "words": 33,
+        "family": "STAT_TILES",
+        "family_label": "Stat tiles",
+        "variant": "tiles",
+        "reason": "7 headline figures",
+        "alternatives": [],
+        "confidence": 0.8,
+        "data_preview": {
+          "kind": "tiles",
+          "count": 4,
+          "sample": [
+            {
+              "value": "24%",
+              "label": "Revenue grew year over year",
+              "detail": "Revenue grew 24% year over year to $4.2 million"
+            },
+            {
+              "value": "$4.2 million",
+              "label": "Revenue grew year over year",
+              "detail": ""
+            },
+            {
+              "value": "93%",
+              "label": "Customer retention",
+              "detail": "Customer retention reached 93%"
+            }
+          ]
+        },
+        "has_illustration": false,
+        "illustration_reason": "the stat tiles visual is the content \u2014 an image would only crowd it",
+        "illustration_icons": [],
+        "transition": "convex"
+      },
+      "change": {
+        "words_delta": 3,
+        "words_delta_pct": 10,
+        "facts_total": 7,
+        "facts_kept": 7,
+        "facts_missing": [],
+        "visual": "text only \u2192 Stat tiles"
+      }
+    },
+    {
+      "index": 5,
+      "kind": "content",
+      "title": "Definition of Entropy",
+      "before": {
+        "title": "Definition of Entropy",
+        "text": "Entropy is a measure of the disorder or randomness in a system. In information theory, entropy quantifies the average uncertainty of a random variable. The formula H = -sum p(x) log p(x) gives the entropy of a distribution.",
+        "words": 38,
+        "sentences": [
+          "Entropy is a measure of the disorder or randomness in a system.",
+          "In information theory, entropy quantifies the average uncertainty of a random variable.",
+          "The formula H = -sum p(x) log p(x) gives the entropy of a distribution."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "Definition of Entropy",
+        "bullets": [
+          "Entropy is a measure of the disorder or randomness in a system",
+          "In information theory, entropy quantifies the average uncertainty of a random variable",
+          "The formula H = -sum p(x) log p(x) gives the entropy of a distribution"
+        ],
+        "takeaway": "Remember: H = -sum p(x) log p(x)",
+        "notes": [],
+        "words": 53,
+        "family": "FORMULA_CALLOUT",
+        "family_label": "Formula callout",
+        "variant": "card",
+        "reason": "a definition with its formula",
+        "alternatives": [],
+        "confidence": 0.86,
+        "data_preview": {
+          "kind": "",
+          "count": 0,
+          "sample": []
+        },
+        "has_illustration": true,
+        "illustration_reason": "concept slide about \u201cDefinition of Entropy\u201d \u2014 an illustration of settings adds meaning",
+        "illustration_icons": [
+          "settings",
+          "chart-pie",
+          "ruler",
+          "atom"
+        ],
+        "transition": "convex"
+      },
+      "change": {
+        "words_delta": 15,
+        "words_delta_pct": 39,
+        "facts_total": 1,
+        "facts_kept": 1,
+        "facts_missing": [],
+        "visual": "text only \u2192 Formula callout"
+      }
+    },
+    {
+      "index": 6,
+      "kind": "content",
+      "title": "Layers of the Earth",
+      "before": {
+        "title": "Layers of the Earth",
+        "text": "The Earth has four main layers. The crust is the thin outer shell. Beneath it lies the mantle, which is the thickest layer. The outer core is liquid iron and nickel. The inner core is solid and extremely hot.",
+        "words": 39,
+        "sentences": [
+          "The Earth has four main layers.",
+          "The crust is the thin outer shell.",
+          "Beneath it lies the mantle, which is the thickest layer.",
+          "The outer core is liquid iron and nickel.",
+          "The inner core is solid and extremely hot."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "Layers of the Earth",
+        "bullets": [
+          "The Earth has four main layers",
+          "The crust is the thin outer shell",
+          "Beneath it lies the mantle, which is the thickest layer",
+          "The outer core is liquid iron and nickel",
+          "The inner core is solid and extremely hot"
+        ],
+        "takeaway": "4 levels, from crust to inner core.",
+        "notes": [
+          "The Earth has four main layers."
+        ],
+        "words": 53,
+        "family": "LAYERS",
+        "family_label": "Layered stack",
+        "variant": "stack",
+        "reason": "4 nested / stacked levels",
+        "alternatives": [],
+        "confidence": 0.84,
+        "data_preview": {
+          "kind": "levels",
+          "count": 4,
+          "sample": [
+            {
+              "label": "Crust",
+              "detail": "The crust is the thin outer shell"
+            },
+            {
+              "label": "Mantle",
+              "detail": "Beneath it lies the mantle, which is the thickest layer"
+            },
+            {
+              "label": "Outer core",
+              "detail": "The outer core is liquid iron and nickel"
+            }
+          ]
+        },
+        "has_illustration": false,
+        "illustration_reason": "the layers visual is the content \u2014 an image would only crowd it",
+        "illustration_icons": [],
+        "transition": "convex"
+      },
+      "change": {
+        "words_delta": 14,
+        "words_delta_pct": 36,
+        "facts_total": 1,
+        "facts_kept": 1,
+        "facts_missing": [],
+        "visual": "text only \u2192 Layered stack"
+      }
+    },
+    {
+      "index": 7,
+      "kind": "quiz",
+      "title": "Checkpoint 2",
+      "quiz": {
+        "question": "Which is described by: \u201cBeneath it lies the mantle, which is the thickest layer\u201d?",
+        "options": [
+          "Benefits of Exercise",
+          "Mantle",
+          "Outer core",
+          "Inner core"
+        ],
+        "correct": "B",
+        "explanation": "Beneath it lies the mantle, which is the thickest layer",
+        "difficulty": "recall"
+      }
+    },
+    {
+      "index": 8,
+      "kind": "content",
+      "title": "Benefits of Exercise",
+      "before": {
+        "title": "Benefits of Exercise",
+        "text": "Regular exercise improves heart health. It strengthens muscles and bones. It boosts mood and reduces anxiety. It improves sleep quality. It helps maintain a healthy weight.",
+        "words": 26,
+        "sentences": [
+          "Regular exercise improves heart health.",
+          "It strengthens muscles and bones.",
+          "It boosts mood and reduces anxiety.",
+          "It improves sleep quality.",
+          "It helps maintain a healthy weight."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "Benefits of Exercise",
+        "bullets": [
+          "Regular exercise improves heart health",
+          "It strengthens muscles and bones",
+          "It boosts mood and reduces anxiety",
+          "It improves sleep quality",
+          "It helps maintain a healthy weight"
+        ],
+        "takeaway": "",
+        "notes": [],
+        "words": 55,
+        "family": "KEY_POINTS",
+        "family_label": "Key-point cards",
+        "variant": "grid",
+        "reason": "discrete key points (lossless cards)",
+        "alternatives": [],
+        "confidence": 0.66,
+        "data_preview": {
+          "kind": "cards",
+          "count": 5,
+          "sample": [
+            {
+              "heading": "Regular exercise improves",
+              "body": "Regular exercise improves heart health"
+            },
+            {
+              "heading": "Strengthens muscles",
+              "body": "It strengthens muscles and bones"
+            },
+            {
+              "heading": "Boosts mood",
+              "body": "It boosts mood and reduces anxiety"
+            }
+          ]
+        },
+        "has_illustration": false,
+        "illustration_reason": "no room beside the visual",
+        "illustration_icons": [],
+        "transition": "convex"
+      },
+      "change": {
+        "words_delta": 29,
+        "words_delta_pct": 112,
+        "facts_total": 0,
+        "facts_kept": 0,
+        "facts_missing": [],
+        "visual": "text only \u2192 Key-point cards"
+      }
+    },
+    {
+      "index": 9,
+      "kind": "content",
+      "title": "Newton's Second Law",
+      "before": {
+        "title": "Newton's Second Law",
+        "text": "The acceleration of an object depends on the net force acting on it and its mass. Force equals mass times acceleration. A heavier object needs more force to accelerate at the same rate.",
+        "words": 33,
+        "sentences": [
+          "The acceleration of an object depends on the net force acting on it and its mass.",
+          "Force equals mass times acceleration.",
+          "A heavier object needs more force to accelerate at the same rate."
+        ],
+        "has_figure": false,
+        "has_table": false,
+        "visual": "text only"
+      },
+      "after": {
+        "title": "Newton's Second Law",
+        "bullets": [
+          "The acceleration of an object depends on the net force acting on it and its mass",
+          "Force equals mass times acceleration",
+          "A heavier object needs more force to accelerate at the same rate"
+        ],
+        "takeaway": "Remember: Force = mass \u00d7 acceleration",
+        "notes": [],
+        "words": 36,
+        "family": "FORMULA_CALLOUT",
+        "family_label": "Formula callout",
+        "variant": "card",
+        "reason": "a law / theorem with a formula",
+        "alternatives": [],
+        "confidence": 0.86,
+        "data_preview": {
+          "kind": "",
+          "count": 0,
+          "sample": []
+        },
+        "has_illustration": true,
+        "illustration_reason": "concept slide about \u201cNewton's Second Law\u201d \u2014 an illustration of magnet adds meaning",
+        "illustration_icons": [
+          "magnet",
+          "rocket",
+          "key",
+          "target"
+        ],
+        "transition": "convex"
+      },
+      "change": {
+        "words_delta": 3,
+        "words_delta_pct": 9,
+        "facts_total": 0,
+        "facts_kept": 0,
+        "facts_missing": [],
+        "visual": "text only \u2192 Formula callout"
+      }
+    }
+  ]
+}

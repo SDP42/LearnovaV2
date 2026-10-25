@@ -1,0 +1,276 @@
+[
+ {
+  "id": "b_p1",
+  "title": "Cell Division (Mitosis)",
+  "text": "Prophase: chromosomes condense and become visible. Metaphase: chromosomes line up along the cell equator. Anaphase: sister chromatids are pulled apart. Telophase: two new nuclei form and the cell divides.",
+  "ok": [
+   "PROCESS_LINEAR",
+   "PROCESS_CYCLIC",
+   "KEY_POINTS",
+   "LIST_STRUCTURED"
+  ]
+ },
+ {
+  "id": "b_p2",
+  "title": "Installing the Software",
+  "text": "Download the installer from the official site. Run the installer and accept the licence. Choose the install folder. Restart your computer when the setup finishes.",
+  "ok": [
+   "PROCESS_LINEAR",
+   "CHECKLIST"
+  ]
+ },
+ {
+  "id": "b_p3",
+  "title": "How the Heart Pumps Blood",
+  "text": "Blood enters the right atrium. It passes to the right ventricle. The ventricle pumps it to the lungs. Oxygenated blood returns to the left atrium. The left ventricle sends it to the body.",
+  "ok": [
+   "PROCESS_LINEAR",
+   "CAUSE_EFFECT"
+  ]
+ },
+ {
+  "id": "b_c1",
+  "title": "The Krebs Cycle",
+  "text": "Acetyl-CoA joins oxaloacetate to form citrate. Citrate is converted through a series of steps releasing carbon dioxide. Energy is captured as NADH and ATP. Oxaloacetate is regenerated and the cycle begins again.",
+  "ok": [
+   "PROCESS_CYCLIC"
+  ]
+ },
+ {
+  "id": "b_t1",
+  "title": "Milestones in Medicine",
+  "text": "Edward Jenner developed the smallpox vaccine in 1796. Anaesthesia was first used in surgery in 1846. Alexander Fleming discovered penicillin in 1928. The first human heart transplant took place in 1967. The Human Genome Project finished in 2003.",
+  "ok": [
+   "TIMELINE"
+  ]
+ },
+ {
+  "id": "b_t2",
+  "title": "Project Schedule",
+  "text": "Kick-off is on 3 March 2025. The design phase ends in June 2025. Development completes in November 2025. The public launch is planned for February 2026.",
+  "ok": [
+   "TIMELINE"
+  ]
+ },
+ {
+  "id": "b_cmp1",
+  "title": "Mitosis vs Meiosis",
+  "text": "Mitosis produces two identical cells, whereas meiosis produces four different cells. Mitosis has one division; meiosis has two. Mitosis occurs in body cells, while meiosis occurs in gametes.",
+  "ok": [
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "b_cmp2",
+  "title": "TCP versus UDP",
+  "text": "TCP is connection-oriented, while UDP is connectionless. TCP guarantees delivery; UDP does not. TCP is slower but reliable, whereas UDP is faster but may lose packets.",
+  "ok": [
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "b_cmp3",
+  "title": "Stocks and Bonds",
+  "text": "Stocks represent ownership in a company, whereas bonds represent a loan to it. Stocks carry higher risk; bonds are generally safer. Stocks may pay dividends, while bonds pay fixed interest.",
+  "ok": [
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "b_pc1",
+  "title": "Solar Power",
+  "text": "Solar panels cut electricity bills and need little maintenance. They produce no emissions while running. However, installation has a high upfront cost. Output drops on cloudy days and at night.",
+  "ok": [
+   "COMPARE_VISUAL",
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "b_pc2",
+  "title": "Online Exams",
+  "text": "Online exams are convenient and save travel time. They allow instant grading. The downsides include technical failures. Cheating is harder to prevent and some students lack reliable internet.",
+  "ok": [
+   "COMPARE_VISUAL",
+   "COMPARE_TABLE"
+  ]
+ },
+ {
+  "id": "b_l1",
+  "title": "The Atmosphere",
+  "text": "The atmosphere has five layers. The troposphere is closest to the ground and holds the weather. Above it lies the stratosphere, which contains the ozone layer. Next comes the mesosphere. The thermosphere follows. The exosphere is the outermost layer.",
+  "ok": [
+   "LAYERS",
+   "HIERARCHY_NEST",
+   "KEY_POINTS"
+  ]
+ },
+ {
+  "id": "b_l2",
+  "title": "Organisational Hierarchy",
+  "text": "At the top sits the board of directors. Below it are the executives. Next come the managers. Team leads sit below them. At the base are the individual contributors.",
+  "ok": [
+   "LAYERS",
+   "HIERARCHY_NEST"
+  ]
+ },
+ {
+  "id": "b_v",
+  "title": "Reptiles and Amphibians",
+  "text": "Both reptiles and amphibians are cold-blooded and lay eggs. Only reptiles have dry scaly skin and live entirely on land. Only amphibians have moist skin and begin life in water.",
+  "ok": [
+   "SET_DIAGRAM"
+  ]
+ },
+ {
+  "id": "b_pie",
+  "title": "Budget Allocation",
+  "text": "Salaries take 55% of the budget. Marketing takes 20%. Operations take 15%. Research takes 10%.",
+  "ok": [
+   "CHART_PART_TO_WHOLE"
+  ]
+ },
+ {
+  "id": "b_bar",
+  "title": "Largest Cities",
+  "text": "Tokyo has 37 million people. Delhi has 33 million. Shanghai has 29 million. Sao Paulo has 22 million. Mexico City has 22 million.",
+  "ok": [
+   "CHART_CATEGORICAL",
+   "CHART_RANKING"
+  ]
+ },
+ {
+  "id": "b_line",
+  "title": "Website Traffic",
+  "text": "Visits were 10,000 in January, 14,000 in February, 19,000 in March and 26,000 in April.",
+  "ok": [
+   "CHART_TREND",
+   "CHART_CATEGORICAL"
+  ]
+ },
+ {
+  "id": "b_stat",
+  "title": "Campaign Results",
+  "text": "The campaign reached 2.4 million people. Click-through rate was 3.8%. Conversion rose by 12%. Cost per lead fell to $14.",
+  "ok": [
+   "STAT_TILES",
+   "KPI"
+  ]
+ },
+ {
+  "id": "b_kpi",
+  "title": "Record Quarter",
+  "text": "Net profit hit a record $18.6 million this quarter.",
+  "ok": [
+   "KPI",
+   "STAT_TILES"
+  ]
+ },
+ {
+  "id": "b_d1",
+  "title": "What is Osmosis",
+  "text": "Osmosis is the movement of water across a semi-permeable membrane from a region of low solute concentration to a region of high solute concentration.",
+  "ok": [
+   "DEFINITION"
+  ]
+ },
+ {
+  "id": "b_d2",
+  "title": "Opportunity Cost",
+  "text": "Opportunity cost refers to the value of the next best alternative that is given up when a choice is made.",
+  "ok": [
+   "DEFINITION"
+  ]
+ },
+ {
+  "id": "b_f",
+  "title": "Einstein's Mass-Energy Equivalence",
+  "text": "Einstein showed that mass and energy are interchangeable. The relationship is E = mc^2, where c is the speed of light.",
+  "ok": [
+   "FORMULA_CALLOUT",
+   "DEFINITION"
+  ]
+ },
+ {
+  "id": "b_ce1",
+  "title": "Why Leaves Change Colour",
+  "text": "Shorter days reduce sunlight. Trees stop producing chlorophyll. As a result, green fades and hidden yellow and orange pigments appear.",
+  "ok": [
+   "CAUSE_EFFECT",
+   "PROCESS_LINEAR"
+  ]
+ },
+ {
+  "id": "b_ce2",
+  "title": "The Domino Effect of Debt",
+  "text": "Rising interest rates increase repayments. Higher repayments leave households with less to spend, which in turn reduces business sales. Lower sales lead to job cuts and further falls in spending.",
+  "ok": [
+   "CAUSE_EFFECT",
+   "PROCESS_CYCLIC"
+  ]
+ },
+ {
+  "id": "b_fun",
+  "title": "Admissions Funnel",
+  "text": "8,000 students applied. 3,200 were shortlisted. 900 received offers. 640 accepted.",
+  "ok": [
+   "FUNNEL",
+   "CHART_CATEGORICAL",
+   "STAT_TILES"
+  ]
+ },
+ {
+  "id": "b_mx",
+  "title": "BCG Matrix",
+  "text": "Products are classified on two axes: market growth and market share. High growth and high share products are stars. High growth and low share products are question marks. Low growth and high share products are cash cows. Low growth and low share products are dogs.",
+  "ok": [
+   "MATRIX_GRID"
+  ]
+ },
+ {
+  "id": "b_cards",
+  "title": "The Three Branches of Government",
+  "text": "Power is divided among three branches. Legislative: makes the laws. Executive: carries out the laws. Judicial: interprets the laws.",
+  "ok": [
+   "LIST_STRUCTURED",
+   "KEY_POINTS"
+  ]
+ },
+ {
+  "id": "b_tips",
+  "title": "Healthy Habits",
+  "text": "Drink water throughout the day. Walk for thirty minutes. Eat vegetables with every meal. Limit screen time before bed.",
+  "ok": [
+   "CHECKLIST",
+   "KEY_POINTS",
+   "LIST_STRUCTURED"
+  ]
+ },
+ {
+  "id": "b_para",
+  "title": "Why Study History",
+  "text": "History helps us understand how societies developed. It teaches critical thinking by asking us to weigh evidence. Knowing the past can prevent us from repeating old mistakes.",
+  "ok": [
+   "KEY_POINTS",
+   "LIST_STRUCTURED",
+   "CAUSE_EFFECT"
+  ]
+ },
+ {
+  "id": "b_work",
+  "title": "Expanding a Binomial",
+  "text": "Expand (x + 3)(x + 2). Multiply each term: x*x + x*2 + 3*x + 3*2. Simplify: x^2 + 2x + 3x + 6. Combine like terms: x^2 + 5x + 6.",
+  "ok": [
+   "WORKED_EXAMPLE"
+  ]
+ },
+ {
+  "id": "b_fn",
+  "title": "The Quadratic Function",
+  "text": "The function y = x^2 - 4 is a parabola. It crosses the x-axis at x = -2 and x = 2, and its lowest point is at y = -4.",
+  "ok": [
+   "FUNCTION_PLOT",
+   "WORKED_EXAMPLE",
+   "FORMULA_CALLOUT"
+  ]
+ }
+]

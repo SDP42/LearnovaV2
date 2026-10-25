@@ -4,13 +4,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Eraser,
+  Grid3X3,
+  Keyboard,
   Maximize2,
   MonitorPlay,
   Pause,
+  Pencil,
   Play,
   RotateCcw,
   SkipBack,
   SkipForward,
+  Target,
   Square,
   X,
 } from "lucide-react";
@@ -63,6 +68,11 @@ export default function Present() {
   const mainRef = useRef(null);
   const chan = useRef(null);
   const filmRef = useRef(null);
+  const nextRef = useRef(null);
+  const stageRef = useRef(null);
+  const canvasRef = useRef(null);
+  const drawing = useRef(false);
+  const digitTimer = useRef(null);
 
   const [deck, setDeck] = useState(null);
   const [htmlUrl, setHtmlUrl] = useState(null);
@@ -74,25 +84,27 @@ export default function Present() {
   const [now, setNow] = useState(clock());
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [blackout, setBlackout] = useState(false);
+  const [white, setWhite] = useState(false);
+  const [tool, setTool] = useState("none"); // none | laser | pen
+  const [laser, setLaser] = useState(null);
+  const [sorter, setSorter] = useState(false);
+  const [help, setHelp] = useState(false);
+  const [digits, setDigits] = useState("");
+  const [nextReady, setNextReady] = useState(false);
 
   useEffect(() => {
     api.getDeck(jobId).then(setDeck).catch((e) => setError(e.message));
   }, [jobId]);
 
   useEffect(() => {
-    let url;
     let dead = false;
+    // Blob URL is cached in api.js (shared with Preview) — never revoke it here.
     api
       .deckArtifactUrl(jobId, "html")
-      .then((u) => {
-        if (dead) return URL.revokeObjectURL(u);
-        url = u;
-        setHtmlUrl(u);
-      })
+      .then((u) => !dead && setHtmlUrl(u))
       .catch((e) => setError(e.message));
     return () => {
       dead = true;
-      if (url) URL.revokeObjectURL(url);
     };
   }, [jobId]);
 
@@ -156,10 +168,54 @@ export default function Present() {
     });
   }, []);
 
+  const startShow = useCallback(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    document.fullscreenElement ? document.exitFullscreen?.() : el.requestFullscreen?.();
+  }, []);
+
+  const typeDigit = useCallback((d) => {
+    setDigits((x) => (x + d).slice(0, 3));
+    clearTimeout(digitTimer.current);
+    digitTimer.current = setTimeout(() => setDigits(""), 3000);
+  }, []);
+
+  const clearInk = () => {
+    const c = canvasRef.current;
+    c?.getContext("2d").clearRect(0, 0, c.width, c.height);
+  };
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      if (["ArrowRight", "PageDown", " "].includes(e.key)) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (/^[0-9]$/.test(e.key)) return typeDigit(e.key);
+      if (e.key === "Enter" && digits) {
+        jump(Math.max(0, Math.min(Number(digits) - 1, (deck?.slides?.length ?? 0))));
+        setDigits("");
+        return;
+      }
+      if (e.key === "F5") {
+        e.preventDefault();
+        startShow();
+      } else if (e.key === "Escape") {
+        setTool("none");
+        setSorter(false);
+        setHelp(false);
+        setDigits("");
+      } else if (e.key === "l" || e.key === "L") {
+        setTool((t) => (t === "laser" ? "none" : "laser"));
+      } else if (e.key === "d" || e.key === "D") {
+        setTool((t) => (t === "pen" ? "none" : "pen"));
+      } else if (e.key === "e" || e.key === "E") {
+        clearInk();
+      } else if (e.key === "g" || e.key === "G") {
+        setSorter((v) => !v);
+      } else if (e.key === "w" || e.key === "W") {
+        setWhite((v) => !v);
+      } else if (e.key === "?") {
+        setHelp((v) => !v);
+      } else if (["ArrowRight", "PageDown", " "].includes(e.key)) {
         e.preventDefault();
         go(1);
       } else if (["ArrowLeft", "PageUp"].includes(e.key)) {
@@ -170,8 +226,8 @@ export default function Present() {
       } else if (e.key === "End") {
         jump((deck?.slides?.length ?? 0));
       } else if (e.key === "f") {
-        mainRef.current?.requestFullscreen?.();
-      } else if (e.key === "b" || e.key === ".") {
+        startShow();
+      } else if (e.key === "b" || e.key === "B" || e.key === ".") {
         toggleBlackout();
       } else if (e.key === "p") {
         setRunning((r) => !r);
@@ -181,7 +237,7 @@ export default function Present() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, jump, toggleBlackout, deck]);
+  }, [go, jump, toggleBlackout, deck, digits, startShow, typeDigit]);
 
   function openAudience() {
     const w = window.open(`/app/audience/${jobId}`, "learnova-audience");
@@ -197,6 +253,70 @@ export default function Present() {
       chan.current?.postMessage({ type: "blackout", on: blackout });
     }, 900);
   }
+
+  // Drive the preview iframe to slide (current + 1) via its own Reveal API.
+  useEffect(() => {
+    const R = nextRef.current?.contentWindow?.Reveal;
+    if (!R || !nextReady) return;
+    try {
+      R.slide(pos.h + 1, 0, -1);
+    } catch {
+      /* ignore */
+    }
+  }, [pos.h, nextReady]);
+
+  const onNextLoad = () => {
+    let tries = 0;
+    const t = setInterval(() => {
+      const w = nextRef.current?.contentWindow;
+      const R = w?.Reveal;
+      if (R?.isReady?.() || (R && ++tries > 20)) {
+        clearInterval(t);
+        try {
+          R.configure({ controls: false, progress: false, slideNumber: false, keyboard: false, touch: false, overview: false, help: false });
+          setNextReady(true);
+        } catch {
+          /* fall back to text card */
+        }
+      } else if (++tries > 40) clearInterval(t);
+    }, 150);
+  };
+
+  // pen canvas follows the stage size
+  useEffect(() => {
+    const el = stageRef.current;
+    const c = canvasRef.current;
+    if (!el || !c) return;
+    const ro = new ResizeObserver(() => {
+      c.width = el.clientWidth;
+      c.height = el.clientHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const pt = (e) => {
+    const r = canvasRef.current.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  };
+  const penDown = (e) => {
+    drawing.current = true;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const ctx = canvasRef.current.getContext("2d");
+    const [x, y] = pt(e);
+    ctx.strokeStyle = "#ef4444";
+    ctx.lineWidth = 4;
+    ctx.lineCap = ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+  const penMove = (e) => {
+    if (!drawing.current) return;
+    const ctx = canvasRef.current.getContext("2d");
+    const [x, y] = pt(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
 
   // keep the current filmstrip thumb visible
   useEffect(() => {
@@ -230,7 +350,7 @@ export default function Present() {
           {deck?.summary?.source_name || "Presenter view"}
         </span>
         <span className="hidden text-xs text-neutral-500 sm:inline">
-          ← → navigate · B blackout · F fullscreen · P timer
+          ← → navigate · B black · W white · L laser · D pen · G sorter · ? help
         </span>
         <div className="ml-auto flex items-center gap-2">
           <span
@@ -242,6 +362,9 @@ export default function Present() {
             <Circle className={cn("size-2 fill-current", audienceOpen && "animate-pulse")} />
             {audienceOpen ? "Audience live" : "Audience off"}
           </span>
+          <Button size="sm" onClick={startShow} title="Start slideshow (F5)">
+            <Play /> Start slideshow
+          </Button>
           <Button size="sm" variant="secondary" onClick={openAudience}>
             <MonitorPlay /> {audienceOpen ? "Re-sync" : "Audience view"}
           </Button>
@@ -251,7 +374,7 @@ export default function Present() {
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_380px]">
         {/* ── current slide ─────────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-col gap-3 bg-black p-4">
-          <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white">
+          <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white">
             {htmlUrl ? (
               <iframe
                 ref={mainRef}
@@ -266,16 +389,48 @@ export default function Present() {
                   } catch {
                     /* blob is same-origin */
                   }
+                  mainRef.current?.blur();
+                  window.focus(); // keep presenter shortcuts on this page
                   setTimeout(sync, 500);
                 }}
               />
             ) : (
               <Skeleton className="h-full w-full" />
             )}
+            <canvas
+              ref={canvasRef}
+              className={cn("absolute inset-0 z-10 h-full w-full", tool === "pen" ? "cursor-crosshair" : "pointer-events-none")}
+              onPointerDown={penDown}
+              onPointerMove={penMove}
+              onPointerUp={() => (drawing.current = false)}
+            />
+            {tool === "laser" ? (
+              <div
+                className="absolute inset-0 z-10 cursor-none"
+                onMouseMove={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setLaser({ x: e.clientX - r.left, y: e.clientY - r.top });
+                }}
+                onMouseLeave={() => setLaser(null)}
+              >
+                {laser ? (
+                  <span
+                    className="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 shadow-[0_0_14px_6px_rgba(239,68,68,0.6)]"
+                    style={{ left: laser.x, top: laser.y }}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+            {white ? <div className="absolute inset-0 z-20 bg-white" /> : null}
             {blackout ? (
-              <div className="absolute inset-0 grid place-items-center bg-black text-sm text-neutral-500">
+              <div className="absolute inset-0 z-20 grid place-items-center bg-black text-sm text-neutral-500">
                 Screen blacked out — press B
               </div>
+            ) : null}
+            {digits ? (
+              <span className="absolute bottom-3 right-3 z-30 rounded-md bg-black/80 px-3 py-1.5 font-mono text-lg text-white">
+                {digits}<span className="ml-2 text-xs text-neutral-400">↵ go to slide</span>
+              </span>
             ) : null}
           </div>
 
@@ -318,7 +473,24 @@ export default function Present() {
             <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={toggleBlackout} title="Blackout (B)">
               <Square className={blackout ? "fill-current" : ""} />
             </Button>
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => mainRef.current?.requestFullscreen?.()} title="Fullscreen (F)">
+            {[
+              ["laser", Target, "Laser pointer (L)"],
+              ["pen", Pencil, "Pen (D)"],
+            ].map(([k, Icon, label]) => (
+              <Button key={k} variant="ghost" size="icon" className={cn("text-neutral-300 hover:bg-white/10", tool === k && "bg-primary/30 text-white")} onClick={() => setTool((t) => (t === k ? "none" : k))} title={label}>
+                <Icon />
+              </Button>
+            ))}
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={clearInk} title="Clear ink (E)">
+              <Eraser />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => setSorter(true)} title="Slide sorter (G)">
+              <Grid3X3 />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => setHelp(true)} title="Shortcuts (?)">
+              <Keyboard />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={startShow} title="Fullscreen (F)">
               <Maximize2 />
             </Button>
           </div>
@@ -350,7 +522,14 @@ export default function Present() {
           <div>
             <p className="mb-1 text-xs uppercase tracking-wide text-neutral-400">Next</p>
             {nextSlide ? (
-              <SlideMini slide={nextSlide} index={pos.h + 2} className="border-primary/25 bg-primary/[0.06]" />
+              <>
+                {htmlUrl ? (
+                  <div className={cn("relative aspect-video w-full overflow-hidden rounded-md border border-primary/25 bg-white", !nextReady && "hidden")}>
+                    <iframe ref={nextRef} title="Next slide" src={htmlUrl} onLoad={onNextLoad} tabIndex={-1} className="pointer-events-none absolute left-0 top-0 h-[400%] w-[400%] origin-top-left scale-[0.25]" />
+                  </div>
+                ) : null}
+                {!nextReady ? <SlideMini slide={nextSlide} index={pos.h + 2} className="border-primary/25 bg-primary/[0.06]" /> : null}
+              </>
             ) : (
               <div className="rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-neutral-500">
                 End of deck
@@ -420,6 +599,57 @@ export default function Present() {
           </button>
         ))}
       </div>
+
+      {sorter ? (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black/90 p-6" onClick={() => setSorter(false)}>
+          <div className="mb-4 flex items-center justify-between text-sm text-neutral-300">
+            <span>Slide sorter · click a slide to jump</span>
+            <Button size="icon" variant="ghost" className="text-neutral-300 hover:bg-white/10"><X /></Button>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" onClick={(e) => e.stopPropagation()}>
+            {[{ title: deck?.summary?.source_name || "Title", variant: "title" }, ...slides].map((sl, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  jump(i);
+                  setSorter(false);
+                }}
+                className={cn("rounded-lg border p-1 text-left transition-colors", pos.h === i ? "border-primary bg-primary/10" : "border-white/10 hover:bg-white/10")}
+              >
+                <SlideMini slide={sl} index={i + 1} className="aspect-video border-0 bg-transparent" />
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {help ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-6" onClick={() => setHelp(false)}>
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-neutral-900 p-5 text-sm" onClick={(e) => e.stopPropagation()}>
+            <p className="mb-3 font-semibold">Keyboard shortcuts</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
+              {[
+                ["← → / Space", "Previous / next"],
+                ["Home / End", "First / last slide"],
+                ["Digits + Enter", "Jump to slide number"],
+                ["F5 / F", "Start slideshow (fullscreen)"],
+                ["L", "Laser pointer"],
+                ["D", "Pen (E clears ink)"],
+                ["G", "Slide sorter"],
+                ["B / W", "Black / white screen"],
+                ["P / R", "Pause / reset timer"],
+                ["Esc", "Exit tools and overlays"],
+                ["?", "This cheat sheet"],
+              ].map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs">{k}</kbd></dt>
+                  <dd className="text-neutral-300">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      ) : null}
 
       {error ? <p className="bg-red-950/60 px-4 py-2 text-sm text-red-300">{error}</p> : null}
     </div>

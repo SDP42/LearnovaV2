@@ -6,6 +6,7 @@ import {
   Clock,
   Download,
   FileDown,
+  GitCompare,
   History,
   Loader2,
   Pencil,
@@ -124,19 +125,14 @@ export default function Preview() {
   }
 
   const loadHtml = useCallback(() => {
-    let url;
-    let revoked = false;
+    let dead = false;
+    // The blob URL is cached by api.js (shared with Present) — never revoke it here.
     api
       .deckArtifactUrl(jobId, "html")
-      .then((u) => {
-        if (revoked) return URL.revokeObjectURL(u);
-        url = u;
-        setHtmlUrl(u);
-      })
+      .then((u) => !dead && setHtmlUrl(u))
       .catch(() => {});
     return () => {
-      revoked = true;
-      if (url) URL.revokeObjectURL(url);
+      dead = true;
     };
   }, [jobId]);
 
@@ -292,6 +288,11 @@ export default function Preview() {
               <Button asChild variant="outline" size="sm">
                 <Link to={`/app/present/${jobId}`}>
                   <Play /> Present
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/app/compare/${jobId}`}>
+                  <GitCompare /> Before vs after
                 </Link>
               </Button>
               <Button asChild size="sm" variant="secondary">

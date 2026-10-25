@@ -195,7 +195,7 @@ def det_process(title: str, sents: List[str]) -> Det:
         f"{len(steps)} sequenced steps" + (" that repeat" if fam.endswith("CYCLIC") else "")
 
 
-_PROC_TITLE = re.compile(r"\b(how|steps?|process|procedure|making|makes?|works?|working|method|workflow|recipe|install|set ?up|lifecycle|stages|guide|instructions)\b", re.I)
+_PROC_TITLE = re.compile(r"\b(how|steps?|process|procedure|mak(?:e|es|ing)|work(?:s|ing)?|method|workflow|recipe|install\w*|set ?up|lifecycle|stages|guide|instructions)\b", re.I)
 
 
 def det_process_implicit(title: str, sents: List[str]) -> Det:
@@ -429,7 +429,9 @@ def det_funnel(title: str, sents: List[str]) -> Det:
         label = re.sub(r"^\s*(?:the|a|an)\s+", "", label, flags=re.I)
         if v is not None:
             vals.append((v, short_label(label, 5), _strip_end(s)))
-    if len(vals) >= 3 and all(vals[i][0] >= vals[i + 1][0] for i in range(len(vals) - 1)) and vals[0][0] > vals[-1][0] * 1.5:
+    steep = vals and vals[0][0] > vals[-1][0] * 4
+    cue = bool(re.search(r"funnel|pipeline|conversion|stages|admission|hiring|recruit|sales", title, re.I))
+    if len(vals) >= 3 and all(vals[i][0] >= vals[i + 1][0] for i in range(len(vals) - 1)) and (steep or (cue and vals[0][0] > vals[-1][0] * 1.5)):
         return "FUNNEL", "funnel", 0.86, {"stages": [{"label": l, "value": _fmt(v), "detail": d} for v, l, d in vals[:6]]}, "a narrowing sequence of counts"
     return None
 
@@ -468,15 +470,25 @@ def det_chart(title: str, sents: List[str]) -> Det:
         pts = [{"label": p[1].strip(), "value": _to_float(p[0])} for p in pairs if _to_float(p[0]) is not None]
         if len(pts) >= 3:
             return "CHART_TREND", "line", 0.88, {"points": pts[:10]}, "a value across ordered periods"
-    # label → value per sentence
+    # label → value per sentence (only when every figure shares one unit — otherwise they are separate statistics)
+    def _unit(tok: str) -> str:
+        t = tok.lower()
+        if "%" in t or "percent" in t:
+            return "pct"
+        if re.search(r"[$₹€£]", t):
+            return "cur"
+        m = re.search(r"(trillion|billion|million|thousand|bn|mn|k)\b", t)
+        return m.group(1) if m else "plain"
+
     lab = []
     for s in sents:
         nums = _numbers(s)
         if len(nums) == 1 and _to_float(nums[0]) is not None:
             subj = _subject_before_verb(s)
             if subj and len(subj.split()) <= 4:
-                lab.append((subj, _to_float(nums[0])))
-    if len(lab) >= 3 and len({l for l, _ in lab}) == len(lab):
+                lab.append((subj, _to_float(nums[0]), _unit(nums[0])))
+    if len(lab) >= 3 and len({l for l, _, _ in lab}) == len(lab) and len({u for _, _, u in lab}) == 1:
+        lab = [(l, v) for l, v, _ in lab]
         return "CHART_CATEGORICAL", "bar", 0.84, {"points": [{"label": l, "value": v} for l, v in lab[:8]]}, "one quantity compared across categories"
     return None
 
@@ -601,6 +613,25 @@ def det_checklist_or_points(title: str, sents: List[str], bullets: List[str]) ->
     return "KEY_POINTS", "grid" if len(heads) <= 6 else "list", 0.55, {"cards": heads}, "discrete key points (lossless cards)"
 
 
+_MATH_VERB = re.compile(r"^(?:expand|solve|simplify|multiply|factor(?:ise|ize)?|combine|substitute|divide|subtract|add|differentiate|integrate|evaluate|compute|calculate|check|rearrange|collect|cancel|square|take)\b", re.I)
+_MATHY = re.compile(r"\d\s*[\^*/+\-=]\s*[\w(]|[a-z]\^\d|\)\s*\(|\d[a-z]\b")
+
+
+def det_worked(title: str, sents: List[str]) -> Det:
+    """A problem worked line by line: imperative maths verbs, each followed by an expression."""
+    steps = [x for x in sents if _MATH_VERB.match(x.strip()) and _MATHY.search(x)]
+    if len(steps) < 3:
+        return None
+    rows = []
+    for x in steps[1:]:
+        if ":" in x:
+            reason, expr = x.split(":", 1)
+            rows.append({"step": _strip_end(expr), "reason": _strip_end(reason)})
+        else:
+            rows.append({"step": _strip_end(x), "reason": ""})
+    return "WORKED_EXAMPLE", "steps", 0.9, {"problem": _strip_end(steps[0]), "rows": rows[:10]}, "a problem worked step by step"
+
+
 def det_function(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents)
     m = re.search(r"\b(?:y|f\(x\))\s*=\s*([-+*/^()\d.\sx]+?)(?=\s+(?:has|is|with|where|and|for|gives|so)\b|[.;,]|$)", blob)
@@ -680,6 +711,7 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
             cands.append((vms.family, vms.variant, float(vms.confidence) + 0.4, vms.data, "specialised STEM extractor"))
 
     add(det_function(title, sents))
+    add(det_worked(title, sents))
     add(det_labelled(title, sents, text))
     add(det_compare(title, sents))
     add(det_pros_cons(title, sents))

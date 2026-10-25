@@ -14,6 +14,7 @@ JSON classification, favour the fast model") without hardcoding a vendor.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from learnova.logging_config import logger
@@ -255,23 +256,67 @@ class LLMRouter(LLMProvider):
 
         raise RuntimeError("All LLM providers failed: " + " | ".join(errors))
 
+    # ── response cache ───────────────────────────────────────────────────────
+    # Identical requests (same prompt, system prompt, task and sampling) are answered
+    # from disk, so regenerating a deck or re-opening an editor never re-pays for the
+    # same LLM call. Off with LEARNOVA_LLM_CACHE=0. Failures are never cached.
+    @staticmethod
+    def _cache_get(key: str) -> Optional[str]:
+        if os.getenv("LEARNOVA_LLM_CACHE", "1") == "0":
+            return None
+        try:
+            return (_llm_cache_dir() / f"{key}.txt").read_text(encoding="utf-8")
+        except OSError:
+            return None
+
+    @staticmethod
+    def _cache_put(key: str, value: str) -> None:
+        if os.getenv("LEARNOVA_LLM_CACHE", "1") == "0" or not value:
+            return
+        try:
+            (_llm_cache_dir() / f"{key}.txt").write_text(value, encoding="utf-8")
+        except OSError:
+            pass
+
+    def _cached(self, kind: str, payload: Any, task: Optional[str], kwargs: dict, call):
+        import hashlib
+        import json as _json
+
+        sig = {k: v for k, v in kwargs.items() if k not in {"timeout"}}
+        key = hashlib.sha256(_json.dumps([kind, payload, task, sig], sort_keys=True, default=str).encode()).hexdigest()[:40]
+        hit = self._cache_get(key)
+        if hit is not None:
+            logger.info("LLM cache hit (%s)", kind)
+            return hit
+        out = call()
+        self._cache_put(key, out if isinstance(out, str) else "")
+        return out
+
     # ── LLMProvider interface ────────────────────────────────────────────────
     def generate(self, prompt: str, system_prompt: Optional[str] = None, **kwargs: Any) -> str:
         task = kwargs.pop("task", None)
-        return self._attempt(
+        return self._cached("generate", [prompt, system_prompt], task, kwargs, lambda: self._attempt(
             lambda p, kw: p.generate(prompt, system_prompt=system_prompt, **kw),
             task, kwargs,
-        )
+        ))
 
     def chat(self, messages: List[Dict[str, str]], **kwargs: Any) -> str:
         task = kwargs.pop("task", None)
-        return self._attempt(lambda p, kw: p.chat(messages, **kw), task, kwargs)
+        return self._cached("chat", messages, task, kwargs, lambda: self._attempt(lambda p, kw: p.chat(messages, **kw), task, kwargs))
 
     def rewrite(self, text: str, instructions: str, **kwargs: Any) -> str:
         task = kwargs.pop("task", None)
-        return self._attempt(
+        return self._cached("rewrite", [text, instructions], task, kwargs, lambda: self._attempt(
             lambda p, kw: p.rewrite(text, instructions, **kw), task, kwargs
-        )
+        ))
+
+
+def _llm_cache_dir():
+    from learnova.config import CACHE_DIR
+
+    d = CACHE_DIR / "llm"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def _build_default_chain() -> List[tuple[str, LLMProvider]]:
