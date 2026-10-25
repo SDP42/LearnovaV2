@@ -1,92 +1,170 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Monitor, Presentation, Sparkles, Timer } from "lucide-react";
+import { Plus } from "lucide-react";
 import AppLayout from "@/components/app/AppLayout";
-import { useDecks } from "@/lib/useDecks";
+import { deckId, deckTitle, useDecks } from "@/lib/useDecks";
+import { deckSlides, deckUpdated, relativeTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer, PageHeader } from "@/components/app/Page";
-import PresentationCard from "@/components/app/PresentationCard";
-import { EmptyState, ErrorNote, LoadingGrid } from "@/components/app/states";
+import PresentationCard, { DeckMenu, confirmDelete, statusDot } from "@/components/app/PresentationCard";
+import DeckThumb from "@/components/app/DeckThumb";
+import LibraryToolbar from "@/components/app/LibraryToolbar";
+import { EmptyState, ErrorNote, LoadingGrid, NoResults } from "@/components/app/states";
+import { DecksIllustration } from "@/components/app/Illustrations";
+
+const CHIPS = [
+  { id: "all", label: "All" },
+  { id: "ready", label: "Ready" },
+  { id: "progress", label: "In progress" },
+  { id: "week", label: "This week" },
+];
+const SORTS = [
+  { id: "recent", label: "Recently edited" },
+  { id: "title", label: "Title A–Z" },
+  { id: "slides", label: "Most slides" },
+];
+const ts = (d) => {
+  const v = deckUpdated(d);
+  return typeof v === "number" ? (v < 1e12 ? v * 1000 : v) : Date.parse(v) || 0;
+};
 
 export default function Presentations() {
-  const { decks, error } = useDecks();
+  const { decks, error, removeWithUndo } = useDecks();
+  const [q, setQ] = useState("");
+  const [chip, setChip] = useState("all");
+  const [sort, setSort] = useState("recent");
+  const [view, setView] = useState(() => {
+    try {
+      return localStorage.getItem("lv-decks-view") || "grid";
+    } catch {
+      return "grid";
+    }
+  });
+  const setViewP = (v) => {
+    setView(v);
+    try {
+      localStorage.setItem("lv-decks-view", v);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const shown = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    const weekAgo = Date.now() - 7 * 864e5;
+    let rows = (decks ?? []).filter((d) => {
+      if (t && !deckTitle(d).toLowerCase().includes(t)) return false;
+      const kind = statusDot(d.status).label;
+      if (chip === "ready") return kind === "Ready";
+      if (chip === "progress") return kind === "In progress";
+      if (chip === "week") return ts(d) >= weekAgo;
+      return true;
+    });
+    rows = [...rows].sort((a, b) =>
+      sort === "title" ? deckTitle(a).localeCompare(deckTitle(b)) : sort === "slides" ? deckSlides(b) - deckSlides(a) : ts(b) - ts(a)
+    );
+    return rows;
+  }, [decks, q, chip, sort]);
+
+  const onDelete = (d) => confirmDelete(d, removeWithUndo);
+  const clear = () => {
+    setQ("");
+    setChip("all");
+  };
 
   return (
-    <AppLayout title="Presentations">
+    <AppLayout title="My Decks">
       <PageContainer>
         <PageHeader
-          title="Presentations"
-          subtitle="Open a deck in the editor or start presenting."
+          title="My Decks"
+          subtitle={decks ? `${decks.length} deck${decks.length === 1 ? "" : "s"} in your library.` : "Everything you’ve made, in one place."}
           actions={
-            <Button asChild>
-              <Link to="/app/create"><Sparkles /> New</Link>
+            <Button asChild className="bg-[#0B1F44] text-white hover:bg-[#13306a]">
+              <Link to="/app" state={{ focus: Date.now() }}>
+                <Plus /> New deck
+              </Link>
             </Button>
           }
         />
 
         <ErrorNote error={error} />
 
+        {decks !== null && decks.length > 0 ? (
+          <LibraryToolbar
+            query={q}
+            onQuery={setQ}
+            placeholder="Search your decks…"
+            chips={CHIPS}
+            chip={chip}
+            onChip={setChip}
+            sorts={SORTS}
+            sort={sort}
+            onSort={setSort}
+            view={view}
+            onView={setViewP}
+          />
+        ) : null}
+
         {decks === null ? (
-          <LoadingGrid count={6} />
+          <LoadingGrid count={8} />
         ) : decks.length === 0 ? (
           <EmptyState
-            icon={Presentation}
-            title="No presentations yet"
-            description="Generate your first deck from a syllabus, a chapter or a set of notes."
-            action={{ to: "/app/create", label: "Create one" }}
+            illustration={<DecksIllustration />}
+            title="No decks yet"
+            description="Every deck you generate lands here, with a live thumbnail, one-click present and export."
+            action={{ to: "/app", label: "Create your first deck" }}
           />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {decks.map((d, idx) => (
-              <PresentationCard key={d.id ?? d.deck_id ?? idx} deck={d} index={idx} />
+        ) : shown.length === 0 ? (
+          <NoResults query={q} onClear={clear} />
+        ) : view === "grid" ? (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {shown.map((d, i) => (
+              <PresentationCard key={deckId(d)} deck={d} index={i} onDelete={onDelete} />
             ))}
           </div>
+        ) : (
+          <div className="lv-surface overflow-hidden">
+            <table className="w-full text-[14px]">
+              <thead>
+                <tr className="border-b bg-[#F8FBFF] text-left text-[12px] text-muted-foreground">
+                  <th className="px-4 py-2 font-medium">Deck</th>
+                  <th className="hidden px-3 py-2 font-medium sm:table-cell">Slides</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Edited</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Status</th>
+                  <th className="w-12 px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((d) => {
+                  const id = deckId(d);
+                  const st = statusDot(d.status);
+                  return (
+                    <tr key={id} className="border-b transition-colors last:border-0 hover:bg-[#F4F9FF]">
+                      <td className="px-4 py-2.5">
+                        <Link to={`/app/preview/${id}`} className="flex items-center gap-3">
+                          <span className="w-24 shrink-0 overflow-hidden rounded-md border">
+                            <DeckThumb id={id} title={deckTitle(d)} />
+                          </span>
+                          <span className="t-card min-w-0 truncate">{deckTitle(d)}</span>
+                        </Link>
+                      </td>
+                      <td className="hidden px-3 tabular-nums text-muted-foreground sm:table-cell">{deckSlides(d)}</td>
+                      <td className="hidden px-3 text-muted-foreground md:table-cell">{relativeTime(deckUpdated(d)) || "–"}</td>
+                      <td className="hidden px-3 md:table-cell">
+                        <span className="inline-flex items-center gap-1.5 text-[13px]">
+                          <span className="size-2 rounded-full" style={{ background: st.color }} /> {st.label}
+                        </span>
+                      </td>
+                      <td className="px-3 text-right">
+                        <DeckMenu deck={d} onDelete={onDelete} triggerClassName="border bg-white" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="lv-card">
-            <CardContent className="flex flex-col gap-3 p-5">
-              <div className="flex items-center gap-2">
-                <Monitor className="size-4 text-primary" />
-                <p className="font-medium">The presenter console</p>
-              </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Hit <span className="font-medium text-foreground">Present</span> to open a
-                dual-screen view: current slide, next-slide preview, speaker notes, a
-                large timer and wall clock, a filmstrip to jump anywhere, and a
-                reveal-step indicator. Open the audience view on a second screen — it
-                stays in sync, including blackout.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="lv-card">
-            <CardContent className="flex flex-col gap-3 p-5">
-              <div className="flex items-center gap-2">
-                <Timer className="size-4 text-primary" />
-                <p className="font-medium">Keys while presenting</p>
-              </div>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                {[
-                  ["→ / Space", "Next"],
-                  ["←", "Previous"],
-                  ["Home / End", "First / last"],
-                  ["F", "Fullscreen"],
-                  ["B or .", "Blackout"],
-                  ["P / R", "Pause / reset timer"],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between gap-2">
-                    <dt className="text-muted-foreground">{v}</dt>
-                    <dd>
-                      <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[11px] font-medium">
-                        {k}
-                      </kbd>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </CardContent>
-          </Card>
-        </div>
       </PageContainer>
     </AppLayout>
   );

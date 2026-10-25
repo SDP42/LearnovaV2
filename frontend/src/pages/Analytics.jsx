@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
 import StatCard from "@/components/app/StatCard";
+import { InsightsIllustration } from "@/components/app/Illustrations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageContainer, PageHeader } from "@/components/app/Page";
@@ -119,10 +120,10 @@ export default function Analytics() {
   }, [decks, avg, trend, quizCoverage, totalSlides, avgSlides]);
 
   return (
-    <AppLayout title="Analytics">
+    <AppLayout title="Insights">
       <PageContainer>
         <PageHeader
-          title="Learning analytics"
+          title="Insights"
           subtitle="Engagement (Pedagogical Slide Fitness) and deck composition across your projects."
         />
 
@@ -130,10 +131,10 @@ export default function Analytics() {
 
         {decks && decks.length === 0 ? (
           <EmptyState
-            icon={BarChart3}
-            title="No analytics yet"
+            illustration={<InsightsIllustration />}
+            title="No insights yet"
             description="Generate a deck — its engagement score, slide mix and quiz coverage will show up here."
-            action={{ to: "/app/create", label: "Create a presentation" }}
+            action={{ to: "/app", label: "Create a presentation" }}
           />
         ) : (
         <>

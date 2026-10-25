@@ -107,14 +107,14 @@ export default function AssistantWidget() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Open Learnova assistant"
-          className="fixed bottom-5 right-5 z-40 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:scale-105"
+          className="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-40 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:scale-105"
         >
           <Sparkles className="size-5" />
         </button>
       )}
 
       {open && (
-        <div className="fixed bottom-5 right-5 z-40 flex h-[520px] w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
+        <div className="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-40 flex h-[520px] w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
           <div className="flex items-center gap-2 border-b px-3 py-2">
             <Sparkles className="size-4 text-primary" />
             <span className="text-sm font-medium">Learnova assistant</span>

@@ -9,15 +9,20 @@ import {
   GitCompare,
   History,
   Loader2,
+  ChevronDown,
   Pencil,
   Play,
+  Undo2,
+  Wand2,
+  TriangleAlert,
   RotateCcw,
   Sparkles,
   X,
 } from "lucide-react";
 import * as api from "@/api";
-import { UserButton } from "@/auth";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -221,31 +226,113 @@ export default function Preview() {
     }
   }
 
+  // ── AI assist ─────────────────────────────────────────────────────────
+  const [aiOn, setAiOn] = useState(null); // null = unknown, boolean once /status answers
+  const [aiBusy, setAiBusy] = useState("");
+  const [aiResult, setAiResult] = useState(null); // {label, before, after, applied}
+  const [aiUnavailable, setAiUnavailable] = useState(false);
+  const [tab, setTab] = useState("design");
+
+  useEffect(() => {
+    api.assistStatus().then((r) => setAiOn(!!r?.llm)).catch(() => setAiOn(false));
+  }, []);
+  useEffect(() => setAiResult(null), [selected]);
+
+  async function runAi(label, instruction, audience = "") {
+    const base = curDraft || (cur ? { title: cur.title, bullets: cur.bullets || [] } : null);
+    if (!base) return;
+    setAiBusy(label);
+    setAiUnavailable(false);
+    try {
+      const out = await api.assistSlide({ title: base.title || "", bullets: base.bullets || [], instruction, audience });
+      setAiResult({
+        label,
+        before: { title: base.title || "", bullets: base.bullets || [] },
+        after: { title: out.title ?? base.title ?? "", bullets: out.bullets ?? base.bullets ?? [] },
+        applied: false,
+      });
+    } catch (e) {
+      if (e.status === 503) setAiUnavailable(true);
+      else toast.error(e.message || "The AI request failed");
+    } finally {
+      setAiBusy("");
+    }
+  }
+  function acceptAi() {
+    if (!aiResult || !curDraft) return;
+    patchDraft({ title: aiResult.after.title, bullets: aiResult.after.bullets });
+    setEditing(true);
+    setAiResult({ ...aiResult, applied: true });
+    toast.success("Applied to your draft. Save & re-render to publish it.");
+  }
+  function undoAi() {
+    if (aiResult?.applied) patchDraft({ title: aiResult.before.title, bullets: aiResult.before.bullets });
+    setAiResult(null);
+  }
+
+  // ↑ / ↓ move through slides
+  useEffect(() => {
+    const onKey = (e) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('[role="listbox"],[role="menu"]'))) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelected((i) => Math.max(0, Math.min((deck?.slides?.length || 1) - 1, i + (e.key === "ArrowDown" ? 1 : -1))));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deck]);
+  useEffect(() => {
+    document.querySelector(`[data-rail-i="${selected}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [selected]);
+
+  const deckQuizzes = deck?.quizzes ?? [];
+  const aiNeedsSetup = aiOn === false || aiUnavailable;
+  const aiDisabled = !curDraft || aiNeedsSetup || !!aiBusy;
+
+  const AiButton = ({ label, instruction, audience }) => (
+    <button
+      disabled={aiDisabled}
+      onClick={() => runAi(label, instruction, audience)}
+      className="flex items-center justify-between gap-2 rounded-lg border border-[#DEE7F5] bg-white px-3 py-2 text-left text-[13px] font-medium text-[#0B1F44] transition hover:border-[#9DBBF5] hover:bg-[#F4F9FF] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {label}
+      {aiBusy === label ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5 text-[#2563EB]" />}
+    </button>
+  );
+
+  const chip = saving
+    ? { text: "Saving…", cls: "bg-[#EEF4FF] text-[#1D4ED8]", icon: <Loader2 className="size-3 animate-spin" /> }
+    : dirty
+    ? { text: "Unsaved changes", cls: "bg-[#FFF3D6] text-[#8A5A00]", icon: <span className="size-1.5 rounded-full bg-[#FFC93C]" /> }
+    : { text: `Saved${meta.version > 1 ? ` · v${meta.version}` : ""}`, cls: "bg-[#E2F8F1] text-[#0B7A5E]", icon: <Check className="size-3" /> };
+
   return (
-    <div data-learnova-app className="flex h-svh flex-col bg-background text-foreground">
-      <header className="flex h-14 shrink-0 items-center gap-2 overflow-hidden border-b px-3">
-        <Button asChild variant="ghost" size="icon" className="shrink-0">
-          <Link to="/app">
+    <div data-learnova-app data-lv-shell className="flex h-svh flex-col bg-[#F4F9FF] text-[#0B1F44]">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-white px-3">
+        <Button asChild variant="ghost" size="icon" className="size-8 shrink-0" title="Back to My Decks">
+          <Link to="/app/presentations" aria-label="Back to My Decks">
             <ArrowLeft />
           </Link>
         </Button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <p className="t-card truncate" title={summary?.source_name || ""}>
             {summary?.source_name || deck?.job_id || "Presentation"}
-            {meta.version > 1 ? (
-              <span className="ml-1.5 text-xs font-normal text-muted-foreground">v{meta.version}</span>
-            ) : null}
           </p>
-          <p className="truncate whitespace-nowrap text-xs text-muted-foreground">
-            {summary ? `${summary.slide_count} slides · ${summary.quiz_count} quizzes` : "…"}
+          <span className={cn("hidden shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-semibold sm:inline-flex", chip.cls)}>
+            {chip.icon} {chip.text}
+          </span>
+          <span className="t-meta hidden truncate xl:block">
+            {summary ? `${summary.slide_count} slides · ${summary.quiz_count} quizzes` : ""}
             {summary?.overall_score != null ? ` · ${summary.overall_score}/100` : ""}
             {estMin ? ` · ≈ ${estMin} min` : ""}
-          </p>
+          </span>
         </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           {editing ? (
             <>
-              <Button size="sm" onClick={save} disabled={saving || !dirty}>
+              <Button size="sm" onClick={save} disabled={saving || !dirty} className="bg-[#2563EB] hover:bg-[#1D4ED8]">
                 {saving ? <Loader2 className="animate-spin" /> : <Check />}
                 {saving ? "Re-rendering…" : "Save & re-render"}
               </Button>
@@ -258,7 +345,7 @@ export default function Preview() {
               {meta.versions?.length ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" className="hidden md:inline-flex">
                       <History /> History
                     </Button>
                   </DropdownMenuTrigger>
@@ -276,82 +363,97 @@ export default function Preview() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
-              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-                <Pencil /> Edit
+              <Button size="sm" variant="outline" onClick={() => { setEditing(true); setTab("content"); }}>
+                <Pencil /> <span className="hidden sm:inline">Edit</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => download("html")}>
-                <Download /> Web deck
-              </Button>
-              <Button size="sm" onClick={() => download("pptx")}>
-                <FileDown /> PowerPoint
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link to={`/app/present/${jobId}`}>
-                  <Play /> Present
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
+              <Button asChild variant="outline" size="sm" className="hidden md:inline-flex">
                 <Link to={`/app/compare/${jobId}`}>
                   <GitCompare /> Before vs after
                 </Link>
               </Button>
-              <Button asChild size="sm" variant="secondary">
-                <Link to={`/app/export/${jobId}`}>Finish</Link>
-              </Button>
             </>
           )}
-          <UserButton afterSignOutUrl="/" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Download /> <span className="hidden sm:inline">Export</span> <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onSelect={() => download("pptx")}>
+                <FileDown /> PowerPoint (.pptx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => download("html")}>
+                <Download /> Web deck (.html)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to={`/app/export/${jobId}`}>
+                  <Check /> Finish &amp; share
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button asChild size="sm" className="bg-[#0B1F44] text-white hover:bg-[#13306a]">
+            <Link to={`/app/present/${jobId}`}>
+              <Play className="fill-current" /> Present
+            </Link>
+          </Button>
         </div>
       </header>
 
       {error ? (
         <p className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</p>
       ) : null}
-      {dirty && !editing ? (
-        <p className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
-          You have unsaved edits — open Edit to save and re-render.
-        </p>
-      ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[220px_1fr_320px]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:grid lg:grid-cols-[232px_minmax(0,1fr)_340px] lg:overflow-hidden">
         {/* Slides rail */}
-        <ScrollArea className="border-r">
-          <ul className="flex flex-col gap-2 p-3">
+        <aside className="shrink-0 border-b bg-white lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Slides">
+          <ul className="lv-no-scrollbar flex gap-2 overflow-x-auto p-3 lg:flex-col lg:overflow-x-visible" role="listbox" aria-label="Slides">
             {!deck
-              ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16" />)
+              ? Array.from({ length: 6 }).map((_, i) => <li key={i} className="lv-skel h-16 w-40 shrink-0 lg:w-auto" />)
               : slides.map((s, i) => (
-                  <li key={s.index}>
+                  <li key={s.index ?? i} className="w-44 shrink-0 lg:w-auto">
                     <button
+                      data-rail-i={i}
+                      role="option"
+                      aria-selected={i === selected}
                       onClick={() => setSelected(i)}
                       className={cn(
-                        "w-full rounded-lg border p-2 text-left text-xs transition-colors",
-                        i === selected ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        "group flex w-full gap-2.5 rounded-[10px] border p-2 text-left transition",
+                        i === selected
+                          ? "border-[#2563EB] bg-[#EEF4FF] shadow-[0_0_0_3px_rgb(37_99_235/0.12)]"
+                          : "border-transparent hover:border-[#DEE7F5] hover:bg-[#F4F9FF]"
                       )}
                     >
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="font-medium text-muted-foreground">
-                          {s.is_section_start ? "◆ " : ""}
-                          {i + 1}
+                      <span
+                        className={cn(
+                          "grid size-7 shrink-0 place-items-center rounded-md text-[12px] font-bold tabular-nums",
+                          i === selected ? "bg-[#2563EB] text-white" : "bg-[#EAF1FC] text-[#5A6B8C]"
+                        )}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 text-[12.5px] font-semibold leading-4 text-[#0B1F44]">
+                          {draft?.[i]?.title || s.title}
                         </span>
-                        {s.family ? (
-                          <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
-                            {s.variant || s.family}
+                        {s.family || s.variant ? (
+                          <span className="mt-1 inline-block max-w-full truncate rounded bg-[#E3ECF9] px-1.5 py-px text-[10px] font-medium text-[#4A5C80]">
+                            {(s.variant || s.family || "").toString().replace(/_/g, " ").toLowerCase()}
                           </span>
                         ) : null}
-                      </div>
-                      <p className="line-clamp-2 font-medium">
-                        {draft?.[i]?.title || s.title}
-                      </p>
+                      </span>
                     </button>
                   </li>
                 ))}
           </ul>
-        </ScrollArea>
+        </aside>
 
-        {/* Viewer */}
-        <div className="flex min-w-0 items-center justify-center bg-muted/30 p-4">
+        {/* Canvas */}
+        <div className="flex min-h-[300px] min-w-0 items-center justify-center bg-[#E8F0FB] p-4 sm:p-6 lg:min-h-0">
           {htmlUrl ? (
-            <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-xl border bg-white shadow-sm">
+            <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-[0_18px_50px_-18px_rgb(11_31_68/0.35),0_2px_6px_rgb(11_31_68/0.08)]">
               <iframe
                 ref={iframeRef}
                 title="Presentation preview"
@@ -367,133 +469,231 @@ export default function Preview() {
               />
             </div>
           ) : (
-            <Skeleton className="aspect-video w-full max-w-4xl rounded-xl" />
+            <div className="lv-skel aspect-video w-full max-w-4xl rounded-xl" />
           )}
         </div>
 
-        {/* Properties / editor */}
-        <ScrollArea className="border-l">
-          <div className="flex flex-col gap-4 p-4">
-            <p className="text-sm font-semibold">
-              {editing ? "Edit slide" : "Slide"} {selected + 1}
-            </p>
+        {/* Inspector */}
+        <aside className="min-h-0 border-t bg-white lg:overflow-y-auto lg:border-l lg:border-t-0" aria-label="Inspector">
+          <Tabs value={tab} onValueChange={setTab} className="flex flex-col">
+            <TabsList className="m-3 grid h-9 grid-cols-4 rounded-lg bg-[#EAF1FC] p-0.5">
+              {[
+                ["design", "Design"],
+                ["content", "Content"],
+                ["quiz", "Quiz"],
+                ["ai", "AI"],
+              ].map(([v, l]) => (
+                <TabsTrigger key={v} value={v} className="relative rounded-md px-2 text-[13px] data-[state=active]:text-[#1D4ED8]">
+                  {l}
+                  {v === "ai" && aiNeedsSetup ? <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#FFC93C]" title="Needs setup" /> : null}
+                  {v === "ai" && aiOn ? <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#12C99B]" /> : null}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-            {editing && curDraft ? (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Title</label>
-                  <Input
-                    value={curDraft.title || ""}
-                    onChange={(e) => patchDraft({ title: e.target.value })}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Points (one per line)
-                  </label>
-                  <Textarea
-                    rows={7}
-                    value={(curDraft.bullets || []).join("\n")}
-                    onChange={(e) =>
-                      patchDraft({
-                        bullets: e.target.value.split("\n").map((x) => x.trimEnd()).filter(Boolean),
-                      })
-                    }
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Visual</label>
-                  <Select
-                    value={curDraft.family || ""}
-                    onValueChange={(v) => patchDraft({ family: v || null })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {FAMILIES.map(([v, label]) => (
-                        <SelectItem key={v || "auto"} value={v}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Takeaway</label>
-                  <Input
-                    value={curDraft.takeaway || ""}
-                    onChange={(e) => patchDraft({ takeaway: e.target.value })}
-                    placeholder="One-line key point (optional)"
-                  />
-                </div>
-                {imageSlides.includes(selected) || cur?.has_image ? (
-                  <Button variant="outline" size="sm" onClick={openFigureEditor}>
-                    <ImageIcon /> Crop / highlight figure
-                  </Button>
-                ) : null}
-                <p className="text-xs text-muted-foreground">
-                  Save re-runs the layout, animation and scoring for the whole deck.
-                  Figures are kept and can be cropped or highlighted above.
-                </p>
-              </>
-            ) : !cur ? (
-              <Skeleton className="h-40" />
-            ) : (
-              <>
-                <Prop label="Visual">
-                  <span className="font-medium">{cur.variant || cur.treatment || cur.layout_type}</span>
-                  {cur.family ? <span className="text-muted-foreground"> · {cur.family}</span> : null}
-                </Prop>
-                <Prop label="Transition in">
-                  <Badge variant="secondary">{cur.transition || "slide"}</Badge>
-                  {cur.transition_reason ? (
-                    <p className="mt-1 text-xs text-muted-foreground">{cur.transition_reason}</p>
-                  ) : null}
-                </Prop>
-                <Prop label="Summarisation">
-                  <Badge
-                    variant={
-                      cur.summary_directive === "PRESERVE"
-                        ? "warning"
-                        : cur.summary_directive === "COMPRESS"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {cur.summary_directive || "BALANCED"}
-                  </Badge>
-                </Prop>
-                <Prop label="Progressive reveal">
-                  <span className="inline-flex items-center gap-1">
-                    <Sparkles className="size-3.5 text-primary" />
-                    {cur.reveal_steps || 1} step{(cur.reveal_steps || 1) === 1 ? "" : "s"}
-                  </span>
-                </Prop>
-                {cur.est_seconds ? (
-                  <Prop label="Est. time">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="size-3.5" /> ~{Math.round(cur.est_seconds)}s
-                    </span>
-                  </Prop>
-                ) : null}
+            <div className="px-4 pb-6">
+              <p className="t-meta mb-3 font-semibold uppercase tracking-wide">
+                {editing ? "Editing slide" : "Slide"} {selected + 1}
+                {slides.length ? ` of ${slides.length}` : ""}
+              </p>
 
-                {cur.mermaid_code ||
-                (cur.family && /PROCESS|FLOW|DECISION|STATE/.test(cur.family)) ? (
-                  <Button asChild variant="outline" size="sm" className="w-full">
-                    <Link to={`/app/diagram/${jobId}/${selected}`}>Open in diagram editor</Link>
-                  </Button>
-                ) : null}
+              <TabsContent value="design" className="mt-0 flex flex-col gap-4">
+                {!cur ? (
+                  <div className="lv-skel h-40" />
+                ) : (
+                  <>
+                    {editing && curDraft ? (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Visual</label>
+                        <Select value={curDraft.family || ""} onValueChange={(v) => patchDraft({ family: v || null })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {FAMILIES.map(([v, label]) => (
+                              <SelectItem key={v || "auto"} value={v}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <Prop label="Visual">
+                        <span className="font-medium">{cur.variant || cur.treatment || cur.layout_type}</span>
+                        {cur.family ? <span className="text-muted-foreground"> · {cur.family}</span> : null}
+                      </Prop>
+                    )}
+                    <Prop label="Transition in">
+                      <Badge variant="secondary">{cur.transition || "slide"}</Badge>
+                      {cur.transition_reason ? <p className="mt-1 text-xs text-muted-foreground">{cur.transition_reason}</p> : null}
+                    </Prop>
+                    <Prop label="Summarisation">
+                      <Badge variant={cur.summary_directive === "PRESERVE" ? "warning" : cur.summary_directive === "COMPRESS" ? "destructive" : "secondary"}>
+                        {cur.summary_directive || "BALANCED"}
+                      </Badge>
+                    </Prop>
+                    <Prop label="Progressive reveal">
+                      <span className="inline-flex items-center gap-1">
+                        <Sparkles className="size-3.5 text-primary" />
+                        {cur.reveal_steps || 1} step{(cur.reveal_steps || 1) === 1 ? "" : "s"}
+                      </span>
+                    </Prop>
+                    {cur.est_seconds ? (
+                      <Prop label="Est. time">
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="size-3.5" /> ~{Math.round(cur.est_seconds)}s
+                        </span>
+                      </Prop>
+                    ) : null}
+                    {editing && (imageSlides.includes(selected) || cur?.has_image) ? (
+                      <Button variant="outline" size="sm" onClick={openFigureEditor}>
+                        <ImageIcon /> Crop / highlight figure
+                      </Button>
+                    ) : null}
+                    {cur.mermaid_code || (cur.family && /PROCESS|FLOW|DECISION|STATE/.test(cur.family)) ? (
+                      <Button asChild variant="outline" size="sm" className="w-full">
+                        <Link to={`/app/diagram/${jobId}/${selected}`}>Open in diagram editor</Link>
+                      </Button>
+                    ) : null}
+                  </>
+                )}
+              </TabsContent>
 
-                <Separator />
-                <div className="flex flex-col gap-1">
-                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Speaker notes
-                  </span>
-                  <pre className="whitespace-pre-wrap rounded-md bg-muted p-2 text-xs leading-relaxed">
-                    {cur.speaker_notes || cur.takeaway || "—"}
-                  </pre>
+              <TabsContent value="content" className="mt-0 flex flex-col gap-4">
+                {editing && curDraft ? (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Title</label>
+                      <Input value={curDraft.title || ""} onChange={(e) => patchDraft({ title: e.target.value })} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Points (one per line)</label>
+                      <Textarea
+                        rows={7}
+                        value={(curDraft.bullets || []).join("\n")}
+                        onChange={(e) => patchDraft({ bullets: e.target.value.split("\n").map((x) => x.trimEnd()).filter(Boolean) })}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Takeaway</label>
+                      <Input value={curDraft.takeaway || ""} onChange={(e) => patchDraft({ takeaway: e.target.value })} placeholder="One-line key point (optional)" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Save re-runs the layout, animation and scoring for the whole deck. Figures are kept and can be cropped or highlighted from the Design tab.
+                    </p>
+                  </>
+                ) : !cur ? (
+                  <div className="lv-skel h-40" />
+                ) : (
+                  <>
+                    <Prop label="Title"><span className="font-medium">{curDraft?.title || cur.title}</span></Prop>
+                    {(curDraft?.bullets || cur.bullets || []).length ? (
+                      <ul className="list-disc space-y-1 pl-4 text-[13px] leading-5">
+                        {(curDraft?.bullets || cur.bullets).map((b, i) => <li key={i}>{b}</li>)}
+                      </ul>
+                    ) : null}
+                    <Separator />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Speaker notes</span>
+                      <pre className="whitespace-pre-wrap rounded-md bg-[#F4F9FF] p-2 text-xs leading-relaxed">
+                        {cur.speaker_notes || cur.takeaway || "—"}
+                      </pre>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                      <Pencil /> Edit this slide
+                    </Button>
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="quiz" className="mt-0 flex flex-col gap-3">
+                {!deck ? (
+                  <div className="lv-skel h-32" />
+                ) : deckQuizzes.length === 0 ? (
+                  <p className="t-body text-muted-foreground">No checkpoint questions in this deck.</p>
+                ) : (
+                  <>
+                    <p className="t-meta">{deckQuizzes.length} checkpoint question{deckQuizzes.length === 1 ? "" : "s"} in this deck</p>
+                    {deckQuizzes.map((q, i) => {
+                      const letter = String(q.correct ?? "").trim().toUpperCase().slice(0, 1);
+                      return (
+                        <div key={i} className="rounded-lg border border-[#DEE7F5] p-3">
+                          <p className="text-[13px] font-semibold leading-5">{i + 1}. {q.question}</p>
+                          <ul className="mt-2 space-y-1">
+                            {(q.options || []).slice(0, 4).map((o, k) => (
+                              <li
+                                key={k}
+                                className={cn(
+                                  "rounded-md px-2 py-1 text-[12.5px]",
+                                  "ABCD"[k] === letter ? "bg-[#E2F8F1] font-medium text-[#0B7A5E]" : "bg-[#F4F9FF] text-[#4A5C80]"
+                                )}
+                              >
+                                {String(o)}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="ai" className="mt-0 flex flex-col gap-3">
+                {aiNeedsSetup ? (
+                  <div className="flex gap-2.5 rounded-lg border border-[#FFE29A] bg-[#FFF8E1] p-3 text-[13px] leading-5 text-[#6B4A00]">
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                    <p>
+                      <b>AI isn’t configured on this server.</b> Add a key in <code className="rounded bg-white/70 px-1">.env</code> (for example GROQ_API_KEY),
+                      restart the server, and these tools switch on.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="t-body text-muted-foreground">Rewrite this slide with one click. You review a before/after before anything changes.</p>
+                )}
+                <div className="grid gap-1.5">
+                  <AiButton label="Improve this slide" instruction="Improve clarity and flow while keeping every fact." />
+                  <AiButton label="Make shorter" instruction="Make it shorter: fewer, tighter bullets." />
+                  <AiButton label="Explain like I'm new" instruction="Explain it for someone completely new to the topic, with simple words." />
                 </div>
-              </>
-            )}
-          </div>
-        </ScrollArea>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rewrite for</p>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                  {["Grade 6", "University", "Executive"].map((a) => (
+                    <AiButton key={a} label={a} instruction="Rewrite this slide for the target audience." audience={a} />
+                  ))}
+                </div>
+
+                {aiResult ? (
+                  <div className="mt-1 overflow-hidden rounded-xl border border-[#DEE7F5]">
+                    <div className="flex items-center justify-between bg-[#F4F9FF] px-3 py-1.5">
+                      <span className="text-[12px] font-semibold">{aiResult.label}</span>
+                      {aiResult.applied ? <span className="text-[11px] font-semibold text-[#0B7A5E]">Applied</span> : null}
+                    </div>
+                    {[
+                      ["Before", aiResult.before, "bg-[#FFF1F1] text-[#7A2E2E]"],
+                      ["After", aiResult.after, "bg-[#E8FAF4] text-[#0B5F4A]"],
+                    ].map(([l, v, cls]) => (
+                      <div key={l} className={cn("border-t px-3 py-2", cls)}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">{l}</p>
+                        <p className="text-[13px] font-semibold leading-5">{v.title}</p>
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[12.5px] leading-[18px]">
+                          {v.bullets.map((b, i) => <li key={i}>{b}</li>)}
+                        </ul>
+                      </div>
+                    ))}
+                    <div className="flex gap-2 border-t bg-white p-2">
+                      {!aiResult.applied ? (
+                        <Button size="sm" onClick={acceptAi} className="flex-1 bg-[#12C99B] text-[#04382C] hover:bg-[#0FB88C]">
+                          <Check /> Accept
+                        </Button>
+                      ) : null}
+                      <Button size="sm" variant="outline" onClick={undoAi} className="flex-1">
+                        <Undo2 /> Undo
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </TabsContent>
+            </div>
+          </Tabs>
+        </aside>
       </div>
 
       {figSrc ? (

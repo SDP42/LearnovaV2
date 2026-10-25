@@ -411,3 +411,50 @@ export function deckArtifactUrl(id, artifact) {
     false
   );
 }
+
+// ── Deck thumbnails (auth-required PNG → cached blob URL) ─────────────────
+/** Resolves to an object URL for the deck's thumbnail. Cached; never revoke. */
+export function getDeckThumb(id) {
+  return swr(
+    `blob:${id}:thumb`,
+    async () => {
+      const r = await fetch(`${BASE}/api/decks/${id}/thumb`, { headers: await authHeaders() });
+      if (!r.ok) throw new Error(`No thumbnail (${r.status})`);
+      return URL.createObjectURL(await r.blob());
+    },
+    false
+  );
+}
+
+// ── AI assist ─────────────────────────────────────────────────────────────
+export async function assistStatus() {
+  return json(await fetch(`${BASE}/api/assist/status`, { headers: await authHeaders() }));
+}
+/** → {text, llm, hints[]} */
+export async function assistPrompt(text) {
+  return json(
+    await fetch(`${BASE}/api/assist/prompt`, {
+      method: "POST",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ text }),
+    })
+  );
+}
+/** → {title, bullets}; rejects with an Error whose .status is the HTTP status (503 = AI not configured). */
+export async function assistSlide({ title, bullets, instruction, audience }) {
+  const r = await fetch(`${BASE}/api/assist/slide`, {
+    method: "POST",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ title, bullets, instruction, audience }),
+  });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try {
+      detail = (await r.json()).detail ?? detail;
+    } catch {
+      /* not JSON */
+    }
+    throw Object.assign(new Error(typeof detail === "string" ? detail : "Request failed"), { status: r.status });
+  }
+  return r.json();
+}

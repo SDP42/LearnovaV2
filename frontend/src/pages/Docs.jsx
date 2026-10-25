@@ -1,4 +1,5 @@
 import AppLayout from "@/components/app/AppLayout";
+import { PageHeader } from "@/components/app/Page";
 import { Card, CardContent } from "@/components/ui/card";
 
 const SECTIONS = [
@@ -93,14 +94,9 @@ const SECTIONS = [
 
 export default function Docs() {
   return (
-    <AppLayout title="Docs">
-      <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Documentation</h2>
-          <p className="text-sm text-muted-foreground">
-            How the engine works and how to get more out of it.
-          </p>
-        </div>
+    <AppLayout title="Help">
+      <div className="flex max-w-3xl flex-col gap-4">
+        <PageHeader title="Help" subtitle="How the engine works and how to get more out of it." />
 
         <Card className="lv-card">
           <CardContent className="p-5">

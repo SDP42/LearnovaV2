@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { PageContainer } from "@/components/app/Page";
+import LibraryToolbar from "@/components/app/LibraryToolbar";
 
 const KIND_META = {
   process: { icon: GitBranch, ring: "text-chart-1" },
@@ -48,7 +49,7 @@ export default function Library() {
   }, [kind, q]);
 
   function use(t) {
-    navigate("/app/create", { state: { template: { topic: t.topic, text: t.text } } });
+    navigate("/app", { state: { template: { topic: t.topic, text: t.text } } });
   }
 
   return (
@@ -73,33 +74,14 @@ export default function Library() {
         </div>
 
         {/* controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search lessons…"
-              className="w-56 pl-8"
-            />
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {["all", ...Object.keys(TEMPLATE_KINDS)].map((k) => (
-              <button
-                key={k}
-                onClick={() => setKind(k)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  kind === k
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted/60"
-                )}
-              >
-                {k === "all" ? "All" : TEMPLATE_KINDS[k].label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <LibraryToolbar
+          query={q}
+          onQuery={setQ}
+          placeholder="Search lessons…"
+          chips={["all", ...Object.keys(TEMPLATE_KINDS)].map((k) => ({ id: k, label: k === "all" ? "All" : TEMPLATE_KINDS[k].label }))}
+          chip={kind}
+          onChip={setKind}
+        />
 
         {/* grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -154,7 +136,7 @@ export default function Library() {
           <Card>
             <CardContent className="p-10 text-center text-sm text-muted-foreground">
               No lessons match that. Clear the filters, or{" "}
-              <button className="underline" onClick={() => navigate("/app/create")}>
+              <button className="underline" onClick={() => navigate("/app")}>
                 start from your own content
               </button>
               .
@@ -175,7 +157,7 @@ export default function Library() {
               </div>
             </div>
             <Button asChild variant="outline">
-              <button onClick={() => navigate("/app/create")}>
+              <button onClick={() => navigate("/app")}>
                 Open Create <ArrowRight />
               </button>
             </Button>

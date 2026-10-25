@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageContainer, PageHeader } from "@/components/app/Page";
+import { EmptyState } from "@/components/app/states";
+import { QuizIllustration } from "@/components/app/Illustrations";
 
 export default function Quizzes() {
   const [params, setParams] = useSearchParams();
@@ -54,7 +56,7 @@ export default function Quizzes() {
 
   return (
     <AppLayout title="Quizzes">
-      <PageContainer width="prose">
+      <PageContainer width="prose" className="mx-0">
         <PageHeader
           title="Checkpoint quizzes"
           subtitle="Run the inline questions generated for one of your decks."
@@ -86,23 +88,20 @@ export default function Quizzes() {
         ) : null}
 
         {!jobId ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-              <BrainCircuit className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                {decks === null
-                  ? "Loading your decks…"
-                  : decks.length === 0
-                  ? "No decks yet — generate one first."
-                  : "Pick a deck above to start its quiz."}
-              </p>
-              {decks && decks.length === 0 ? (
-                <Button asChild size="sm">
-                  <Link to="/app/create">Create a presentation</Link>
-                </Button>
-              ) : null}
-            </CardContent>
-          </Card>
+          decks === null ? (
+            <Skeleton className="h-72 rounded-2xl" />
+          ) : (
+            <EmptyState
+              illustration={<QuizIllustration />}
+              title={decks.length === 0 ? "No quizzes yet" : "Pick a deck to start"}
+              description={
+                decks.length === 0
+                  ? "Quizzes are written automatically with every deck. Generate one to get checkpoint questions."
+                  : "Choose a deck from the menu above to run its checkpoint questions."
+              }
+              action={decks.length === 0 ? { to: "/app", label: "Create a deck" } : undefined}
+            />
+          )
         ) : quizzes === null ? (
           <Skeleton className="h-72" />
         ) : total === 0 ? (

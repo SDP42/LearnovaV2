@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  *         "narrow"  → focused single-column flows (max-w-xl)
  */
 const WIDTHS = {
-  default: "max-w-[1400px]",
+  default: "max-w-full",
   prose: "max-w-3xl",
   narrow: "max-w-xl",
 };
@@ -32,9 +32,9 @@ export function PageHeader({ title, subtitle, actions, className }) {
   return (
     <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="min-w-0">
-        <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h2>
+        <h1 className="t-h1">{title}</h1>
         {subtitle ? (
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>
+          <p className="t-body mt-1 max-w-2xl text-muted-foreground">{subtitle}</p>
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
@@ -45,9 +45,9 @@ export function PageHeader({ title, subtitle, actions, className }) {
 export function SectionHeader({ children, action, className }) {
   return (
     <div className={cn("flex items-center justify-between gap-3", className)}>
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="t-h2">
         {children}
-      </h3>
+      </h2>
       {action}
     </div>
   );

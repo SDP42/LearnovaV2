@@ -471,3 +471,112 @@
 
 /* Display type: Bricolage Grotesque for headings across the app shell. */
 [data-learnova-app] h1,[data-learnova-app] h2,[data-learnova-app] h3{font-family:"Bricolage Grotesque","Plus Jakarta Sans",system-ui,sans-serif;letter-spacing:-0.025em}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Learnova app shell v3 — palette, type scale, spacing, motion.
+   Palette tokens apply only while the new shell is mounted ([data-lv-shell]);
+   `:root:has()` lets radix portals (menus, dialogs) pick them up too, without
+   touching Landing / sign-in / Present which share [data-learnova-app].
+   ═════════════════════════════════════════════════════════════════════════ */
+:root:has([data-lv-shell]),
+[data-lv-shell] {
+  --background: #F4F9FF;
+  --foreground: #0B1F44;
+  --card: #ffffff;
+  --card-foreground: #0B1F44;
+  --popover: #ffffff;
+  --popover-foreground: #0B1F44;
+  --primary: #2563EB;
+  --primary-foreground: #ffffff;
+  --secondary: #EAF1FC;
+  --secondary-foreground: #0B1F44;
+  --muted: #EAF1FC;
+  --muted-foreground: #5A6B8C;
+  --accent: #E6EEFD;
+  --accent-foreground: #1D4ED8;
+  --border: #DEE7F5;
+  --input: #D3DFF1;
+  --ring: #2563EB;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0B1F44;
+  --sidebar-border: #DEE7F5;
+  --sidebar-accent: #E6EEFD;
+  --sidebar-accent-foreground: #1D4ED8;
+  --lv-ink: #0B1F44;
+  --lv-mint: #12C99B;
+  --lv-yellow: #FFC93C;
+  --lv-canvas: #E8F0FB;
+  --lv-shadow: 0 12px 32px -10px rgb(11 31 68 / 0.12);
+  --lv-gutter: 16px;
+  --lv-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (min-width: 640px) {
+  :root:has([data-lv-shell]), [data-lv-shell] { --lv-gutter: 24px; }
+}
+
+[data-learnova-app] {
+  /* type scale */
+  --t-h1: 32px; --t-h1-lh: 36px;
+  --t-h2: 20px; --t-h2-lh: 28px;
+  --t-card: 15px; --t-card-lh: 22px;
+  --t-body: 14px; --t-body-lh: 22px;
+  --t-meta: 12px; --t-meta-lh: 16px;
+  /* spacing + radii */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+  --r-card: 12px; --r-hero: 16px;
+}
+
+@layer components {
+  [data-learnova-app] .t-h1 { font-family: "Bricolage Grotesque","Plus Jakarta Sans",system-ui,sans-serif; font-size: var(--t-h1); line-height: var(--t-h1-lh); letter-spacing: -0.02em; font-weight: 700; color: var(--lv-ink, var(--color-foreground)); }
+  [data-learnova-app] .t-h2 { font-family: "Bricolage Grotesque","Plus Jakarta Sans",system-ui,sans-serif; font-size: var(--t-h2); line-height: var(--t-h2-lh); letter-spacing: -0.015em; font-weight: 600; }
+  [data-learnova-app] .t-card { font-size: var(--t-card); line-height: var(--t-card-lh); font-weight: 600; }
+  [data-learnova-app] .t-body { font-size: var(--t-body); line-height: var(--t-body-lh); }
+  [data-learnova-app] .t-meta { font-size: var(--t-meta); line-height: var(--t-meta-lh); color: var(--color-muted-foreground); }
+  @media (max-width: 639px) { [data-learnova-app] .t-h1 { font-size: 26px; line-height: 30px; } }
+
+  [data-learnova-app] .lv-page { width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: var(--lv-gutter); padding-block: var(--sp-5) var(--sp-7); }
+  [data-learnova-app] .lv-r-card { border-radius: var(--r-card); }
+  [data-learnova-app] .lv-r-hero { border-radius: var(--r-hero); }
+
+  /* hover lift: -3px + navy 12% shadow, 180ms */
+  [data-learnova-app] .lv-lift { transition: transform 180ms var(--lv-ease), box-shadow 180ms var(--lv-ease), border-color 180ms ease; }
+  [data-learnova-app] .lv-lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -10px rgb(11 31 68 / 0.12); border-color: #C7D6F0; }
+
+  [data-learnova-app] .lv-surface { background: #fff; border: 1px solid var(--color-border); border-radius: var(--r-card); }
+  [data-learnova-app] .lv-skel { position: relative; overflow: hidden; background: #E3ECF9; border-radius: 8px; }
+  [data-learnova-app] .lv-skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.7) 45%, transparent 70%); background-size: 200% 100%; animation: lv-skel 1.4s linear infinite; }
+  @keyframes lv-skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+  [data-learnova-app] .lv-pill-active { background: #E6EEFD; color: #1D4ED8; position: relative; }
+  [data-learnova-app] .lv-pill-active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: #2563EB; }
+
+  [data-learnova-app] .lv-glow-blue { box-shadow: 0 0 0 4px rgb(37 99 235 / 0.14), 0 0 24px rgb(37 99 235 / 0.35); }
+  [data-learnova-app] .lv-no-scrollbar { scrollbar-width: none; }
+  [data-learnova-app] .lv-no-scrollbar::-webkit-scrollbar { display: none; }
+  @keyframes lv-burst { from { transform: translate(0,0) scale(1) rotate(0); opacity: 1; } to { transform: translate(var(--bx), var(--by)) scale(0.6) rotate(var(--br)); opacity: 0; } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-learnova-app] *, [data-learnova-app] *::before, [data-learnova-app] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* calmer card surface for legacy .lv-card users inside the new shell */
+@layer components {
+  [data-lv-shell] .lv-card { background: #fff; backdrop-filter: none; border: 1px solid var(--color-border); border-radius: var(--r-card); box-shadow: none; }
+  [data-lv-shell] .lv-card:hover { border-color: #C7D6F0; box-shadow: 0 10px 24px -12px rgb(11 31 68 / 0.12); }
+  [data-lv-shell] .lv-wash { background: #fff; }
+}
+
+/* Unlayered on purpose: beats the legacy global textarea/select rules in styles.css. */
+[data-learnova-app] textarea.lv-bare { border: 0; padding: 0; background: transparent; box-shadow: none; }
+/* Legacy `a { color: inherit }` is unlayered and would beat these utilities on anchors. */
+[data-learnova-app] a.text-primary-foreground, [data-learnova-app] a.text-white { color: #fff; }
+
+.lv-shell-main { padding-left: 0; }
+@media (min-width: 768px) { .lv-shell-main { padding-left: 72px; } }
+@media (min-width: 1100px) { .lv-shell-main { padding-left: 248px; } }

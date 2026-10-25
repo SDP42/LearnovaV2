@@ -90,7 +90,7 @@ export default function Gallery() {
         if (!live) return;
         setPreview(e);
         if (!e.has_deck && e.title) {
-          navigate("/app/create", {
+          navigate("/app", {
             state: { template: { topic: e.title, text: scaffold(e.title, e.subject) } },
           });
         }
@@ -159,7 +159,7 @@ export default function Gallery() {
     if (entry.has_deck) {
       setPreview(entry);
     } else {
-      navigate("/app/create", {
+      navigate("/app", {
         state: { template: { topic: entry.title, text: scaffold(entry.title, entry.subject) } },
       });
     }
@@ -170,10 +170,10 @@ export default function Gallery() {
   const canLoadMore = data && shown < data.total;
 
   return (
-    <AppLayout title="Gallery">
+    <AppLayout title="Community gallery">
       <PageContainer>
         <PageHeader
-          title="Gallery"
+          title="Community gallery"
           subtitle={
             data
               ? `${data.total.toLocaleString()} topics across ${data.subjects.length} subjects — ${data.ready_total} ready to open now.`

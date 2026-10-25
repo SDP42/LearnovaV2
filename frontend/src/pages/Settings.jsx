@@ -3,6 +3,7 @@ import { Check, Moon, Sun, X } from "lucide-react";
 import * as api from "@/api";
 import { UserProfile } from "@/auth";
 import AppLayout from "@/components/app/AppLayout";
+import { PageHeader } from "@/components/app/Page";
 import { useTheme } from "@/components/theme.jsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -54,34 +55,9 @@ export default function Settings() {
 
   return (
     <AppLayout title="Settings">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Settings</h2>
-          <p className="text-sm text-muted-foreground">Appearance, generation defaults, and integration status.</p>
-        </div>
+      <div className="flex max-w-3xl flex-col gap-6">
+        <PageHeader title="Settings" subtitle="Generation defaults, account and integration status." />
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Appearance</CardTitle></CardHeader>
-          <CardContent>
-            <RadioGroup value={theme} onValueChange={setTheme} className="grid gap-2 sm:grid-cols-2">
-              {[
-                ["dark", "Dark", Moon],
-                ["light", "Light", Sun],
-              ].map(([v, label, Icon]) => (
-                <label
-                  key={v}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm",
-                    theme === v ? "border-primary bg-primary/5" : "hover:bg-muted/40"
-                  )}
-                >
-                  <RadioGroupItem value={v} />
-                  <Icon className="size-4" /> {label}
-                </label>
-              ))}
-            </RadioGroup>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader><CardTitle className="text-base">Generation defaults</CardTitle></CardHeader>
@@ -205,7 +181,7 @@ export default function Settings() {
             </p>
             <div className="flex gap-4 pt-1">
               <a href="/app/docs" className="underline hover:text-foreground">Documentation</a>
-              <a href="/app/library" className="underline hover:text-foreground">Templates</a>
+              <a href="/app/gallery?tab=lessons" className="underline hover:text-foreground">Templates</a>
             </div>
           </CardContent>
         </Card>

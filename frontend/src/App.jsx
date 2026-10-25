@@ -18,12 +18,12 @@ import DiagramView from "./pages/DiagramView.jsx";
 import Docs from "./pages/Docs.jsx";
 import Export from "./pages/Export.jsx";
 import Landing from "./pages/Landing.jsx";
-import Library from "./pages/Library.jsx";
-import Gallery from "./pages/Gallery.jsx";
+import Templates from "./pages/Templates.jsx";
 import Present from "./pages/Present.jsx";
 import Presentations from "./pages/Presentations.jsx";
 import Preview from "./pages/Preview.jsx";
-import Projects from "./pages/Projects.jsx";
+import Generate from "./pages/Generate.jsx";
+import AppShell from "./components/app/AppShell.jsx";
 import Quizzes from "./pages/Quizzes.jsx";
 import Settings from "./pages/Settings.jsx";
 import Studio from "./pages/Studio.jsx";
@@ -109,23 +109,26 @@ export default function App() {
           }
         />
 
-        {/* New app shell (shadcn design system) */}
-        <Route path="/app" element={<Protected><Dashboard /></Protected>} />
-        <Route path="/app/create" element={<Protected><Create /></Protected>} />
+        {/* App shell: persistent sidebar + header, pages render in the Outlet */}
+        <Route element={<Protected><AppShell /></Protected>}>
+          <Route path="/app" element={<Dashboard />} />
+          <Route path="/app/create" element={<Create />} />
+          <Route path="/app/generate/:jobId" element={<Generate />} />
+          <Route path="/app/presentations" element={<Presentations />} />
+          <Route path="/app/projects" element={<Navigate to="/app/presentations" replace />} />
+          <Route path="/app/gallery" element={<Templates />} />
+          <Route path="/app/library" element={<Navigate to="/app/gallery?tab=lessons" replace />} />
+          <Route path="/app/quizzes" element={<Quizzes />} />
+          <Route path="/app/analytics" element={<Analytics />} />
+          <Route path="/app/docs" element={<Docs />} />
+          <Route path="/app/settings" element={<Settings />} />
+        </Route>
         <Route path="/app/preview/:jobId" element={<Protected><Preview /></Protected>} />
         <Route path="/app/compare/:jobId" element={<Protected><Compare /></Protected>} />
         <Route path="/app/present/:jobId" element={<Protected><Present /></Protected>} />
         <Route path="/app/audience/:jobId" element={<Protected><Audience /></Protected>} />
         <Route path="/app/export/:jobId" element={<Protected><Export /></Protected>} />
         <Route path="/app/diagram/:jobId/:slide" element={<Protected><DiagramView /></Protected>} />
-        <Route path="/app/projects" element={<Protected><Projects /></Protected>} />
-        <Route path="/app/presentations" element={<Protected><Presentations /></Protected>} />
-        <Route path="/app/quizzes" element={<Protected><Quizzes /></Protected>} />
-        <Route path="/app/analytics" element={<Protected><Analytics /></Protected>} />
-        <Route path="/app/library" element={<Protected><Library /></Protected>} />
-        <Route path="/app/gallery" element={<Protected><Gallery /></Protected>} />
-        <Route path="/app/docs" element={<Protected><Docs /></Protected>} />
-        <Route path="/app/settings" element={<Protected><Settings /></Protected>} />
 
         <Route path="/privacy" element={<Legal kind="privacy" />} />
         <Route path="/terms" element={<Legal kind="terms" />} />
