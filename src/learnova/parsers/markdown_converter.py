@@ -753,7 +753,7 @@ def _native_to_markdown(path: str, ext: str, textbook_mode: bool = False):
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
-def convert_to_markdown(
+def _convert_to_markdown_impl(
     path: str,
     source_name: Optional[str] = None,
     textbook_mode: bool = False,
@@ -856,3 +856,23 @@ __all__ = [
     "attach_assets_to_units",
     "anydoc_available",
 ]
+
+
+def convert_to_markdown(
+    path: str,
+    source_name: Optional[str] = None,
+    textbook_mode: bool = False,
+    use_cache: bool = True,
+    prefer_anydoc: bool = True,
+    extract_images: bool = True,
+) -> MarkdownDocument:
+    """
+    Convert a PPTX or PDF into the markdown IR. For PDFs, tables are then recovered natively
+    (see ``pdf_tables``) so a table reaches the pipeline as a real grid, not as fragments.
+    """
+    doc = _convert_to_markdown_impl(path, source_name, textbook_mode, use_cache, prefer_anydoc, extract_images)
+    if str(path).lower().endswith(".pdf") and not re.search(r"\[TABLE DATA\]\n\|", doc.markdown or ""):
+        from learnova.parsers.pdf_tables import inject_native_tables
+
+        doc.markdown = inject_native_tables(str(path), doc.markdown)
+    return doc

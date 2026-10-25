@@ -563,6 +563,56 @@ def get_my_deck(deck_id: str, user_id: str = Depends(current_user)) -> dict:
     return record
 
 
+@app.get("/api/decks/{deck_id}/thumb")
+def get_my_deck_thumb(deck_id: str, user_id: str = Depends(current_user)) -> Response:
+    """16:9 PNG title card for deck grids (owner-only, cacheable)."""
+    if deck_library.get_deck(user_id, deck_id) is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    data = deck_library.read_thumb(user_id, deck_id)
+    if data is None:
+        rec = deck_library.get_deck(user_id, deck_id) or {}
+        from learnova.rendering.thumbnail import title_card_png
+
+        data = title_card_png(str(rec.get("title") or "Untitled deck"), int(rec.get("slide_count") or 0))
+    return Response(data, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})
+
+
+# ── AI assist (optional: needs an LLM provider; every route says so plainly when there is none) ──────────
+class AssistSlide(BaseModel):
+    title: str = ""
+    bullets: list[str] = []
+    instruction: str = "Make it clearer and more concise."
+    audience: str = ""
+
+
+class AssistPrompt(BaseModel):
+    text: str
+
+
+@app.get("/api/assist/status")
+def assist_status(user_id: str = Depends(current_user)) -> dict:
+    from learnova.ai import assist
+
+    return {"llm": assist.llm_available()}
+
+
+@app.post("/api/assist/slide")
+def assist_slide(body: AssistSlide, user_id: str = Depends(current_user)) -> dict:
+    from learnova.ai import assist
+
+    out = assist.improve_slide(body.title, body.bullets, body.instruction, body.audience)
+    if out is None:
+        raise HTTPException(status_code=503, detail="No AI provider is configured (set GROQ_API_KEY, NVIDIA_API_KEY or GEMINI_API_KEY).")
+    return out
+
+
+@app.post("/api/assist/prompt")
+def assist_prompt(body: AssistPrompt, user_id: str = Depends(current_user)) -> dict:
+    from learnova.ai import assist
+
+    return assist.improve_prompt(body.text)
+
+
 @app.get("/api/decks/{deck_id}/analysis")
 def get_my_deck_analysis(deck_id: str, user_id: str = Depends(current_user)) -> JSONResponse:
     """Before/after comparison against the source, written when the deck was generated."""

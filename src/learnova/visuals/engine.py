@@ -187,7 +187,7 @@ def det_process(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents)
     loop = bool(re.search(r"\b(cycle|loop)\b", title, re.I)) or bool(re.search(
         r"\b(cycle|loop|process|it) (?:repeats|continues|begins again|starts again)|back to the (?:start|beginning)|"
-        r"continuous(?:ly)?|repeats? (?:continuously|again|indefinitely)|the cycle continues", blob, re.I))
+        r"repeats? (?:continuously|again|indefinitely)|the cycle continues", blob, re.I))
     stages = [{"label": short_label(s, 5), "detail": _strip_end(_LEAD_CUE.sub("", s))} for s in steps[:8]]
     conf = 0.82 + min(len(cued), 5) * 0.02
     fam = "PROCESS_CYCLIC" if loop else "PROCESS_LINEAR"
@@ -213,7 +213,7 @@ def det_cycle(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents) + " " + title
     if not (re.search(r"\b(cycle|loop)\b", title, re.I) or re.search(
             r"\b(?:the )?(?:cycle|loop|process) (?:repeats|continues|begins again|starts again)|back to the (?:start|beginning)|"
-            r"continuous(?:ly)?|repeats? (?:continuously|again|indefinitely)|iterat\w+", blob, re.I)):
+            r"repeats? (?:continuously|again|indefinitely)", blob, re.I)):
         return None
     items = [s for s in sents if len(s.split()) >= 3]
     # "Plan the change, do it..., check..., and act..." → one sentence enumerating a loop
@@ -234,9 +234,21 @@ _MONTH = r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul
 _DATE_TOK = re.compile(rf"\b(?:{_MONTH}\s+\d{{1,2}},?\s+\d{{4}}|{_MONTH}\s+\d{{4}}|1[0-9]{{3}}|20[0-9]{{2}}|\d{{1,2}}(?:st|nd|rd|th)\s+century)\b")
 
 
+_CITATION = re.compile(r"\b(?:edition|ed\.|press|publications?|publisher|isbn|wiley|mcgraw|springer|pearson|elsevier|oxford|cambridge|"
+                       r"o'reilly|tata|phi learning|et al|pp\.|vol\.|journal|proceedings|ieee|acm)\b", re.I)
+
+
+def is_citation(line: str) -> bool:
+    return bool(_CITATION.search(line)) and bool(re.search(r"\b(?:1[89]\d{2}|20\d{2})\b|\bed(?:ition)?\b", line, re.I))
+
+
 def det_timeline(title: str, sents: List[str]) -> Det:
     events = []
+    if sum(1 for x in sents if is_citation(x)) >= max(2, len(sents) // 2):
+        return None  # a reference list, not a history
     for s in sents:
+        if is_citation(s):
+            continue
         m = _DATE_TOK.search(s)
         if not m:
             continue
@@ -632,6 +644,32 @@ def det_worked(title: str, sents: List[str]) -> Det:
     return "WORKED_EXAMPLE", "steps", 0.9, {"problem": _strip_end(steps[0]), "rows": rows[:10]}, "a problem worked step by step"
 
 
+_REF_TITLE = re.compile(r"\b(references?|bibliography|text ?books?|reference books?|further reading|suggested reading|recommended reading|citations|sources)\b", re.I)
+
+
+def det_references(title: str, text: str) -> Det:
+    lines = [re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", l).strip() for l in re.split(r"\n+", text) if l.strip() and not l.strip().startswith("|")]
+    if len(lines) == 1:
+        lines = [x.strip() for x in re.split(r"(?<=\d{4})\.\s+(?=[A-Z])|(?<=\.)\s+(?=\d+\.\s)", lines[0]) if x.strip()]
+    cites = sum(1 for l in lines if is_citation(l))
+    if not lines or not (_REF_TITLE.search(title) and cites >= 1 or cites >= max(3, int(len(lines) * 0.6))):
+        return None
+    return "REFERENCES", "list", 0.93, {"items": [_strip_end(l) for l in lines[:12]]}, f"{len(lines)} references — shown compactly, not as content"
+
+
+def det_table(title: str, text: str) -> Det:
+    from learnova.parsers.pdf_tables import parse_table_block
+
+    t = parse_table_block(text)
+    if not t:
+        return None
+    rows = [r for r in t["rows"] if any(c.strip() for c in r)]
+    if len(rows) < 1:
+        return None
+    return "COMPARE_TABLE", "table", 0.95, {"headers": t["headers"], "rows": rows[:8], "kind": "table", "total_rows": len(rows)}, \
+        f"a {len(rows)}-row × {len(t['headers'])}-column table in the source — drawn as a real table"
+
+
 def det_function(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents)
     m = re.search(r"\b(?:y|f\(x\))\s*=\s*([-+*/^()\d.\sx]+?)(?=\s+(?:has|is|with|where|and|for|gives|so)\b|[.;,]|$)", blob)
@@ -661,6 +699,8 @@ def takeaway_for(family: str, d: Dict[str, Any]) -> str:
             st = d["stages"]; return f"{len(st)} steps — from “{st[0]['label']}” to “{st[-1]['label']}”" + (", then it repeats." if family.endswith("CYCLIC") else ".")
         if family == "TIMELINE":
             ev = d["events"]; return f"{len(ev)} milestones between {ev[0]['date']} and {ev[-1]['date']}."
+        if family == "COMPARE_TABLE" and d.get("kind") == "table":
+            return f"{d.get('total_rows', len(d['rows']))} rows · {', '.join(h for h in d['headers'] if h)[:90]}"
         if family == "COMPARE_TABLE":
             h, r = d["headers"], d["rows"][0]; return f"Key difference — {h[0]}: {r[0]}  |  {h[1]}: {r[1]}"[:170]
         if family == "COMPARE_VISUAL":
@@ -695,6 +735,15 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     with a payload, because their extractors are specialised.
     """
     bullets = [b for b in (bullets or []) if b and b.strip()]
+    raw_text = text or ""
+    tbl = det_table(title, raw_text)
+    if tbl:
+        # the table is the slide; prose around it becomes notes via the residual-notes pass
+        return Decision(tbl[0], tbl[1], tbl[2], tbl[3], tbl[4], [], takeaway=takeaway_for("COMPARE_TABLE", tbl[3]))
+    text = "\n".join(l for l in raw_text.split("\n") if not l.strip().startswith("|") and l.strip() != "[TABLE DATA]")
+    ref = det_references(title, text)
+    if ref:
+        return Decision(ref[0], ref[1], ref[2], ref[3], ref[4], [], takeaway="")
     sents = split_sentences(text) or [s for b in bullets for s in split_sentences(b)]
     if not sents:
         sents = [title or "Key idea"]

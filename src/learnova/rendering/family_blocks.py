@@ -410,14 +410,14 @@ def _compare_table(data: Dict[str, Any], theme) -> Optional[str]:
         return None
     on = _on(theme)
     th = "".join(
-        f'<th style="background:{theme.primary_hex};color:{on};padding:16px 20px;'
-        f'text-align:left;font-size:1.1rem;">{_esc(str(h))}</th>' for h in headers
+        f'<th style="background:{theme.primary_hex};color:{on};padding:14px 18px;'
+        f'text-align:left;font-size:{1.1 if len(rows) <= 5 else 0.95}rem;">{_esc(str(h))}</th>' for h in headers
     )
     body = ""
     for i, r in enumerate(rows[:8]):
         cells = "".join(
-            f'<td style="padding:16px 20px;border-bottom:1px solid {theme.primary_hex}22;'
-            f'font-size:1.02rem;line-height:1.4;color:{theme.text_hex};">{_esc(str(c))}</td>'
+            f'<td style="padding:{14 if len(rows) <= 5 else 9}px 18px;border-bottom:1px solid {theme.primary_hex}22;'
+            f'font-size:{1.02 if len(rows) <= 5 else 0.85}rem;line-height:1.35;vertical-align:top;color:{theme.text_hex};">{_esc(str(c))}</td>'
             for c in (list(r) + [""] * len(headers))[:len(headers)]
         )
         body += f'<tr data-el="el.{i}" data-build="{i}">{cells}</tr>'
@@ -655,6 +655,22 @@ def _funnel(data: Dict[str, Any], theme) -> Optional[str]:
             f'<span style="font-weight:900;font-size:1.5rem;">{_esc(str(st.get("value", "")))}</span></div>'
         )
     return f'<div style="display:flex;flex-direction:column;gap:8px;margin-top:18px;{_FILL}justify-content:center;">{rows}</div>'
+
+
+def _references(data: Dict[str, Any], theme) -> Optional[str]:
+    items = [str(x) for x in (data.get("items") or []) if str(x).strip()]
+    if not items:
+        return None
+    cols = 2 if len(items) > 4 else 1
+    cells = "".join(
+        f'<div data-el="el.{i}" data-build="{i}" style="display:flex;gap:12px;align-items:flex-start;background:{theme.card_bg_hex};'
+        f'border-radius:12px;padding:12px 14px;border:1px solid {_tint(theme, "22")};">'
+        f'<span style="flex:none;min-width:26px;height:26px;border-radius:8px;background:{theme.primary_hex};color:{_on(theme)};'
+        f'display:grid;place-items:center;font-weight:800;font-size:.8rem;">{i + 1}</span>'
+        f'<span style="font-size:.9rem;line-height:1.4;color:{theme.text_hex};">{_esc(t)}</span></div>'
+        for i, t in enumerate(items[:12])
+    )
+    return (f'<div style="display:grid;grid-template-columns:repeat({cols},1fr);gap:10px;margin-top:18px;{_FILL}align-content:start;">{cells}</div>')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -911,6 +927,7 @@ def _chem(data: Dict[str, Any], theme) -> Optional[str]:
 _BUILDERS = {
     "LIST_STRUCTURED": _cards,
     "KEY_POINTS": _key_points,
+    "REFERENCES": _references,
     "STAT_TILES": _stat_tiles,
     "CAUSE_EFFECT": _cause_effect,
     "LAYERS": _layers,

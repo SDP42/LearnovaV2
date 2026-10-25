@@ -406,7 +406,12 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         visual_reason, visual_alts, params = "", [], {}
         engine_conf = vd.confidence
         user_forced = bool(vdata and vdata.get("forced"))
-        llm_data = bool(vdata and vdata.get("data") and vdata.get("source") == "llm" and family == vdata.get("family"))
+        llm_data = bool(vdata and vdata.get("data") and vdata.get("source") == "llm" and vdata.get("family"))
+        if llm_data and not user_forced and not hard_layout:
+            family, variant, data = vdata["family"], vdata.get("variant", "llm"), vdata["data"]
+            treatment = _FAMILY_TO_TREATMENT.get(family, family)
+            visual_reason, engine_conf = "chosen by the AI assistant (the rules were unsure)", 0.9
+            params = {"notes": _residual_notes(vms_source, data), "takeaway": str(imp.get("takeaway_llm") or "")}
         if not user_forced and not hard_layout and existing_layout != "QUIZ" and not llm_data:
             from learnova.visuals import decide
 
@@ -415,7 +420,7 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             family, variant, data = dec.family, dec.variant, dec.data
             visual_reason, visual_alts = dec.reason, dec.alternatives
             engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
-            params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": dec.takeaway}
+            params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": str(imp.get("takeaway_llm") or dec.takeaway)}
         animation = plan_animation_steps(
             bullets, treatment, family, takeaway=str(imp.get("takeaway", ""))
         )

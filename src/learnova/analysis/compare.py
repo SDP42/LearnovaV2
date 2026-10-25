@@ -30,7 +30,7 @@ _FAMILY_LABEL = {
     "DEFINITION": "Definition callout", "FORMULA_CALLOUT": "Formula callout", "QUOTE": "Statement callout",
     "CHART_CATEGORICAL": "Bar chart", "CHART_RANKING": "Ranked bars", "CHART_TREND": "Line chart", "CHART_PART_TO_WHOLE": "Pie chart",
     "FUNCTION_PLOT": "Function plot", "WORKED_EXAMPLE": "Worked example", "ALGORITHM_TRACE": "Algorithm trace",
-    "DATA_STRUCTURE": "Data structure", "GEOMETRY": "Geometry figure", "ML_VIZ": "ML plot", "TEXT": "Plain text", "KPI": "KPI",
+    "DATA_STRUCTURE": "Data structure", "GEOMETRY": "Geometry figure", "ML_VIZ": "ML plot", "TEXT": "Plain text", "KPI": "KPI", "REFERENCES": "Reference list",
 }
 
 

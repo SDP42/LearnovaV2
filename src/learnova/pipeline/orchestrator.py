@@ -592,6 +592,16 @@ def generate(
 
     runner.run("density", _density)
 
+    # Long tables become continuation slides (header repeated) before checkpoints are placed.
+    try:
+        from learnova.pipeline.table_pages import paginate_tables
+
+        _added = paginate_tables(result.improved)
+        if _added:
+            logger.info("table pagination: +%d continuation slide(s)", _added)
+    except Exception:
+        logger.exception("table pagination failed")
+
     # 9. Quiz generation + interleaving
     def _quiz():
         result.quizzes = generate_quizzes(result.improved, frequency=config.quiz_frequency, positions=config.quiz_positions or None)
@@ -611,6 +621,26 @@ def generate(
     # A quiz failure must not cost us the deck.
     if not result.final_deck:
         result.final_deck = list(result.improved)
+
+    # 6b''. One batched request for sharper takeaways (no-op without a provider)
+    def _takeaways():
+        from learnova.ai import assist
+
+        items = []
+        for i, e in enumerate(result.final_deck):
+            imp = e.get("improved") if isinstance(e.get("improved"), dict) else None
+            if imp and str(imp.get("layout_type", "")).upper() != "QUIZ":
+                body = " ".join(str(b) for b in (imp.get("bullets") or [])) or str((e.get("original") or {}).get("text") or "")
+                items.append({"id": i, "title": str(imp.get("title") or ""), "text": body})
+        got = assist.polish_takeaways(items)
+        for i, t in got.items():
+            result.final_deck[i]["improved"]["takeaway_llm"] = t
+        return f"{len(got)} takeaway(s)"
+
+    try:
+        _takeaways()
+    except Exception:
+        logger.exception("takeaway polish failed")
 
     # 6c. Illustrations — only where the policy says an image adds meaning.
     def _illustrate():

@@ -302,6 +302,10 @@ def _compare_table(c: _Canvas, data) -> bool:
         for p in cell.text_frame.paragraphs:
             for r in p.runs:
                 r.font.size = Pt(22); r.font.bold = True; r.font.color.rgb = _on(c.t.primary_rgb)
+    ncol = len(heads)
+    rh = (c.h - 0.1) / (len(rows) + 1)
+    longest = max((str(x) for r in rows for x in r), key=len, default="")
+    body_pt = c.fit([longest], max(0.6, c.w / ncol - 0.35), max(0.3, rh - 0.1), 18, 8.5)
     for i, row in enumerate(rows, start=1):
         for j in range(len(heads)):
             cell = tbl.cell(i, j)
@@ -309,7 +313,7 @@ def _compare_table(c: _Canvas, data) -> bool:
             cell.text = str((list(row) + [""] * len(heads))[j])
             for p in cell.text_frame.paragraphs:
                 for r in p.runs:
-                    r.font.size = Pt(c.fit([str(x) for x in (list(rows[0]) if rows else [])], c.w / len(heads) - 0.4, c.h / (len(rows) + 1) - 0.2, 20, 12)); r.font.color.rgb = c.t.text_rgb; cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+                    r.font.size = Pt(body_pt); r.font.color.rgb = c.t.text_rgb; cell.vertical_anchor = MSO_ANCHOR.MIDDLE
     return True
 
 
@@ -323,6 +327,24 @@ def _pros_cons(c: _Canvas, data) -> bool:
         c.card(x, c.y + 0.1, cw, c.h - 0.2, line=col)
         c.text(x + 0.1, c.y + 0.18, cw - 0.2, 0.5, [(title.upper(), 15, True, col)])
         c.text(x + 0.1, c.y + 0.75, cw - 0.2, c.h - 1.0, [("•  " + t, 13, False, c.t.text_rgb) for t in items])
+    return True
+
+
+def _references(c: _Canvas, data) -> bool:
+    items = [str(x) for x in (data.get("items") or []) if str(x).strip()][:12]
+    if not items:
+        return False
+    cols = 2 if len(items) > 4 else 1
+    rows = math.ceil(len(items) / cols)
+    gap = 0.16
+    cw = (c.w - gap * (cols - 1)) / cols
+    ch = min(1.15, (c.h - gap * (rows - 1)) / rows)
+    for i, t in enumerate(items):
+        r, k = divmod(i, cols)
+        x, y = c.x + k * (cw + gap), c.y + r * (ch + gap)
+        c.card(x, y, cw, ch, radius=0.12)
+        c.badge(x + 0.12, y + (ch - 0.4) / 2, i + 1, d=0.4)
+        c.runs_fit(x + 0.6, y, cw - 0.7, ch, "", t, bmax=14, anchor=MSO_ANCHOR.MIDDLE)
     return True
 
 
@@ -600,6 +622,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             ok = _pros_cons(c, data)
         elif family == "MATRIX_GRID":
             ok = _matrix(c, data)
+        elif family == "REFERENCES":
+            ok = _references(c, data)
         elif family in {"LAYERS", "HIERARCHY_NEST"}:
             ok = _layers(c, {"levels": [{"label": x} if isinstance(x, str) else x for x in data.get("levels", [])]})
         elif family == "SET_DIAGRAM":

@@ -1,13 +1,9 @@
 """
-Pipeline stage: fill in structured visual data the regex extractor missed.
+Pipeline stage: let an LLM (when configured) refine the slides the deterministic engine is unsure about.
 
-Runs the deterministic VMS over each slide; when it picks a data-hungry family
-(chart, matrix, comparison table, mind map, dated timeline, …) but
-``build_family_data`` came back empty, it asks the LLM once for the exact JSON
-the renderer needs and stashes it on ``improved["visual_data"]`` so the deck
-director uses it instead of falling back to bullets.
-
-Bounded, rate-limit-aware, no-op without a provider.
+ONE batched request covers every uncertain slide (``ai/assist.refine_visuals``); answers are validated against
+the renderers and stored on ``improved["visual_data"]`` with ``source="llm"``, which the Deck Director adopts.
+No provider, or an engine that is confident everywhere → no request at all.
 """
 
 from __future__ import annotations
@@ -16,77 +12,37 @@ from typing import List
 
 from learnova.logging_config import logger
 
-MAX_LLM_EXTRACTIONS = 10
-_MIN_CONFIDENCE = 0.55
-
-
-_ENGINE_SURE = 0.7  # engine confidence above which no LLM call is made
+ENGINE_SURE = 0.7  # engine confidence above which no LLM call is made
 
 
 def fill_visual_data(deck: List[dict]) -> int:
-    """Attach ``improved['visual_data']`` where an LLM extraction helped. Returns count."""
-    try:
-        from learnova.ai.visual_data import LLM_EXTRACTABLE, extract_family_data
-        from learnova.ai.visual_selector import build_family_data, extract_features, select_visual
-    except Exception as exc:  # pragma: no cover - import guard
-        logger.info("visual_data stage skipped: %s", exc)
+    """Attach ``improved['visual_data']`` for LLM-refined slides. Returns how many were refined."""
+    from learnova.ai import assist
+
+    if not assist.llm_available():
         return 0
+    from learnova.ai.visual_selector import select_visual
+    from learnova.visuals import decide
 
-    filled = 0
-    used_llm = 0
-    for entry in deck:
-        improved = entry.get("improved") if isinstance(entry.get("improved"), dict) else None
-        if not improved:
+    uncertain = []
+    for i, entry in enumerate(deck):
+        imp = entry.get("improved") if isinstance(entry.get("improved"), dict) else None
+        if not imp or str(imp.get("layout_type", "")).upper() == "QUIZ":
             continue
-        if str(improved.get("layout_type", "")).upper() == "QUIZ":
+        orig = entry.get("original") if isinstance(entry.get("original"), dict) else {}
+        bullets = [str(b) for b in (imp.get("bullets") or []) if str(b).strip()]
+        text = "\n".join(p for p in (str(orig.get("text") or "").strip(), "\n".join(bullets)) if p)
+        title = str(imp.get("title") or "")
+        if not text.strip():
             continue
-
-        original = entry.get("original") if isinstance(entry.get("original"), dict) else {}
-        title = str(improved.get("title") or "")
-        bullets = [str(b) for b in (improved.get("bullets") or []) if str(b).strip()]
-        source = "\n".join(
-            p for p in (str((original or {}).get("text") or "").strip(),
-                        "\n".join(bullets)) if p
-        )
-        if not source.strip():
-            continue
-
-        vd = select_visual(source, title)
-
-        # The deterministic Content Decision Engine handles almost every slide
-        # with no network call. Only when it is genuinely unsure do we spend an
-        # LLM request, and only for families whose payload an LLM can extract.
-        from learnova.visuals import decide
-
-        if decide(title, source, bullets, vms=vd).confidence >= _ENGINE_SURE:
-            continue
-        if vd.family not in LLM_EXTRACTABLE or vd.confidence < _MIN_CONFIDENCE:
-            continue
-        data = {}
-
-        if not data:
-            if used_llm >= MAX_LLM_EXTRACTIONS:
-                continue
-            data = extract_family_data(source, title, vd.family)
-            used_llm += 1
-            if not data:
-                # A rate-limited provider returns {} for everything now — stop.
-                if used_llm >= 3 and filled == 0:
-                    logger.info("visual_data: no extractions landing, stopping early")
-                    break
-                continue
-
-        improved["visual_data"] = {
-            "family": vd.family,
-            "variant": vd.variant,
-            "data": data,
-            "confidence": round(vd.confidence, 3),
-            "source": "llm",
-        }
-        filled += 1
-
-    logger.info("visual_data: %d slide(s) enriched (%d via LLM)", filled, used_llm)
-    return filled
+        dec = decide(title, text, bullets, vms=select_visual(text, title))
+        if dec.confidence < ENGINE_SURE and dec.family not in {"COMPARE_TABLE", "REFERENCES"}:
+            uncertain.append({"id": i, "title": title, "text": text})
+    answers = assist.refine_visuals(uncertain)
+    for sid, a in answers.items():
+        deck[sid]["improved"]["visual_data"] = {**a, "confidence": 0.9, "source": "llm"}
+    logger.info("visual_data: %d uncertain slide(s), %d refined by the LLM in one request", len(uncertain), len(answers))
+    return len(answers)
 
 
-__all__ = ["fill_visual_data", "MAX_LLM_EXTRACTIONS"]
+__all__ = ["fill_visual_data"]

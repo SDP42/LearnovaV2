@@ -30,6 +30,7 @@ PPTX_FILE = "deck.pptx"
 HTML_FILE = "deck.html"
 META_FILE = "meta.json"
 SLIDES_FILE = "deck.json"   # the slides payload, so a saved deck opens without a live job
+THUMB_FILE = "thumb.png"
 ANALYSIS_FILE = "analysis.json"  # before/after comparison, written at generation time
 EDIT_FILE = "deck_edit.json"  # the editable improved-slide list (title/bullets/family), for re-renders
 VERSIONS_DIR = "versions"
@@ -115,6 +116,14 @@ def save_deck(
             ),
             encoding="utf-8",
         )
+    try:
+        from learnova.rendering.thumbnail import title_card_png
+        from learnova.rendering.theme_engine import resolve_theme
+
+        _th = resolve_theme(title or result.source_name or "", theme_id, theme_spec)
+        (target / THUMB_FILE).write_bytes(title_card_png(title or result.source_name or "Untitled deck", len(result.final_deck), _th.primary_hex, _th.accent_hex))
+    except Exception:
+        logger.exception("thumbnail failed")
     if analysis is not None:
         (target / ANALYSIS_FILE).write_text(json.dumps(analysis, ensure_ascii=False, default=str), encoding="utf-8")
     if editable_slides is not None:
@@ -174,6 +183,14 @@ def get_deck(user_id: str, deck_id: str) -> Optional[dict]:
     try:
         return json.loads(meta.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        return None
+
+
+def read_thumb(user_id: str, deck_id: str) -> Optional[bytes]:
+    path = _deck_dir(user_id, deck_id) / THUMB_FILE
+    try:
+        return path.read_bytes()
+    except OSError:
         return None
 
 
