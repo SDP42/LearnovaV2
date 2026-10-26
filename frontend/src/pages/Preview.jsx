@@ -47,6 +47,7 @@ import {
 import { cn } from "@/lib/utils";
 import ImageEditor from "@/components/app/ImageEditor";
 import { Image as ImageIcon } from "lucide-react";
+import { TutorLauncher } from "@/components/app/TutorPanel";
 
 const FAMILIES = [
   ["", "Auto — let the engine choose"],
@@ -695,6 +696,8 @@ export default function Preview() {
           </Tabs>
         </aside>
       </div>
+
+      <TutorLauncher deckId={jobId} onJumpToSlide={setSelected} />
 
       {figSrc ? (
         <ImageEditor

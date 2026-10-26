@@ -23,6 +23,7 @@ import * as api from "@/api";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { TutorLauncher } from "@/components/app/TutorPanel";
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -650,6 +651,8 @@ export default function Present() {
           </div>
         </div>
       ) : null}
+
+      <TutorLauncher deckId={jobId} onJumpToSlide={(i) => jump(i + 1)} className="bottom-24" />
 
       {error ? <p className="bg-red-950/60 px-4 py-2 text-sm text-red-300">{error}</p> : null}
     </div>

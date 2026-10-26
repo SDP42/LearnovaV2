@@ -458,3 +458,16 @@ export async function assistSlide({ title, bullets, instruction, audience }) {
   }
   return r.json();
 }
+
+// ── Deck tutor (persona chat grounded in one deck) ────────────────────────
+export const tutorPersonas = () => swr("tutor:personas", async () => json(await fetch(`${BASE}/api/tutor/personas`, { headers: await authHeaders() })));
+/** → {answer, sources:[{slide,title}], mode, persona, quiz?} */
+export async function tutorChat(deckId, message, persona, history = []) {
+  return json(
+    await fetch(`${BASE}/api/decks/${deckId}/chat`, {
+      method: "POST",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ message, persona, history }),
+    })
+  );
+}
