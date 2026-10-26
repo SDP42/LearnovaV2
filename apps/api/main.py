@@ -565,6 +565,13 @@ def start_generate(
             from learnova.analysis import build_analysis
 
             analysis = build_analysis(finished.result)
+            try:
+                from learnova.analysis.accessibility import audit as _a11y
+                from learnova.rendering.theme_engine import resolve_theme
+
+                analysis["accessibility"] = _a11y(payload or [], resolve_theme(finished.source_name, config.theme_id, config.theme_spec))
+            except Exception:
+                logger.warning("accessibility audit failed", exc_info=True)
         except Exception:
             logger.exception("analysis failed")
             analysis = None
@@ -886,6 +893,102 @@ def download_my_deck(
     record = deck_library.get_deck(user_id, deck_id) or {}
     stem = pathlib.Path(record.get("title", "deck")).stem or "deck"
     return _artifact_response(data, artifact, stem)
+
+
+# ── Study pack exports ────────────────────────────────────────────────────────
+_EXPORTS = {
+    "flashcards": ("text/csv", "csv"), "flashcards_anki": ("text/plain", "txt"), "quiz_csv": ("text/csv", "csv"),
+    "quiz_json": ("application/json", "json"), "cheatsheet": ("text/html", "html"), "script": ("text/markdown", "md"),
+}
+
+
+@app.get("/api/decks/{deck_id}/export/{kind}")
+def export_study_pack(deck_id: str, kind: str, user_id: str = Depends(current_user)) -> Response:
+    """Flashcards (CSV / Anki), quiz bank (CSV / JSON), a one-page cheat sheet and a narration script — all built from the deck."""
+    from learnova.export import study_pack as sp
+
+    if kind not in _EXPORTS:
+        raise HTTPException(status_code=400, detail=f"kind must be one of {sorted(_EXPORTS)}")
+    record = deck_library.get_deck(user_id, deck_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    slides = (deck_library.read_slides(user_id, deck_id) or {}).get("slides") or []
+    title = record.get("title") or "Deck"
+    if kind == "flashcards":
+        body = sp.flashcards_csv(sp.flashcards(slides))
+    elif kind == "flashcards_anki":
+        body = sp.flashcards_csv(sp.flashcards(slides), anki=True)
+    elif kind == "quiz_csv":
+        body = sp.quiz_csv(sp.quiz_bank(slides))
+    elif kind == "quiz_json":
+        body = sp.to_json(sp.quiz_bank(slides))
+    elif kind == "cheatsheet":
+        body = sp.cheatsheet_html(slides, title)
+    else:
+        body = sp.narration_markdown(sp.narration(slides, title), title)
+    media, ext = _EXPORTS[kind]
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", pathlib.Path(title).stem)[:40] or "deck"
+    return Response(content=body.encode("utf-8-sig") if ext == "csv" else body.encode("utf-8"), media_type=f"{media}; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{stem}_{kind}.{ext}"'})
+
+
+@app.get("/api/decks/{deck_id}/narration")
+def deck_narration(deck_id: str, user_id: str = Depends(current_user)) -> dict:
+    """Per-slide spoken script with timings (the app reads it aloud with the browser's text-to-speech)."""
+    from learnova.export import study_pack as sp
+
+    record = deck_library.get_deck(user_id, deck_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    slides = (deck_library.read_slides(user_id, deck_id) or {}).get("slides") or []
+    script = sp.narration(slides, record.get("title") or "")
+    return {"slides": script, "total_seconds": sum(x["seconds"] for x in script)}
+
+
+# ── Share links ───────────────────────────────────────────────────────────────
+class ShareIn(BaseModel):
+    days: Optional[int] = 30
+
+
+@app.post("/api/decks/{deck_id}/shares", status_code=201)
+def create_share(deck_id: str, body: ShareIn, request: Request, user_id: str = Depends(current_user)) -> dict:
+    from learnova.storage import shares
+
+    if deck_library.get_deck(user_id, deck_id) is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    made = shares.create(user_id, deck_id, max(1, min(365, body.days)) if body.days else None)
+    base = str(request.base_url).rstrip("/")
+    return {**made, "url": f"{base}/api/share/{made['token']}"}
+
+
+@app.get("/api/decks/{deck_id}/shares")
+def list_shares(deck_id: str, user_id: str = Depends(current_user)) -> dict:
+    from learnova.storage import shares
+
+    return {"shares": shares.list_for_deck(user_id, deck_id)}
+
+
+@app.delete("/api/decks/{deck_id}/shares/{token}", status_code=204)
+def revoke_share(deck_id: str, token: str, user_id: str = Depends(current_user)) -> Response:
+    from learnova.storage import shares
+
+    shares.revoke(user_id, deck_id, token)
+    return Response(status_code=204)
+
+
+@app.get("/api/share/{token}")
+def open_share(token: str) -> Response:
+    """Public, read-only slideshow for a share link. No account, no editing, not indexed."""
+    from learnova.storage import shares
+
+    row = shares.resolve(token)
+    if row is None:
+        raise HTTPException(status_code=404, detail="This link has expired or was turned off.")
+    data = deck_library.read_artifact(row["user_id"], row["deck_id"], "html")
+    if not data:
+        raise HTTPException(status_code=404, detail="deck not found")
+    return Response(content=data, media_type="text/html; charset=utf-8",
+                    headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 @app.delete("/api/decks/{deck_id}", status_code=204)

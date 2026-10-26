@@ -187,3 +187,41 @@ def test_providers_api_never_echoes_the_key(tmp_path, monkeypatch):
     assert next(p for p in r.json()["providers"] if p["id"] == "groq")["configured"] is True
     r = c.delete("/api/providers/groq", headers=h)
     assert next(p for p in r.json()["providers"] if p["id"] == "groq")["configured"] is False
+
+
+def test_study_pack_share_links_and_accessibility():
+    import os, time
+    os.environ["LEARNOVA_RATE_LIMIT"] = "off"
+    from fastapi.testclient import TestClient
+    from apps.api.main import app
+
+    c = TestClient(app)
+    ph = "+919000000066"
+    otp = c.post("/api/auth/otp/request", json={"phone": ph}).json()["dev_otp"]
+    h = {"Authorization": "Bearer " + c.post("/api/auth/otp/verify", json={"phone": ph, "code": otp}).json()["token"]}
+    text = open("demo/sample_syllabus.md").read()
+    jid = c.post("/api/jobs/typed", json={"text": text, "title": "Syllabus"}, headers=h).json()["id"]
+    c.post(f"/api/jobs/{jid}/generate", json={"enable_enhancement": False, "enable_vision_ocr": False}, headers=h)
+    for _ in range(200):
+        if c.get(f"/api/jobs/{jid}", headers=h).json()["status"] in {"done", "failed"}:
+            break
+        time.sleep(0.2)
+    for kind, needle in (("flashcards", "Front,Back"), ("flashcards_anki", "#separator:tab"), ("quiz_csv", "Question,A,B"), ("cheatsheet", "cheat sheet"), ("script", "narration script")):
+        r = c.get(f"/api/decks/{jid}/export/{kind}", headers=h)
+        assert r.status_code == 200 and needle.lower() in r.text.lower(), kind
+    assert c.get(f"/api/decks/{jid}/export/nope", headers=h).status_code == 400
+    n = c.get(f"/api/decks/{jid}/narration", headers=h).json()
+    assert n["slides"] and n["total_seconds"] > 0
+
+    a = c.get(f"/api/decks/{jid}/analysis", headers=h).json()
+    assert a["accessibility"]["items"] and 0 <= a["accessibility"]["score"] <= 100
+
+    share = c.post(f"/api/decks/{jid}/shares", json={"days": 7}, headers=h).json()
+    assert share["url"].endswith(share["token"])
+    page = c.get(f"/api/share/{share['token']}")                      # no auth header: public
+    assert page.status_code == 200 and "<section" in page.text and page.headers["x-robots-tag"].startswith("noindex")
+    assert c.get("/api/share/not-a-real-token").status_code == 404
+    c.delete(f"/api/decks/{jid}/shares/{share['token']}", headers=h)
+    assert c.get(f"/api/share/{share['token']}").status_code == 404
+    other = {"Authorization": "Bearer " + c.post("/api/auth/otp/verify", json={"phone": "+919000000067", "code": c.post("/api/auth/otp/request", json={"phone": "+919000000067"}).json()["dev_otp"]}).json()["token"]}
+    assert c.post(f"/api/decks/{jid}/shares", json={}, headers=other).status_code == 404       # not your deck
