@@ -281,7 +281,7 @@ def footer_rows(imp: Dict[str, Any], takeaway: str) -> List[List[str]]:
     return rows
 
 
-def _residual_notes(text: str, data: Dict[str, Any], limit: int = 3) -> List[str]:
+def _residual_notes(text: str, data: Dict[str, Any], limit: int = 4) -> List[str]:
     """Sentences the chosen visual does not carry — kept as notes so no fact is lost."""
     from learnova.visuals.engine import split_sentences
 

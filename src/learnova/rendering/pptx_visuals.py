@@ -1035,6 +1035,38 @@ def _prose(c: _Canvas, data) -> bool:
     return True
 
 
+def _sections(c: _Canvas, data) -> bool:
+    """Sibling subsections side by side (no boxes): accent rule, heading, lead sentence, text — one shared type size."""
+    secs = (data.get("sections") or [])[:3]
+    if len(secs) < 2:
+        return False
+    n = len(secs)
+    cw = (c.w - GUT * 1.4 * (n - 1)) / n
+    gap = 0.14
+
+    def paras(sc, b):
+        out = [P(str(sc.get("title", "")), b * 1.12, True, c.t.primary_rgb),
+               P(str(sc.get("lead", "")), b * 1.04, True, c.t.text_rgb, 8)]
+        body = " ".join(str(x) for x in sc.get("body", []))
+        if body:
+            out.append(P(body, b, False, c.t.text_rgb, 8))
+        return out
+
+    b = 22.0
+    while b > 9.5:
+        if all(L.paras_height([(p.text, p.size, p.bold, p.before) for p in paras(sc, b)], cw) + 0.2 <= c.h * 0.97 for sc in secs):
+            break
+        b -= 0.5
+    hs = [L.paras_height([(p.text, p.size, p.bold, p.before) for p in paras(sc, b)], cw) for sc in secs]
+    top = c.y + max(0.0, (c.h - (max(hs) + 0.2)) / 2)
+    for i, sc in enumerate(secs):
+        x = c.x + i * (cw + GUT * 1.4)
+        with c.group():
+            c.shape(MSO_SHAPE.RECTANGLE, x, top, cw, 0.07, c.t.accent_rgb)
+            c.tb(x, top + 0.16, cw, hs[i] + 0.05, paras(sc, b), anchor=MSO_ANCHOR.TOP)
+    return True
+
+
 # ── generic entry points used by ppt_builder ─────────────────────────────────
 def draw_cards(slide, theme, band, items: List[Tuple[str, str]], kind: str = "grid", numbered: bool = False) -> bool:
     """Card grid or arrow-linked process from ``(heading, body)`` pairs (heading may be empty)."""
@@ -1123,6 +1155,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             ok = _references(c, data)
         elif family == "PROSE":
             ok = _prose(c, data)
+        elif family == "SECTIONS":
+            ok = _sections(c, data)
         elif family in {"LAYERS", "HIERARCHY_NEST"}:
             ok = _layers(c, {"levels": [{"label": x} if isinstance(x, str) else x for x in data.get("levels", [])]})
         elif family == "SET_DIAGRAM":

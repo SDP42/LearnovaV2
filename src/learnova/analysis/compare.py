@@ -21,7 +21,7 @@ from learnova.visuals.engine import split_sentences
 _NUM = re.compile(r"[$₹€£]?\d[\d,]*(?:\.\d+)?\s?(?:%|percent|billion|million|thousand|bn|mn|k|x|×|years?|months?|days?|hours?|minutes?)?", re.I)
 _YEAR = re.compile(r"\b(?:1[0-9]{3}|20[0-9]{2})\b")
 _FORMULA = re.compile(r"[A-Za-z][A-Za-z0-9_()]{0,6}\s*=\s*[^.;\n]{2,40}")
-_TERM = re.compile(r"\b(?:[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+|[A-Z]{2,6}[a-z]?)\b")
+_TERM = re.compile(r"\b(?:[A-Z][a-z]{2,}(?:[ \t]+[A-Z][a-z]{2,})+|[A-Z]{2,6}[a-z]?)\b")
 _FAMILY_LABEL = {
     "PROCESS_LINEAR": "Process flow", "PROCESS_CYCLIC": "Cycle", "TIMELINE": "Timeline", "COMPARE_TABLE": "Comparison table",
     "COMPARE_VISUAL": "Pros & cons", "MATRIX_GRID": "2×2 matrix", "LAYERS": "Layered stack", "HIERARCHY_NEST": "Pyramid",
@@ -30,7 +30,7 @@ _FAMILY_LABEL = {
     "DEFINITION": "Definition callout", "FORMULA_CALLOUT": "Formula callout", "QUOTE": "Statement callout",
     "CHART_CATEGORICAL": "Bar chart", "CHART_RANKING": "Ranked bars", "CHART_TREND": "Line chart", "CHART_PART_TO_WHOLE": "Pie chart",
     "FUNCTION_PLOT": "Function plot", "WORKED_EXAMPLE": "Worked example", "ALGORITHM_TRACE": "Algorithm trace",
-    "DATA_STRUCTURE": "Data structure", "GEOMETRY": "Geometry figure", "ML_VIZ": "ML plot", "TEXT": "Plain text", "KPI": "KPI", "REFERENCES": "Reference list", "PROSE": "Text, relationships marked",
+    "DATA_STRUCTURE": "Data structure", "GEOMETRY": "Geometry figure", "ML_VIZ": "ML plot", "TEXT": "Plain text", "KPI": "KPI", "REFERENCES": "Reference list", "PROSE": "Text, relationships marked", "SECTIONS": "Sections side by side",
 }
 
 
@@ -40,6 +40,8 @@ def _norm(s: str) -> str:
 
 def extract_facts(text: str) -> List[Dict[str, str]]:
     """Facts worth protecting: figures, dates, formulae, named terms."""
+    text = re.sub(r"(?m)^###\s+.*$", " ", text)       # section markers added by the planner are not source text
+    text = re.sub(r"\[TABLE DATA\]", " ", text).replace("|", " ; ")    # table scaffolding; cells must not run together into "terms"
     facts: List[Dict[str, str]] = []
     seen = set()
 

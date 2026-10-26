@@ -27,7 +27,8 @@ from learnova.logging_config import logger
 from learnova.parsers.pdf_tables import page_tables, table_markdown
 
 _NUM_HEAD = re.compile(r"^(\d+(?:\.\d+){0,3})[.)]?\s+(\S.*)$")
-_LIST = re.compile(r"^\s*(?:[•●▪◦·–—-]|\(?\d{1,2}[.)]|\(?[a-z][.)])\s+(\S.*)$")
+_LIST = re.compile(r"^\s*(?:[•●▪◦·–—-]|\(?\d{1,2}[.)]|\(?[a-z][.)]|\[\d{1,3}\])\s*(\S.*)$")
+_NAMED_HEAD = re.compile(r"^(references|bibliography|appendix(?:\s+[A-Z0-9])?|abstract|conclusions?|introduction|future work|acknowledg\w+)\s*$", re.I)
 _CAPTION = re.compile(r"^(Table|Fig(?:ure)?\.?)\s*(\d+)\s*[.:–-]?\s*(.*)$", re.I)
 _SKIP_TITLES = re.compile(r"^(certificate|declaration|acknowledg\w*|table of contents|contents|list of (figures|tables|abbreviations|symbols)|"
                           r"approval|preface|dedication)\b", re.I)
@@ -190,6 +191,8 @@ def pdf_to_markdown(path: str) -> Optional[Dict]:
             is_head, level = True, 1 if l.size >= body * 1.4 else 2
         elif l.bold and len(text.split()) <= 6 and text.isupper() and l.size >= body:
             is_head, level = True, 1
+        elif l.bold and _NAMED_HEAD.match(text) and l.size >= body:
+            is_head, level = True, 1
         if is_head:
             flush()
             title_text = text
@@ -211,6 +214,8 @@ def pdf_to_markdown(path: str) -> Optional[Dict]:
         if not started or skipping:
             continue
         li = _LIST.match(text)
+        if li and re.match(r"^\[\d{1,3}\]", text):
+            li = re.match(r"^(\[\d{1,3}\]\s*\S.*)$", text)  # keep the [n] marker as part of the reference text
         if li and not re.match(r"^\d+\s+\d", text):
             if para:
                 flush()

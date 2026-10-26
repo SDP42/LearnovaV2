@@ -400,12 +400,16 @@ def generate(
             # No summarising. Keep the whole text, then plan each slide's size (split long, flag short),
             # recover tables, and add student aids (key terms from the document's own definitions, prompts, glossary).
             from learnova.pipeline.enrich import enrich_deck as _enrich_deck
-            from learnova.pipeline.planner import plan_slides, preserve_chunks
+            from learnova.pipeline.planner import plan_to_budget, preserve_chunks
             from learnova.pipeline.table_pages import paginate_tables
 
             result.improved = preserve_chunks(result.chunks)
             paginate_tables(result.improved)
-            plan_slides(result.improved, {"compact": 170, "balanced": 130, "detailed": 90}.get(config.slide_detail, 130))
+            _cap = {"compact": 170, "balanced": 130, "detailed": 95}.get(config.slide_detail, 130)
+            _pages = int((markdown_doc.meta or {}).get("pages") or 0)
+            # a report's length sets the deck's length: ~1 / 1.5 / 2.2 slides per source page for compact / balanced / detailed
+            _target = round(_pages * {"compact": 1.0, "balanced": 1.5, "detailed": 2.2}.get(config.slide_detail, 1.5)) if _pages >= 4 else None
+            plan_to_budget(result.improved, _cap, _target)
             stats = _enrich_deck(result.improved)
             try:
                 from learnova.ai import assist

@@ -136,8 +136,12 @@ _NUM_RE = re.compile(_NUM, re.I)
 _YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
 
 
+_REF_NUM = re.compile(r"\b(?:tables?|figures?|fig\.?|sections?|pages?|steps?|chapters?|appendix|eq\.?|equations?|slides?)\s*\d+(?:\.\d+)*|\[\d+(?:[,\u2013-]\s*\d+)*\]|\(\d+\)", re.I)
+
+
 def _numbers(s: str) -> List[str]:
     out = []
+    s = _REF_NUM.sub(" ", s)  # cross-references are not quantities
     for m in _NUM_RE.finditer(s):
         t = m.group(0).strip()
         if re.fullmatch(r"\d{4}", t) and _YEAR_RE.fullmatch(t):  # a year, not a quantity
@@ -239,6 +243,8 @@ _CITATION = re.compile(r"\b(?:edition|ed\.|press|publications?|publisher|isbn|wi
 
 
 def is_citation(line: str) -> bool:
+    if re.match(r"^\s*\[\d{1,3}\]\s+\S", line) and re.search(r"\b(?:1[89]\d{2}|20\d{2})\b", line):
+        return True
     return bool(_CITATION.search(line)) and bool(re.search(r"\b(?:1[89]\d{2}|20\d{2})\b|\bed(?:ition)?\b", line, re.I))
 
 
@@ -698,6 +704,20 @@ def det_table(title: str, text: str) -> Det:
         f"a {len(rows)}-row × {len(t['headers'])}-column table in the source — drawn as a real table"
 
 
+def det_sections(title: str, text: str) -> Det:
+    """Several short sibling subsections packed on one slide: each keeps its own heading, shown side by side."""
+    parts = re.split(r"(?m)^###\s+", text)
+    secs = []
+    for chunk in parts[1:]:
+        head, _, rest = chunk.partition("\n")
+        sents = split_sentences(rest)
+        if head.strip() and sents:
+            secs.append({"title": head.strip(), "lead": sents[0], "body": sents[1:]})
+    if len(secs) < 2:
+        return None
+    return "SECTIONS", "columns", 0.9, {"sections": secs[:3]}, f"{len(secs)} short subsections shown side by side"
+
+
 def det_function(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents)
     m = re.search(r"\b(?:y|f\(x\))\s*=\s*([-+*/^()\d.\sx]+?)(?=\s+(?:has|is|with|where|and|for|gives|so)\b|[.;,]|$)", blob)
@@ -768,6 +788,9 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     if tbl:
         # the table is the slide; prose around it becomes notes via the residual-notes pass
         return Decision(tbl[0], tbl[1], tbl[2], tbl[3], tbl[4], [], takeaway=takeaway_for("COMPARE_TABLE", tbl[3]))
+    sec = det_sections(title, raw_text)
+    if sec:
+        return Decision(sec[0], sec[1], sec[2], sec[3], sec[4], [], takeaway="")
     text = "\n".join(l for l in raw_text.split("\n") if not l.strip().startswith("|") and l.strip() != "[TABLE DATA]")
     ref = det_references(title, text)
     if ref:

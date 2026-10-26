@@ -65,6 +65,18 @@ def paginate_tables(slides: List[dict], per_page: int = PER_PAGE) -> int:
         done.add(key)
         base = str(orig.get("title") or (entry.get("improved") or {}).get("title") or "Table")
         n_tab = 0
+        # short prose next to a table (an intro line, a remark under it) rides with the table instead of taking its own slide
+        for k, seg in enumerate(segs):
+            if seg["kind"] == "prose" and len(seg["text"].split()) <= 50:
+                nxt = segs[k + 1] if k + 1 < len(segs) else None
+                prv = segs[k - 1] if k > 0 else None
+                if nxt is not None and nxt["kind"] == "table":
+                    nxt["lead_text"] = (nxt.get("lead_text", "") + " " + seg["text"]).strip()
+                    seg["text"] = ""
+                elif prv is not None and prv["kind"] == "table":
+                    prv["tail_text"] = (prv.get("tail_text", "") + " " + seg["text"]).strip()
+                    seg["text"] = ""
+        segs = [x for x in segs if x["kind"] == "table" or x["text"].strip()]
         for seg in segs:
             if seg["kind"] == "prose":
                 out.extend(_prose_entries(entry, base, seg["text"], "" if n_tab == 0 else " (notes)"))
@@ -74,8 +86,9 @@ def paginate_tables(slides: List[dict], per_page: int = PER_PAGE) -> int:
             title = seg["caption"] or (base if n_tables == 1 else f"{base} — table {n_tab}")
             for k, rows in enumerate(chunks, 1):
                 e = copy.deepcopy(entry)
-                e["original"]["text"] = _table_text(seg["headers"], rows)
-                e["improved"] = {"title": title if len(chunks) == 1 else f"{title} ({k}/{len(chunks)})", "bullets": [],
+                e["original"]["text"] = (seg.get("lead_text", "") + "\n\n" if (k == 1 and seg.get("lead_text")) else "") + _table_text(seg["headers"], rows) \
+                    + ("\n\n" + seg["tail_text"] if (k == len(chunks) and seg.get("tail_text")) else "")
+                e["improved"] = {"section": base, "title": title if len(chunks) == 1 else f"{title} ({k}/{len(chunks)})", "bullets": [],
                                  "takeaway": "", "layout_type": "MINIMAL_TEXT"}
                 out.append(e)
     delta = len(out) - len(slides)

@@ -698,6 +698,25 @@ def _prose(data: Dict[str, Any], theme) -> Optional[str]:
     return f'<div style="margin-top:10px;min-height:400px;display:flex;flex-direction:column;justify-content:center;">{"".join(parts)}{"".join(rows)}</div>'
 
 
+def _sections(data: Dict[str, Any], theme) -> Optional[str]:
+    """Short sibling subsections side by side: each keeps its own heading, lead sentence and text — no boxes."""
+    secs = (data.get("sections") or [])[:3]
+    if len(secs) < 2:
+        return None
+    words = sum(len(str(x.get("lead", "")).split()) + sum(len(str(b).split()) for b in x.get("body", [])) for x in secs)
+    fs = 1.04 if words < 120 else 0.94 if words < 170 else 0.86
+    cells = ""
+    for i, sc in enumerate(secs):
+        body = " ".join(_esc(str(b)) for b in sc.get("body", []))
+        cells += (
+            f'<div data-el="el.{i}" data-build="{i}" style="flex:1 1 0;min-width:0;border-top:5px solid {theme.accent_hex};padding-top:14px;">'
+            f'<div style="font-weight:800;color:{theme.primary_hex};font-size:{fs + 0.1:.2f}rem;margin-bottom:10px;line-height:1.25;">{_esc(str(sc.get("title", "")))}</div>'
+            f'<div style="font-weight:600;font-size:{fs + 0.08:.2f}rem;line-height:1.4;margin-bottom:10px;color:{theme.text_hex};">{_esc(str(sc.get("lead", "")))}</div>'
+            f'<div style="font-size:{fs:.2f}rem;line-height:1.55;color:{theme.text_hex};">{body}</div></div>'
+        )
+    return f'<div style="display:flex;gap:30px;margin-top:14px;min-height:400px;align-items:flex-start;">{cells}</div>'
+
+
 def _references(data: Dict[str, Any], theme) -> Optional[str]:
     items = [str(x) for x in (data.get("items") or []) if str(x).strip()]
     if not items:
@@ -970,6 +989,7 @@ _BUILDERS = {
     "KEY_POINTS": _key_points,
     "REFERENCES": _references,
     "PROSE": _prose,
+    "SECTIONS": _sections,
     "STAT_TILES": _stat_tiles,
     "CAUSE_EFFECT": _cause_effect,
     "LAYERS": _layers,

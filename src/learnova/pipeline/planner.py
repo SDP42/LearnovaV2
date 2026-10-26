@@ -110,31 +110,65 @@ _SEC = re.compile(r"^\s*(\d+)(?:\.\d+)*[.)]?\s")
 
 
 def _section_of(entry: dict) -> str:
-    t = str((entry.get("improved") or {}).get("title") or "")
+    imp = entry.get("improved") or {}
+    t = str(imp.get("section") or imp.get("title") or "")
     m = _SEC.match(t)
     return m.group(1) if m else ""
 
 
-def _merge_small(entries: List[dict], max_words: int) -> List[dict]:
-    """Adjacent tiny slides from the same numbered section share one slide, each keeping its heading as a lead-in."""
+def _words_of(e: dict) -> int:
+    return sum(_wc(x) for x in ((e.get("improved") or {}).get("bullets") or []))
+
+
+def _mergeable(e: dict) -> bool:
+    imp = e.get("improved") or {}
+    return bool(_section_of(e)) and not _is_table_entry(e) and not imp.get("is_overview") and not imp.get("part") \
+        and not imp.get("is_glossary") and not imp.get("merged")
+
+
+def _pack_siblings(entries: List[dict], max_words: int) -> List[dict]:
+    """
+    Pack consecutive sibling subsections (same numbered parent, e.g. 4.2, 4.3, 4.4) onto one slide while they fit
+    ``max_words``. Each keeps its heading; the slide is shown as side-by-side sections. Nothing is cut.
+    """
     out: List[dict] = []
-    for e in entries:
+    i = 0
+    while i < len(entries):
+        e = entries[i]
+        if not _mergeable(e) or _words_of(e) > max_words * 0.7:
+            out.append(e)
+            i += 1
+            continue
+        group = [e]
+        total = _words_of(e)
+        j = i + 1
+        while j < len(entries) and len(group) < 3 and _mergeable(entries[j]) and _section_of(entries[j]) == _section_of(e) \
+                and total + _words_of(entries[j]) <= max_words and _words_of(entries[j]) <= max_words * 0.7:
+            total += _words_of(entries[j])
+            group.append(entries[j])
+            j += 1
+        if len(group) == 1:
+            out.append(e)
+            i += 1
+            continue
+        merged = copy.deepcopy(group[0])
+        titles = [str((g.get("improved") or {}).get("title") or "") for g in group]
+        merged["original"]["text"] = "\n".join(f"### {t}\n{(g.get('original') or {}).get('text', '')}" for t, g in zip(titles, group))
+        merged["improved"] = {"layout_type": "MINIMAL_TEXT", "title": " · ".join(titles), "takeaway": "", "verbatim": [], "merged": True,
+                              "bullets": [x for g in group for x in ((g.get("improved") or {}).get("bullets") or [])]}
+        out.append(merged)
+        i = j
+    return out
+
+
+def _drop_empty_headings(entries: List[dict]) -> List[dict]:
+    """A section heading with no text of its own ("6. Implementation" followed by 6.1…) adds nothing as a slide."""
+    out = []
+    for k, e in enumerate(entries):
         imp = e.get("improved") or {}
-        prev = out[-1] if out else None
-        pimp = (prev or {}).get("improved") or {}
-        small = lambda x: sum(_wc(b) for b in (x.get("bullets") or [])) < 55  # noqa: E731
-        if (prev is not None and _section_of(e) and _section_of(e) == _section_of(prev) and small(imp) and small(pimp)
-                and not _is_table_entry(e) and not _is_table_entry(prev) and not imp.get("is_overview") and not pimp.get("is_overview")
-                and not imp.get("part") and not pimp.get("part")
-                and sum(_wc(b) for b in imp.get("bullets", [])) + sum(_wc(b) for b in pimp.get("bullets", [])) <= max_words):
-            heading = re.sub(r"^\s*\d+(?:\.\d+)*[.)]?\s*", "", str(imp.get("title") or ""))
-            if not pimp.get("merged_first"):
-                first = re.sub(r"^\s*\d+(?:\.\d+)*[.)]?\s*", "", str(pimp.get("title") or ""))
-                pimp["bullets"] = [f"{first}. " + pimp["bullets"][0]] + list(pimp["bullets"][1:]) if pimp.get("bullets") else pimp.get("bullets", [])
-                pimp["merged_first"] = True
-            pimp["bullets"] = list(pimp["bullets"]) + ([f"{heading}. " + imp["bullets"][0]] + list(imp["bullets"][1:]) if imp.get("bullets") else [])
-            pimp["title"] = f"{pimp['title']} · {str(imp.get('title') or '').split(' ', 1)[0]}"
-            prev["original"]["text"] = (prev["original"].get("text", "") + "\n" + e["original"].get("text", "")).strip()
+        nxt = entries[k + 1] if k + 1 < len(entries) else None
+        if (not _is_table_entry(e) and _words_of(e) < 8 and nxt is not None and _section_of(e)
+                and _section_of(nxt) == _section_of(e) and not imp.get("is_glossary")):
             continue
         out.append(e)
     return out
@@ -175,7 +209,7 @@ def plan_slides(entries: List[dict], max_words: int = MAX_WORDS) -> int:
             ov["improved"] = {"layout_type": "MINIMAL_TEXT", "title": _unique(f"{base}: overview", used), "bullets": lines, "takeaway": "",
                               "verbatim": [], "is_overview": True}
             out.insert(len(out) - len(groups), ov)
-    out = _merge_small(out, max_words)
+    out = _pack_siblings(_drop_empty_headings(out), max_words)
     # self-correction: nothing over the hard cap; no empty slide
     final = []
     for e in out:
@@ -186,4 +220,24 @@ def plan_slides(entries: List[dict], max_words: int = MAX_WORDS) -> int:
         final.append(e)
     delta = len(final) - len(entries)
     entries[:] = final
+    return delta
+
+
+def plan_to_budget(entries: List[dict], max_words: int = MAX_WORDS, target: int | None = None, ceiling: int = 230) -> int:
+    """
+    Plan the deck, then — if a target slide count is known (from the source's page count) and the plan overshoots it —
+    raise the per-slide capacity step by step and re-plan until it fits (never above ``ceiling`` words per slide).
+    Returns the change in slide count. The result always keeps every sentence.
+    """
+    cap = max_words
+    best = None
+    while True:
+        trial = copy.deepcopy(entries)
+        plan_slides(trial, cap)
+        best = trial
+        if not target or len(trial) <= target * 1.12 or cap >= ceiling:
+            break
+        cap = min(ceiling, int(cap * 1.15) + 1)
+    delta = len(best) - len(entries)
+    entries[:] = best
     return delta
