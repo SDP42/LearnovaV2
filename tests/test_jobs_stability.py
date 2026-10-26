@@ -1,0 +1,100 @@
+"""Jobs survive a restart, queue instead of piling up, cancel, and never leak server paths."""
+import io
+import time
+
+import pytest
+
+from learnova.errors import friendly_error
+from learnova.parsers import text_inputs as ti
+from learnova.pipeline import job_db
+
+
+@pytest.fixture(autouse=True)
+def _db(tmp_path, monkeypatch):
+    monkeypatch.setenv("LEARNOVA_DB_PATH", str(tmp_path / "t.db"))
+    job_db._ready_for = None
+    yield
+
+
+def _store():
+    from learnova.pipeline.jobs import JobStore
+
+    return JobStore()
+
+
+def test_friendly_error_hides_paths_and_maps_known_failures():
+    msg = friendly_error("Failed to open file '/var/folders/zz/tmp123.pdf'")
+    assert "/var/" not in msg and "PDF" in msg
+    assert "password" in friendly_error("document is encrypted").lower()
+    generic = friendly_error(RuntimeError("boom at /Users/x/secret.py line 3"))
+    assert "/Users" not in generic and "ref " in generic
+
+
+def test_job_survives_restart_and_interrupted_build_is_reported():
+    s1 = _store()
+    j = s1.create("notes", user_id="u1")
+    j.markdown, j.status = "## A\ntext", "awaiting_review"
+    job_db.save(j, "typed")
+    running = s1.create("deck", user_id="u1")
+    running.markdown, running.status = "## B\nmore", "running"
+    job_db.save(running, "typed")
+
+    s2 = _store()                      # a fresh process: nothing in memory
+    back = s2.get(j.id)
+    assert back and back.status == "awaiting_review" and back.markdown.startswith("## A")
+    assert back._markdown_doc is not None             # can be generated again without re-uploading
+    cut = s2.get(running.id)
+    assert cut.status == "failed" and "restarted" in cut.error and cut.markdown
+    assert {x.id for x in s2.all("u1")} == {j.id, running.id}
+    assert s2.get("nope") is None
+
+
+def test_cancel_marks_job_cancelled():
+    from learnova.pipeline.jobs import Job
+
+    s = _store()
+    j = s.create("x", user_id="u")
+    j.status = "running"
+    assert s.cancel(j.id) is True and j._cancel.is_set()
+    j.status = "done"
+    assert s.cancel(j.id) is False
+
+
+def test_text_inputs():
+    assert ti.looks_like(b"%PDF-1.7 ...", ".pdf") and not ti.looks_like(b"MZ\x90", ".pdf")
+    assert ti.looks_like(b"PK\x03\x04", ".pptx") and not ti.looks_like(b"hello", ".docx")
+    md = ti.plain_text_to_markdown("UNIT 1\nIntro text here.\n\n1. Basics of Memory\nStuff.")
+    assert "## Unit 1" in md or "## UNIT 1".title() in md
+    import docx
+
+    d = docx.Document()
+    d.add_heading("Photosynthesis", 1)
+    d.add_paragraph("Plants make food.")
+    d.add_paragraph("Light", style="List Bullet")
+    t = d.add_table(rows=2, cols=2)
+    t.cell(0, 0).text, t.cell(0, 1).text, t.cell(1, 0).text, t.cell(1, 1).text = "Stage", "Place", "Light", "Thylakoid"
+    buf = io.BytesIO()
+    d.save(buf)
+    out = ti.docx_to_markdown(buf.getvalue())
+    assert "## Photosynthesis" in out and "- Light" in out and "| Stage | Place |" in out
+
+
+def test_upload_formats_through_the_api(tmp_path, monkeypatch):
+    import os
+    os.environ["LEARNOVA_RATE_LIMIT"] = "off"
+    from fastapi.testclient import TestClient
+    from apps.api.main import app
+
+    c = TestClient(app)
+    ph = "+919000000077"
+    otp = c.post("/api/auth/otp/request", json={"phone": ph}).json()["dev_otp"]
+    h = {"Authorization": "Bearer " + c.post("/api/auth/otp/verify", json={"phone": ph, "code": otp}).json()["token"]}
+    r = c.post("/api/jobs", files={"file": ("n.md", b"# Cells\nCells are the unit of life.\n## Organelles\nMitochondria make energy.", "text/markdown")}, headers=h)
+    assert r.status_code == 202 and r.json()["status"] == "awaiting_review"
+    r = c.post("/api/jobs", files={"file": ("x.pdf", b"not a pdf", "application/pdf")}, headers=h)
+    assert r.status_code == 400
+    assert c.post("/api/jobs", files={"file": ("e.txt", b"   ", "text/plain")}, headers=h).status_code == 400
+    jobs = c.get("/api/jobs", headers=h).json()["jobs"]
+    assert any(j["status"] == "awaiting_review" for j in jobs)
+    assert c.post(f"/api/jobs/{jobs[0]['id']}/cancel", headers=h).status_code == 200
+    assert c.get("/api/health").json()["database"] is True

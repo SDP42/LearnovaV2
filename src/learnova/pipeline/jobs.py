@@ -1,23 +1,27 @@
 """
-In-memory job store for asynchronous pipeline runs.
+Job store for asynchronous pipeline runs.
 
 The pipeline takes far longer than an HTTP request should, so the API returns
 a job id immediately and the client polls for stage progress.
 
-Scope note: this is a single-process, in-memory store — jobs are lost on
-restart and it does not work across multiple workers. That is the right size
-for a demo; swap in Redis if this ever runs multi-worker.
+Execution is in-process threads, bounded by a semaphore (``LEARNOVA_MAX_JOBS``, default 2) so a burst of uploads
+queues instead of starving the machine. State is mirrored to SQLite (``job_db``), so a restart keeps a user's
+uploaded document and reports an interrupted build honestly instead of "job not found". A single process is still
+assumed; swap the semaphore for a real queue if this ever runs multi-worker.
 """
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+from learnova.errors import friendly_error
 from learnova.logging_config import logger
+from learnova.pipeline import job_db
 from learnova.pipeline.orchestrator import (
     STAGES,
     PipelineConfig,
@@ -42,7 +46,9 @@ class Job:
     markdown: str = ""
     created_at: float = field(default_factory=time.time)
     result: Optional[PipelineResult] = None
+    source_type: str = ""
     _markdown_doc: Any = None
+    _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
 
     def to_dict(self) -> dict:
         payload: Dict[str, Any] = {
@@ -63,6 +69,14 @@ class Job:
         return payload
 
 
+class JobCancelled(Exception):
+    """Raised inside the worker when the user cancels a build."""
+
+
+MAX_PAGES = int(os.getenv("LEARNOVA_MAX_PAGES", "400"))
+_SLOTS = threading.BoundedSemaphore(max(1, int(os.getenv("LEARNOVA_MAX_JOBS", "2"))))
+
+
 class JobStore:
     """Thread-safe registry of jobs.
 
@@ -79,6 +93,10 @@ class JobStore:
     def __init__(self) -> None:
         self._jobs: Dict[str, Job] = {}
         self._lock = threading.Lock()
+        self._waiting = 0
+        n = job_db.recover_interrupted("The server restarted while this deck was being built. Your document is kept — press Generate again.")
+        if n:
+            logger.info("marked %d interrupted job(s) as failed after restart", n)
 
     def _prune_locked(self) -> None:
         now = time.time()
@@ -103,19 +121,62 @@ class JobStore:
         with self._lock:
             self._prune_locked()
             self._jobs[job.id] = job
+        job_db.save(job)
         return job
 
     def get(self, job_id: str) -> Optional[Job]:
         with self._lock:
-            return self._jobs.get(job_id)
+            job = self._jobs.get(job_id)
+        if job is not None:
+            return job
+        return self._rehydrate(job_id)
 
-    def all(self) -> List[Job]:
+    def _rehydrate(self, job_id: str) -> Optional[Job]:
+        """A job that survived a restart: rebuilt from its saved row (the document's images are not kept)."""
+        row = job_db.load(job_id)
+        if not row:
+            return None
+        from learnova.parsers.markdown_converter import MarkdownDocument
+
+        job = Job(id=row["id"], source_name=row["source_name"], user_id=row["user_id"], status=row["status"], stage=row["stage"],
+                  progress=row["progress"], detail=row["detail"], error=row["error"], markdown=row["markdown"],
+                  created_at=row["created_at"], source_type=row["source_type"])
+        if job.markdown:
+            job._markdown_doc = MarkdownDocument(markdown=job.markdown, source_name=job.source_name,
+                                                 source_type=row["source_type"] or "typed", converter="restored")
         with self._lock:
-            return list(self._jobs.values())
+            self._jobs.setdefault(job.id, job)
+            return self._jobs[job.id]
+
+    def cancel(self, job_id: str) -> bool:
+        job = self.get(job_id)
+        if job is None or job.status not in {"running", "pending"}:
+            return False
+        job._cancel.set()
+        job.detail = "Cancelling…"
+        return True
+
+    def queue_depth(self) -> int:
+        return self._waiting
+
+    def all(self, user_id: Optional[str] = None) -> List[Job]:
+        """Live jobs, plus (for one user) saved ones from before the last restart."""
+        with self._lock:
+            live = list(self._jobs.values())
+        if user_id is not None:
+            have = {j.id for j in live}
+            for row in job_db.list_for_user(user_id):
+                if row["id"] not in have:
+                    j = self._rehydrate(row["id"])
+                    if j:
+                        live.append(j)
+        return live
 
     def delete(self, job_id: str) -> bool:
         with self._lock:
-            return self._jobs.pop(job_id, None) is not None
+            hit = self._jobs.pop(job_id, None) is not None
+        job_db.delete(job_id)
+        return hit
 
     # ── Execution ────────────────────────────────────────────────────────────
     def start_conversion(self, job: Job, path: str, config: PipelineConfig) -> None:
@@ -131,10 +192,15 @@ class JobStore:
             job.status = "running"
             job.stage = "convert"
             job.stage_status = "running"
+            job_db.save(job)
             try:
+                _check_page_limit(path)
                 doc = build_markdown(path, source_name=job.source_name, config=config)
                 job._markdown_doc = doc
                 job.markdown = doc.markdown
+                job.source_type = getattr(doc, "source_type", "") or job.source_type
+                if not job.markdown.strip():
+                    raise ValueError("no text could be read from this document")
                 job.status = "awaiting_review"
                 job.stage_status = "ok"
                 job.progress = 1.0 / len(STAGES)
@@ -142,8 +208,9 @@ class JobStore:
                 logger.error("job %s conversion failed: %s", job.id, exc, exc_info=True)
                 job.status = "failed"
                 job.stage_status = "failed"
-                job.error = str(exc)
+                job.error = friendly_error(exc, context=f"convert {job.id}")
             finally:
+                job_db.save(job, job.source_type)
                 try:
                     _os.unlink(path)
                 except OSError:
@@ -171,14 +238,41 @@ class JobStore:
             job._markdown_doc.markdown = markdown_override
             job.markdown = markdown_override
 
+        job._cancel.clear()
+        last_saved = {"stage": None}
+
         def _progress(stage: str, status: str, fraction: float, detail: str) -> None:
+            if job._cancel.is_set():
+                raise JobCancelled()
             job.stage = stage
             job.stage_status = status
             job.progress = fraction
             job.detail = detail
+            if stage != last_saved["stage"]:               # persist on stage change, not on every tick
+                last_saved["stage"] = stage
+                job_db.save(job, job.source_type)
 
         def _work() -> None:
             job.status = "running"
+            job.error = None
+            # Bounded concurrency: wait for a slot, telling the client where it stands in the line.
+            got = _SLOTS.acquire(blocking=False)
+            if not got:
+                with self._lock:
+                    self._waiting += 1
+                try:
+                    while not got:
+                        if job._cancel.is_set():
+                            raise JobCancelled()
+                        job.detail = f"Waiting for a free worker ({self._waiting} in line)"
+                        got = _SLOTS.acquire(timeout=0.5)
+                except JobCancelled:
+                    job.status, job.stage_status, job.error = "failed", "failed", "Cancelled."
+                    job_db.save(job, job.source_type)
+                    return
+                finally:
+                    with self._lock:
+                        self._waiting -= 1
             try:
                 job.result = generate(job._markdown_doc, config=config, progress=_progress)
                 # Persist before flipping to "done": the client navigates to the
@@ -192,10 +286,17 @@ class JobStore:
                         logger.error("job %s post-completion hook failed", job.id, exc_info=True)
                 job.status = "done"
                 job.progress = 1.0
+                job.detail = ""
+            except JobCancelled:
+                job.status, job.stage_status, job.error = "failed", "failed", "Cancelled."
             except Exception as exc:
                 logger.error("job %s generation failed: %s", job.id, exc, exc_info=True)
                 job.status = "failed"
-                job.error = str(exc)
+                job.stage_status = "failed"
+                job.error = friendly_error(exc, context=f"generate {job.id}")
+            finally:
+                _SLOTS.release()
+                job_db.save(job, job.source_type)
 
         worker = threading.Thread(target=_work, daemon=True, name=f"generate-{job.id}")
         worker.start()
@@ -209,9 +310,28 @@ class JobStore:
                 logger.error("job %s generation exceeded %ds — marking failed",
                              job.id, self._GEN_TIMEOUT_SECONDS)
                 job.status = "failed"
-                job.error = "generation timed out"
+                job.error = friendly_error("timed out", context=f"watchdog {job.id}")
+                job_db.save(job, job.source_type)
 
         threading.Thread(target=_watchdog, daemon=True, name=f"watchdog-{job.id}").start()
+
+
+def _check_page_limit(path: str) -> None:
+    """Reject absurdly long PDFs early, with a message the user can act on."""
+    if not path.lower().endswith(".pdf"):
+        return
+    try:
+        import fitz
+
+        with fitz.open(path) as doc:
+            if doc.needs_pass:
+                raise ValueError("password-protected PDF")
+            if doc.page_count > MAX_PAGES:
+                raise ValueError(f"too many pages ({doc.page_count}; limit {MAX_PAGES})")
+    except ValueError:
+        raise
+    except Exception:
+        return          # not our job to diagnose a broken file here; the converter reports it
 
 
 _store: Optional[JobStore] = None
@@ -224,4 +344,4 @@ def get_store() -> JobStore:
     return _store
 
 
-__all__ = ["Job", "JobStore", "get_store"]
+__all__ = ["Job", "JobStore", "JobCancelled", "get_store"]

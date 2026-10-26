@@ -78,7 +78,7 @@ app.add_middleware(
 
 app.add_middleware(RateLimitMiddleware)  # toggled per request via LEARNOVA_RATE_LIMIT=off
 
-ALLOWED_SUFFIXES = {".pptx", ".pdf"}
+ALLOWED_SUFFIXES = {".pptx", ".pdf", ".docx", ".md", ".markdown", ".txt"}
 ANONYMOUS_USER = "anonymous"
 
 
@@ -294,7 +294,22 @@ def _config_from(request: GenerateRequest, textbook_mode: bool = False) -> Pipel
 # ── Meta ──────────────────────────────────────────────────────────────────────
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "stages": STAGES, "auth_enabled": auth_enabled()}
+    """Liveness plus the facts an operator (or a demo audience) wants: queue, storage, optional engines."""
+    import shutil
+
+    from learnova.pipeline import job_db
+
+    db_ok = True
+    try:
+        with job_db._db() as c:
+            c.execute("SELECT 1").fetchone()
+    except Exception:
+        db_ok = False
+    return {
+        "status": "ok" if db_ok else "degraded", "stages": STAGES, "auth_enabled": auth_enabled(),
+        "queue": {"waiting": get_store().queue_depth()}, "database": db_ok,
+        "libreoffice": bool(shutil.which("soffice") or os.path.exists("/Applications/LibreOffice.app")),
+    }
 
 
 @app.get("/api/config")
@@ -392,13 +407,40 @@ async def create_job(
             status_code=413,
             detail=f"file is {size_mb:.1f} MB; maximum is {MAX_FILE_SIZE_MB} MB",
         )
+    if not payload.strip():
+        raise HTTPException(status_code=400, detail="the file is empty")
+    from learnova.parsers import text_inputs as ti
+
+    if not ti.looks_like(payload, suffix):
+        raise HTTPException(status_code=400, detail=f"this does not look like a real {suffix} file — re-export it and try again")
+
+    store = get_store()
+    job = store.create(source_name=file.filename or "document", user_id=user_id)
+    if suffix in ti.TEXT_SUFFIXES or suffix == ti.DOCX_SUFFIX:
+        # Text-like inputs are converted on the spot (milliseconds), then wait for review like any other upload.
+        from learnova.errors import friendly_error
+        from learnova.parsers.markdown_converter import MarkdownDocument
+
+        try:
+            md = ti.docx_to_markdown(payload) if suffix == ti.DOCX_SUFFIX else (
+                ti.decode_text(payload) if suffix != ".txt" else ti.plain_text_to_markdown(ti.decode_text(payload)))
+            if not md.strip():
+                raise ValueError("no text found")
+            doc = from_typed_text(md, source_name=pathlib.Path(file.filename or "document").stem)
+            doc.source_type = suffix.lstrip(".")
+            job._markdown_doc, job.markdown, job.status, job.source_type = doc, doc.markdown, "awaiting_review", doc.source_type
+            job.progress = 1.0 / len(STAGES)
+        except Exception as exc:
+            job.status, job.error = "failed", friendly_error(exc, context="upload")
+        from learnova.pipeline import job_db
+
+        job_db.save(job, job.source_type)
+        return job.to_dict()
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(payload)
         tmp_path = tmp.name
 
-    store = get_store()
-    job = store.create(source_name=file.filename or "document", user_id=user_id)
     store.start_conversion(job, tmp_path, PipelineConfig(textbook_mode=textbook_mode))
     logger.info("job %s created for %s (%.1f MB)", job.id, file.filename, size_mb)
     return job.to_dict()
@@ -415,6 +457,10 @@ def create_typed_job(payload: TypedInput, user_id: str = Depends(current_user)) 
     job._markdown_doc = doc
     job.markdown = doc.markdown
     job.status = "awaiting_review"
+    job.source_type = "typed"
+    from learnova.pipeline import job_db
+
+    job_db.save(job, "typed")
     return job.to_dict()
 
 
@@ -424,7 +470,7 @@ def list_jobs(user_id: str = Depends(current_user)) -> dict:
     return {
         "jobs": [
             job.to_dict()
-            for job in get_store().all()
+            for job in get_store().all(user_id)
             if (job.user_id or ANONYMOUS_USER) == user_id
         ]
     }
@@ -440,6 +486,12 @@ def delete_job(job_id: str, user_id: str = Depends(current_user)) -> Response:
     _require_own_job(job_id, user_id)
     get_store().delete(job_id)
     return Response(status_code=204)
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def cancel_job(job_id: str, user_id: str = Depends(current_user)) -> dict:
+    job = _require_own_job(job_id, user_id)
+    return {"id": job.id, "cancelling": get_store().cancel(job_id), "status": job.status}
 
 
 # ── Markdown IR ───────────────────────────────────────────────────────────────
@@ -466,6 +518,9 @@ def put_markdown(
         raise HTTPException(status_code=409, detail="conversion has not completed")
     job._markdown_doc.markdown = payload.markdown
     job.markdown = payload.markdown
+    from learnova.pipeline import job_db
+
+    job_db.save(job, job.source_type)
     return {"job_id": job.id, "saved": True, "length": len(payload.markdown)}
 
 
