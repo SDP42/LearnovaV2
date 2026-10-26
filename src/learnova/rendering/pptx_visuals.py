@@ -727,22 +727,62 @@ def _stack_height(parts: Sequence[float], gap: float) -> float:
     return sum(parts) + gap * (len(parts) - 1)
 
 
+_SUB_CHARS = "₀₁₂₃₄₅₆₇₈₉"
+
+
+def _subscript_runs(shape) -> None:
+    """Chemical / algebraic subscripts as real subscript runs (baseline shift) — Unicode subscript glyphs are missing from many fonts."""
+    import copy
+
+    for p in shape.text_frame.paragraphs:
+        for r in list(p.runs):
+            t = r.text
+            if not any(ch in _SUB_CHARS for ch in t):
+                continue
+            segs, cur, cur_sub = [], "", None
+            for ch in t:
+                is_sub = ch in _SUB_CHARS
+                if cur_sub is None or is_sub == cur_sub:
+                    cur, cur_sub = cur + ch, is_sub
+                else:
+                    segs.append((cur, cur_sub))
+                    cur, cur_sub = ch, is_sub
+            segs.append((cur, cur_sub))
+            prev = r._r
+            for k, (txt, sub) in enumerate(segs):
+                node = prev if k == 0 else copy.deepcopy(r._r)
+                if k > 0:
+                    prev.addnext(node)
+                text = txt.translate(str.maketrans(_SUB_CHARS, "0123456789")) if sub else txt
+                for child in node.iterchildren():
+                    if child.tag.endswith("}t"):
+                        child.text = text
+                rpr = node.get_or_add_rPr()
+                if sub:
+                    rpr.set("baseline", "-25000")
+                elif "baseline" in rpr.attrib:
+                    del rpr.attrib["baseline"]
+                prev = node
+
+
 def _formula(c: _Canvas, data) -> bool:
     f = str(data.get("formula", "")).strip()
     if not f:
         return False
     notes = [str(x) for x in data.get("notes") or []][:4]
     term, statement = str(data.get("term", "")), str(data.get("statement", ""))
+    label = str(data.get("label", "")).strip()
     gap = 0.2
     term_h = 0.4 if term else 0.0
+    label_h = 0.3 if label else 0.0
     st_sz = c.fit([statement], c.w, 1.1, 24, 14) if statement else 0
     st_h = (L.block_height([statement], c.w, st_sz) + 0.05) if statement else 0.0
     notes_h_avail = max(0.8, c.h - term_h - st_h - 1.5 - gap * 3) if notes else 0.0
     n_sz = c.fit(notes, c.w - 0.3, notes_h_avail, 18, 11, spacing=8) if notes else 0
     n_h = (L.block_height(notes, c.w - 0.3, n_sz, 8) + 0.1) if notes else 0.0
-    fixed = [h for h in (term_h, st_h, n_h) if h]
+    fixed = [h for h in (term_h, st_h, label_h, n_h) if h]
     box_h = min(2.4, max(1.4, c.h - sum(fixed) - gap * len(fixed)))
-    parts = [h for h in (term_h, st_h, box_h, n_h) if h]
+    parts = [h for h in (term_h, st_h, label_h, box_h, n_h) if h]
     y = c.y + max(0.0, (c.h - _stack_height(parts, gap)) / 2)
     if term:
         with c.group():
@@ -752,10 +792,15 @@ def _formula(c: _Canvas, data) -> bool:
         with c.group():
             c.tb(c.x, y, c.w, st_h, [P(statement, st_sz, False, c.t.text_rgb)], MSO_ANCHOR.TOP)
         y += st_h + gap
+    if label:
+        with c.group():
+            c.tb(c.x, y, c.w, label_h, [P(label.upper(), 12, True, c.t.subtext_rgb)], MSO_ANCHOR.BOTTOM)
+        y += label_h + gap * 0.5
     with c.group():
         box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, y, c.w, box_h, c.t.primary_rgb, radius=0.25 / max(0.5, box_h) * 0.6)
         fsz = c.fit([f], c.w - 2 * PAD - 0.4, box_h - 0.3, 48, 20, bold=True)
         c.tb(0, 0, 0, 0, [P(f, fsz, True, _on(c.t.primary_rgb))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=box, inset=(PAD, 0.1, PAD, 0.1))
+        _subscript_runs(box)
     y += box_h + gap
     if notes:
         with c.group():
@@ -877,6 +922,11 @@ def _chart(c: _Canvas, data, kind: str) -> bool:
         plot.has_data_labels = True
         plot.data_labels.font.size = Pt(14)
         plot.data_labels.font.bold = True
+        fmt = data.get("fmt") or {}
+        if fmt.get("prefix") or fmt.get("suffix"):      # "$5.6M", "62%": the figures as the source wrote them
+            decimals = "0.0" if any(abs(v - round(v)) > 1e-9 for _, v in pts) else "0"
+            plot.data_labels.number_format = f'"{fmt.get("prefix", "")}"#,##{decimals}"{fmt.get("suffix", "")}"'
+            plot.data_labels.number_format_is_linked = False
         if kind == "pie":
             for i in range(len(pts)):
                 pt = plot.series[0].points[i]
@@ -983,8 +1033,11 @@ def _prose(c: _Canvas, data) -> bool:
     if not lead:
         return False
     bar_w = 0.09
+    facts = [f for f in (data.get("facts") or []) if f.get("value")][:3]
+    rail_w = 3.1 if facts else 0.0
+    text_w = c.w - (rail_w + GUT if facts else 0.0)
     lx = c.x + bar_w + PAD * 0.9
-    lw = (c.w - (lx - c.x)) * 0.93   # conservative: real fonts wrap earlier than the estimate
+    lw = (text_w - (lx - c.x)) * 0.93   # conservative: real fonts wrap earlier than the estimate
     gap = 0.14
 
     def tagged(text, rel):
@@ -1044,7 +1097,31 @@ def _prose(c: _Canvas, data) -> bool:
                     r2.font.color.rgb = _REL_RGB.get(name, c.t.primary_rgb)
                 pos = max(pos, z)
         y += h + gap
+    if facts:
+        _facts_rail(c, facts, c.x + c.w - rail_w, rail_w)
     return True
+
+
+def _facts_rail(c: _Canvas, facts, x: float, w: float) -> None:
+    """"At a glance": the slide's own figures as stacked cards beside the text — a visual anchor made from the content."""
+    n = len(facts)
+    head_h = 0.34
+    gap = 0.18
+    ch = min(1.6, (c.h - head_h - gap * n) / n)
+    total = head_h + gap + n * ch + (n - 1) * gap
+    y = c.y + max(0.0, (c.h - total) / 2)
+    with c.group():
+        c.tb(x, y, w, head_h, [P("AT A GLANCE", 11, True, c.t.subtext_rgb)], MSO_ANCHOR.MIDDLE)
+    y += head_h + gap
+    for f in facts:
+        with c.group():
+            c.card(x, y, w, ch, fill=_blend(c.t.primary_rgb, 0.92), line=_blend(c.t.primary_rgb, 0.7))
+            c.accent_bar(x + 0.12, y + 0.18, ch - 0.36, 0.07)
+            vsz = c.fit([str(f["value"])], w - 0.55, ch * 0.5, 36, 16, bold=True)
+            lsz = c.fit([str(f.get("label", ""))], w - 0.55, ch * 0.34, 14, 10)
+            c.tb(x + 0.3, y + 0.08, w - 0.45, ch - 0.16,
+                 [P(str(f["value"]), vsz, True, c.t.primary_rgb), P(str(f.get("label", "")), lsz, False, c.t.subtext_rgb, 2)], MSO_ANCHOR.MIDDLE)
+        y += ch + gap
 
 
 def _sections(c: _Canvas, data) -> bool:

@@ -197,7 +197,12 @@ def _same_heading(a: str, b: str) -> bool:
     ka, kb = _title_key(a), _title_key(b)
     if not ka or not kb:
         return False
-    if ka == kb or ka in kb or kb in ka:
+    if ka == kb:
+        return True
+    wa, wb = set(ka.split()), set(kb.split())
+    # one heading inside the other only counts when they are nearly the same length ("Stages in NLP" / "Stages in NLP, cont."),
+    # not when a document title merely contains a section name ("The Water Cycle and Photosynthesis" / "The water cycle")
+    if (ka in kb or kb in ka) and min(len(wa), len(wb)) >= 0.75 * max(len(wa), len(wb)):
         return True
     wa, wb = set(ka.split()), set(kb.split())
     long = max(len(wa), len(wb))

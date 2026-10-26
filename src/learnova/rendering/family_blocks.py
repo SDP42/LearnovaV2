@@ -279,6 +279,13 @@ def _series(data: Dict[str, Any]) -> list:
     return out[:8]
 
 
+def _fmt_val(val: float, data: Dict[str, Any]) -> str:
+    """A chart figure the way the source wrote it: 5.6 → "$5.6M", 62 → "62%"."""
+    fmt = data.get("fmt") or {}
+    txt = f"{val:,.1f}".rstrip("0").rstrip(".") if abs(val - round(val)) > 1e-9 else f"{int(round(val)):,}"
+    return f'{fmt.get("prefix", "")}{txt}{fmt.get("suffix", "")}'
+
+
 def _bar_chart(data: Dict[str, Any], theme) -> Optional[str]:
     pts = _series(data)
     if len(pts) < 2:
@@ -295,7 +302,7 @@ def _bar_chart(data: Dict[str, Any], theme) -> Optional[str]:
             f'<span style="display:block;height:20px;width:{w:.0f}%;background:{theme.primary_hex};'
             f'border-radius:4px;"></span></span>'
             f'<span style="flex:0 0 auto;color:{theme.subtext_hex};font-variant-numeric:tabular-nums;">'
-            f'{_esc(str(val).rstrip("0").rstrip(".") if "." in str(val) else str(val))}</span></div>'
+            f'{_esc(_fmt_val(val, data))}</span></div>'
         )
     return f'<div style="margin-top:20px;max-width:720px;">{rows}</div>'
 
@@ -595,6 +602,13 @@ def _layers(data: Dict[str, Any], theme) -> Optional[str]:
     return f'<div style="display:flex;flex-direction:column;gap:8px;margin-top:18px;{_FILL}justify-content:center;">{rows}</div>'
 
 
+def _subs_html(text: str) -> str:
+    """Escape, then turn Unicode subscript digits into <sub> so chemical formulae render in any font."""
+    import re as _re
+
+    return _re.sub(r"([₀-₉]+)", lambda m: "<sub>" + m.group(1).translate(str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789")) + "</sub>", _esc(text))
+
+
 def _formula_callout(data: Dict[str, Any], theme) -> Optional[str]:
     formula = str(data.get("formula", "")).strip()
     if not formula:
@@ -609,10 +623,11 @@ def _formula_callout(data: Dict[str, Any], theme) -> Optional[str]:
         f'<div style="margin-top:18px;{_FILL}display:flex;flex-direction:column;gap:18px;justify-content:center;">'
         f'<div style="font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:{theme.accent_hex};font-size:0.85rem;">{term}</div>'
         f'<div style="font-size:1.25rem;line-height:1.45;color:{theme.text_hex};">{stmt}</div>'
-        f'<div data-el="el.9" data-build="0" style="background:{theme.primary_hex};color:{_on(theme)};border-radius:20px;'
+        + (f'<div style="font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.75rem;color:{theme.subtext_hex};margin-bottom:-10px;">{_esc(str(data.get("label", "")))}</div>' if data.get("label") else "")
+        + f'<div data-el="el.9" data-build="0" style="background:{theme.primary_hex};color:{_on(theme)};border-radius:20px;'
         f'padding:30px 24px;text-align:center;font-size:2.6rem;font-weight:800;'
         f'font-family:Georgia,\'Times New Roman\',serif;letter-spacing:.01em;box-shadow:0 14px 34px {_tint(theme, "40")};">'
-        f'{_esc(formula)}</div>'
+        f'{_subs_html(formula)}</div>'
         + (f'<ul style="margin:0;padding-left:20px;font-size:0.95rem;line-height:1.5;color:{theme.text_hex};">{lis}</ul>' if lis else "")
         + "</div>"
     )
@@ -695,7 +710,20 @@ def _prose(data: Dict[str, Any], theme) -> Optional[str]:
             f'<div data-el="el.{i + 1}" data-build="{i + 1}" style="display:flex;gap:12px;align-items:flex-start;margin:0 0 .55em;">{tag}'
             f'<div style="flex:1;font-size:{fs}rem;line-height:1.55;color:{theme.text_hex};{nest}">{html_text}</div></div>'
         )
-    return f'<div style="margin-top:10px;min-height:400px;display:flex;flex-direction:column;justify-content:center;">{"".join(parts)}{"".join(rows)}</div>'
+    text_html = f'<div style="margin-top:10px;min-height:400px;display:flex;flex-direction:column;justify-content:center;">{"".join(parts)}{"".join(rows)}</div>'
+    facts = [f for f in (data.get("facts") or []) if f.get("value")][:3]
+    if not facts:
+        return text_html
+    chips = "".join(
+        f'<div data-el="el.{len(body) + 1 + k}" data-build="{len(body) + 1 + k}" style="background:{theme.primary_hex}12;border:1px solid {theme.primary_hex}33;'
+        f'border-radius:16px;padding:16px 18px;">'
+        f'<div style="font-weight:800;font-size:2rem;line-height:1.1;color:{theme.primary_hex};">{_esc(str(f["value"]))}</div>'
+        f'<div style="font-size:.85rem;color:{theme.subtext_hex};margin-top:4px;">{_esc(str(f.get("label", "")))}</div></div>'
+        for k, f in enumerate(facts)
+    )
+    return (f'<div style="display:flex;gap:28px;align-items:center;margin-top:10px;"><div style="flex:1 1 0;min-width:0;">{text_html}</div>'
+            f'<div style="flex:0 0 27%;display:flex;flex-direction:column;gap:14px;">'
+            f'<div style="font-size:.7rem;font-weight:800;letter-spacing:.1em;color:{theme.subtext_hex};">AT A GLANCE</div>{chips}</div></div>')
 
 
 def _sections(data: Dict[str, Any], theme) -> Optional[str]:

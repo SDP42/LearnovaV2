@@ -164,9 +164,16 @@ def _pack_siblings(entries: List[dict], max_words: int) -> List[dict]:
 def _drop_empty_headings(entries: List[dict]) -> List[dict]:
     """A section heading with no text of its own ("6. Implementation" followed by 6.1…) adds nothing as a slide."""
     out = []
+
+    def _norm(t: str) -> str:
+        return re.sub(r"[^a-z0-9 ]+", "", str(t).lower()).strip()
+
     for k, e in enumerate(entries):
         imp = e.get("improved") or {}
         nxt = entries[k + 1] if k + 1 < len(entries) else None
+        body = _norm(" ".join(map(str, imp.get("bullets") or [])))
+        if body and body == _norm(imp.get("title", "")) and not _is_table_entry(e):
+            continue                    # a heading that only repeats itself ("# Sorting Algorithms") is the deck title, not a slide
         if (not _is_table_entry(e) and _words_of(e) < 8 and nxt is not None and _section_of(e)
                 and _section_of(nxt) == _section_of(e) and not imp.get("is_glossary")):
             continue

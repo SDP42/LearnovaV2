@@ -94,6 +94,10 @@ def attach_key_terms(entries: List[dict], gl: Dict[str, Tuple[str, int]], per_sl
 
 
 def glossary_slides(entries: List[dict], gl: Dict[str, Tuple[str, int]], per_slide: int = 6, minimum: int = 4, max_terms: int = 12) -> int:
+    import re as _re
+
+    if any(_re.search(r"key terms|glossary|terminology|vocabulary|key concepts|definitions", str((e.get("improved") or {}).get("title", "")), _re.I) for e in entries):
+        return 0               # the source already has its own glossary section; a second one would only repeat it
     corpus = " ".join(str((e.get("original") or {}).get("text") or "") for e in entries).lower()
     ranked = sorted(((corpus.count(t), t, d) for t, (d, _) in gl.items() if len(d.split()) >= 3), reverse=True)
     items = [(t, d) for _, t, d in ranked[:max_terms]]

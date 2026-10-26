@@ -22,6 +22,7 @@ Design rules
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -30,7 +31,7 @@ _WORD = re.compile(r"[A-Za-z][A-Za-z'\-]*")
 _STOP = {"the", "a", "an", "of", "and", "or", "to", "in", "on", "at", "for", "by", "with", "is", "are", "was",
          "were", "be", "been", "it", "its", "this", "that", "these", "those", "as", "from", "which", "who"}
 _LEAD_CUE = re.compile(
-    r"^(?:(?:step|stage|phase)\s*\d+\s*[:.\-)]?\s*|(?:first(?:ly)?|second(?:ly)?|third(?:ly)?|next|then|"
+    r"^(?:(?:step|stage|phase)\s*\d+\s*[:.\-)]?\s*|(?:first(?:ly)?|second(?:ly)?|third(?:ly)?|fourth(?:ly)?|fifth|sixth|seventh|eighth|ninth|tenth|to begin with|to start with|next|then|"
     r"finally|lastly|after that|afterwards|meanwhile|however|in addition|also|therefore|thus|hence|"
     r"as a result|consequently|furthermore|moreover)\b[,:]?\s*)", re.I)
 _VERBISH = re.compile(
@@ -76,15 +77,24 @@ def _cap(s: str) -> str:
     return s[:1].upper() + s[1:] if s else s
 
 
-def short_label(text: str, max_words: int = 6) -> str:
-    """A compact heading for a sentence: leading cue and filler removed, cut at a clause break."""
+_DANGLE = {"favours", "favors", "gives", "makes", "causes", "leads", "shows", "has", "have", "can", "will", "may", "must", "should",
+           "does", "do", "uses", "needs", "requires", "helps", "allows", "lets", "means", "creates", "produces", "provides", "gets", "get"}
+_PARTICIPLE = re.compile(r"^(?:\w+ed|taken|made|done|given|seen|known|shown|built|used|held|kept|sent|written|found|heated|cooled|set|put|read|cut)$", re.I)
+
+
+def short_label(text: str, max_words: int = 6, drop_aux: bool = False) -> str:
+    """A compact heading for a sentence: leading cue and filler removed, cut at a clause break, never ending on a dangling verb."""
     t = _LEAD_CUE.sub("", _strip_end(text))
-    t = re.split(r"[;:,]| — | - |\bwhich\b|\bwhile\b|\bwhereas\b|\bbecause\b", t)[0]
+    t = re.split(r"[;:,]| — | - |\bwhich\b|\bwhile\b|\bwhereas\b|\bbecause\b|\bso that\b", t)[0]
     words = t.split()
+    if drop_aux:         # "Nitrogen is taken from the air" → "Nitrogen taken from the air"
+        words = [w for i, w in enumerate(words) if not (w.lower() in {"is", "are", "was", "were", "gets", "get"} and i + 1 < len(words) and _PARTICIPLE.match(words[i + 1]))]
+        if words and words[0].lower() in {"the", "a", "an"} and len(words) > 3:
+            words = words[1:]
     if len(words) > max_words:
         words = words[:max_words]
-        while words and words[-1].lower() in _STOP:
-            words.pop()
+    while words and (words[-1].lower() in _STOP or words[-1].lower() in _DANGLE):
+        words.pop()
     return _cap(" ".join(words)) or _cap(_strip_end(text)[:40])
 
 
@@ -192,7 +202,7 @@ def det_process(title: str, sents: List[str]) -> Det:
     loop = bool(re.search(r"\b(cycle|loop)\b", title, re.I)) or bool(re.search(
         r"\b(cycle|loop|process|it) (?:repeats|continues|begins again|starts again)|back to the (?:start|beginning)|"
         r"repeats? (?:continuously|again|indefinitely)|the cycle continues", blob, re.I))
-    stages = [{"label": short_label(s, 5), "detail": _strip_end(_LEAD_CUE.sub("", s))} for s in steps[:8]]
+    stages = [{"label": short_label(s, 5, drop_aux=True), "detail": _strip_end(_LEAD_CUE.sub("", s))} for s in steps[:8]]
     conf = 0.82 + min(len(cued), 5) * 0.02
     fam = "PROCESS_CYCLIC" if loop else "PROCESS_LINEAR"
     return fam, "cycle" if fam.endswith("CYCLIC") else "flowchart", conf, {"stages": stages}, \
@@ -209,7 +219,7 @@ def det_process_implicit(title: str, sents: List[str]) -> Det:
         return None
     if sum(len(x.split()) for x in body) / len(body) > 20:
         return None
-    stages = [{"label": short_label(x, 5), "detail": _strip_end(_LEAD_CUE.sub("", x))} for x in body[:8]]
+    stages = [{"label": short_label(x, 5, drop_aux=True), "detail": _strip_end(_LEAD_CUE.sub("", x))} for x in body[:8]]
     return "PROCESS_LINEAR", "flowchart", 0.7, {"stages": stages}, "a procedure (title + short action lines)"
 
 
@@ -285,6 +295,104 @@ def _con_marker_index(sents: List[str]) -> Optional[int]:
     return None
 
 
+# ── equations (chemical and algebraic) ───────────────────────────────────────
+_SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+_ARROW_RE = r"(?:<->|<=>|⇌|→|->|=>)"
+_TERM_RE = r"\d*[A-Z][A-Za-z0-9₀-₉()]*|\d*[a-z]{3,9}"
+_EQ_RE = re.compile(r"(?<![\w])(\d*[A-Z][A-Za-z0-9₀-₉()]*(?:\s*\+\s*(?:" + _TERM_RE + r"))*\s*" + _ARROW_RE +
+                    r"\s*(?:" + _TERM_RE + r")(?:\s*\+\s*(?:" + _TERM_RE + r"))*)")
+
+
+def prettify_equation(eq: str) -> str:
+    """N2 + 3H2 <-> 2NH3  →  N₂ + 3H₂ ⇌ 2NH₃ (subscripts after letters, real arrows)."""
+    eq = re.sub(r"<->|<=>", "⇌", eq)
+    eq = re.sub(r"->|=>", "→", eq)
+    eq = re.sub(r"(?<=[A-Za-z\)])(\d+)", lambda m: m.group(1).translate(_SUB), eq)
+    return re.sub(r"\s+", " ", eq).strip()
+
+
+def det_equation(title: str, sents: List[str]) -> Det:
+    """A reaction or equation written with an arrow is the slide's point: show it big, with the prose as notes."""
+    for i, s in enumerate(sents):
+        m = _EQ_RE.search(s)
+        if not m or "+" not in m.group(1):
+            continue
+        eq = prettify_equation(m.group(1))
+        lead = _strip_end(re.sub(r"\s+", " ", s.replace(m.group(1), "").strip(" :,-")))
+        others = [_strip_end(x) for j, x in enumerate(sents) if j != i]
+        label = _cap(re.sub(r"\s+(?:is|are|can be written as|is written as)$", "", lead).strip())
+        term = re.sub(r"^[\w ]{2,18}:\s*", "", title).strip() or title
+        # the explanatory sentence is the statement; the lead-in ("The overall equation") labels the formula
+        statement = others[0] if others and len(others[0].split()) >= 6 else (label if len(label.split()) >= 2 else term)
+        notes = others[1:] if others and statement == others[0] else others
+        return "FORMULA_CALLOUT", "card", 0.9, {"term": term, "statement": statement, "formula": eq, "label": label if (label.lower() != statement.lower() and label.lower() != term.lower()) else "",
+                                                 "notes": notes}, "a reaction / equation with its explanation"
+    return None
+
+
+# ── parallel items → comparison table ────────────────────────────────────────
+_PAR_VERBS = r"(?:is|are|has|have|uses|provides|means|costs|takes|offers|runs|needs|requires|works)"
+_BEST_FOR = re.compile(r"\b(?:used for|used in|suits?|suited (?:to|for)|best for|ideal for|good for|useful for)\s+(.+?)(?:[.;,]|$)"
+                       r"|\bis\s+((?:usually|generally|often|typically)\s+(?:the\s+)?(?:fastest|best|slowest|cheapest|simplest)[^.;,]*)", re.I)
+_STABLE = re.compile(r"\b(not stable|unstable|stable)\b", re.I)
+
+
+def det_parallel_table(title: str, sents: List[str]) -> Det:
+    """Three or more sentences that each describe one named item in the same way ("Merge sort is …", "Quick sort is …")."""
+    items: List[Tuple[str, str]] = []
+    for s in sents:
+        m = re.match(r"^(?:The\s+)?([A-Z][\w+#.'-]*(?:\s+[A-Za-z][\w+#.'-]*){0,3}?)\s+" + _PAR_VERBS + r"\s+(.+)$", _strip_end(s))
+        if m:
+            items.append((m.group(1).strip(), m.group(2).strip()))
+    if len(items) < 3 or len(items) < 0.6 * len(sents):
+        return None
+    names = [n for n, _ in items]
+    if len(set(n.lower() for n in names)) != len(names):
+        return None
+    firsts, lasts = Counter(n.split()[0].lower() for n in names), Counter(n.split()[-1].lower() for n in names)
+    if max(firsts.values()) < 3 and max(lasts.values()) < 3:      # the items must look alike ("Bubble sort", "Merge sort", "Quick sort")
+        return None
+    cols: List[Tuple[str, List[str]]] = []
+    time_col = [(re.search(r"O\([^)]*\)", p).group(0) if re.search(r"O\([^)]*\)", p) else "") for _, p in items]
+    if sum(1 for t in time_col if t) >= 2:
+        cols.append(("Time", [t.replace("^2", "²").replace("^3", "³") if t else "—" for t in time_col]))
+    stab = [(_STABLE.search(p).group(1).lower() if _STABLE.search(p) else "") for _, p in items]
+    if sum(1 for t in stab if t) >= 2:
+        cols.append(("Stable", ["No" if t in {"not stable", "unstable"} else "Yes" if t else "—" for t in stab]))
+    best = [(_cap(next(g for g in _BEST_FOR.search(p).groups() if g).strip()) if _BEST_FOR.search(p) else "") for _, p in items]
+    if sum(1 for t in best if t) >= 2:
+        cols.append(("Best for", [t or "—" for t in best]))
+    if len(cols) >= 2:
+        shared = lasts.most_common(1)[0]
+        first_col = _cap(shared[0]) if shared[1] == len(names) else "Option"        # "Sort" when every item is "… sort"
+        headers = [first_col] + [c[0] for c in cols]
+        rows = [[_cap(names[i])] + [c[1][i] for c in cols] for i in range(len(items))]
+        return "COMPARE_TABLE", "comparison", 0.9, {"headers": headers, "rows": rows}, f"{len(items)} parallel items compared"
+    headers = ["Option", "What it is"]
+    rows = [[_cap(n), _cap(" ".join(p.split()[:16]))] for n, p in items]
+    return "COMPARE_TABLE", "comparison", 0.82, {"headers": headers, "rows": rows}, f"{len(items)} parallel items listed side by side"
+
+
+_GLOSS_TITLE = re.compile(r"key terms?|glossary|terminology|vocabulary|key concepts?|definitions?|important terms", re.I)
+_GLOSS_SENT = re.compile(r"^(?:(?:A|An|The)\s+)?([A-Z][\w'’()/ -]{1,42}?)\s+(?:is|are|means|refers to|denotes|states that|describes)\s+(?:(?:a|an|the)\s+)?(.+)$")
+
+
+def det_glossary(title: str, sents: List[str]) -> Det:
+    """Term → meaning sentences ("Equilibrium is the state where…", "A catalyst is a substance that…") become definition cards."""
+    pairs = []
+    for s in sents:
+        m = _GLOSS_SENT.match(_strip_end(s))
+        if m and len(m.group(1).split()) <= 5:
+            pairs.append((m.group(1).strip(), _strip_end(m.group(2))))
+    if len(pairs) < 3 or len(pairs) < 0.75 * len(sents):
+        return None
+    if sum(1 for s in sents if re.search(r"\d", s)) >= 2:       # "Everest is 8,849 metres high" is a measurement, not a definition
+        return None
+    if not _GLOSS_TITLE.search(title) and len(pairs) < 4:
+        return None
+    return "LIST_STRUCTURED", "cards", 0.9, {"cards": [{"heading": _cap(t), "body": _cap(d)} for t, d in pairs[:8]]}, f"{len(pairs)} terms with their meanings"
+
+
 def det_pros_cons(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents)
     labelled_a = re.search(r"advantages?\s*[:\-]\s*(.+?)(?=disadvantages?\s*[:\-]|drawbacks?\s*[:\-]|cons?\s*[:\-]|$)", blob, re.I | re.S)
@@ -299,13 +407,17 @@ def det_pros_cons(title: str, sents: List[str]) -> Det:
                 out += [p.strip(" .") for p in re.split(r",\s*(?:and\s+)?|\s+and\s+(?=[a-z]{3,}\s)", x) if len(p.strip(" .").split()) >= 2]
             return [_cap(p) for p in out]
         pros, cons = items(labelled_a.group(1)), items(labelled_d.group(1))
-    elif _con_marker_index(sents) is not None and 1 <= _con_marker_index(sents) <= len(sents) - 1:
+    elif (_con_marker_index(sents) is not None and 1 <= _con_marker_index(sents) <= len(sents) - 1
+          and re.search(r"advantage|disadvantage|benefit|drawback|downside|upside|\bpros?\b|\bcons?\b|strengths?|weakness|trade-?off|merits?|good and bad|positive|negative", title + " " + blob, re.I)):
         k = _con_marker_index(sents)
         pros = [_cap(_strip_end(_LEAD_CUE.sub("", x))) for x in sents[:k]]
         cons = [_cap(_strip_end(_LEAD_CUE.sub("", x))) for x in sents[k:]]
         if len(sents) < 3:
             return None
     else:
+        # without "advantages / drawbacks" labels the claim needs the vocabulary in the title or the text
+        if not re.search(r"advantage|disadvantage|benefit|drawback|downside|upside|\bpros?\b|\bcons?\b|strengths?|weakness|trade-?off|merits?", title + " " + blob, re.I):
+            return None
         mode = "pro"
         for s in sents:
             has_pro, has_con = bool(_PRO.search(s)), bool(_CON.search(s))
@@ -474,8 +586,59 @@ def _subject_before_verb(s: str) -> str:
     return _cap(head.strip(" ,;")[:40])
 
 
+_VERBS_TAIL = {"generated", "provided", "reached", "totalled", "totaled", "was", "were", "is", "are", "had", "has", "contributed", "earned", "made",
+               "sold", "scored", "got", "gets", "recorded", "posted", "delivered", "brought", "produced", "came", "stood", "at", "of", "with", "for"}
+
+
+def _fmt_of(tok: str) -> str:
+    """Number-format hint for a figure as written: "$5.6 million" → "$|M", "62 percent" → "|%"."""
+    t = tok.lower()
+    cur = next((c for c in "$₹€£" if c in t), "")
+    mag = {"trillion": "T", "billion": "B", "bn": "B", "million": "M", "mn": "M", "thousand": "K", "k": "K"}
+    m = re.search(r"(trillion|billion|million|thousand|bn|mn|k)\b", t)
+    suffix = "%" if ("%" in t or "percent" in t) else (mag[m.group(1)] if m else "")
+    return f"{cur}|{suffix}"
+
+
+def _enumerated_pairs(sentence: str) -> List[Tuple[str, float, str]]:
+    """"North America $5.6 million, Europe $3.9 million and Asia $2.1 million" → [(label, value, unit)], or [] if not that shape."""
+    parts = [p.strip() for p in re.split(r",\s*(?:and\s+)?|\s+and\s+(?=[A-Za-z][\w ]{0,30}?\s+\W?\d)", _strip_end(sentence)) if p.strip()]
+    out: List[Tuple[str, float, str]] = []
+    for seg in parts:
+        nums = _numbers(seg)
+        if len(nums) != 1 or _to_float(nums[0]) is None:
+            return []
+        m = _NUM_RE.search(seg)
+        before = seg[:m.start()] if m else seg
+        toks = re.findall(r"[\w'’+#./&-]+", before)
+        while toks and toks[-1].lower() in _VERBS_TAIL:
+            toks.pop()
+        while toks and toks[0].lower() in {"the", "a", "an", "and", "while", "whereas", "but"}:
+            toks.pop(0)
+        label = " ".join(toks[-4:])
+        if not label:
+            return []
+        tok = nums[0].lower()
+        unit = "pct" if ("%" in tok or "percent" in tok) else "cur" if re.search(r"[$₹€£]", tok) else (re.search(r"(trillion|billion|million|thousand|bn|mn|k)\b", tok) or [None, "plain"])[1]
+        raw = float(re.search(r"\d[\d,]*(?:\.\d+)?", tok).group(0).replace(",", ""))     # keep the figure as written: 5.6, not 5,600,000
+        out.append((_cap(label), raw, unit + "|" + _fmt_of(nums[0])))
+    return out if len(out) >= 3 and len({o[0].lower() for o in out}) == len(out) else []
+
+
 def det_chart(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents)
+    # one sentence listing label/value pairs ("A 62 percent, B 24 percent and C 14 percent")
+    for s_ in sents:
+        pairs_ = _enumerated_pairs(s_)
+        if pairs_:
+            units = {u.split("|")[0] for _, _, u in pairs_}
+            fmt = pairs_[0][2].split("|", 1)[1]
+            prefix, _, suffix = fmt.partition("|")
+            meta = {"fmt": {"prefix": prefix, "suffix": suffix}}
+            if units == {"pct"} and 95 <= sum(v for _, v, _ in pairs_) <= 105:
+                return "CHART_PART_TO_WHOLE", "pie", 0.9, {"points": [{"label": l, "value": v} for l, v, _ in pairs_[:8]], **meta}, "shares listed in one sentence that sum to ~100%"
+            if len(units) == 1:
+                return "CHART_CATEGORICAL", "bar", 0.86, {"points": [{"label": l, "value": v} for l, v, _ in pairs_[:8]], **meta}, "one quantity listed across categories"
     # percentage shares of a whole
     pct = []
     for s in sents:
@@ -717,6 +880,34 @@ def det_checklist_or_points(title: str, sents: List[str], bullets: List[str]) ->
     return "KEY_POINTS", "grid" if len(heads) <= 6 else "list", 0.55, {"cards": heads}, "discrete key points (lossless cards)"
 
 
+def prose_facts(sents: List[str]) -> List[Dict[str, str]]:
+    """Up to three figures worth lifting out of running text for an "at a glance" rail: complexities, amounts, shares, durations."""
+    out: List[Dict[str, str]] = []
+    seen = set()
+    blob = " ".join(sents)
+    for m in re.finditer(r"\bO\(([^)]{1,14})\)", blob):
+        value = "O(" + m.group(1).replace("^2", "²").replace("^3", "³") + ")"
+        near = blob[max(0, m.start() - 48):m.start()].lower() + " | " + blob[m.end():m.end() + 36].lower()
+        label = "Complexity"
+        for pat, name in ((r"running time", "Running time"), (r"worst[- ]case", "Worst case"), (r"best[- ]case", "Best case"), (r"average", "Average time"),
+                          (r"extra (?:memory|space)", "Extra memory"), (r"\bspace\b|\bmemory\b", "Memory"), (r"\btime\b", "Time"), (r"\bsteps?\b", "Steps")):
+            hit = re.search(pat, near)
+            if hit:
+                label = name
+                break
+        if value not in seen:
+            seen.add(value)
+            out.append({"value": value, "label": label})
+    for sent in sents:
+        for value, label in _local_stats(sent):
+            strong = bool(re.search(r"[%$₹€£]|percent|million|billion|thousand|[a-z]", value))     # a bare "3" is not a headline figure
+            if value in seen or not strong or len(label.split()) > 4 or not label.strip():
+                continue
+            seen.add(value)
+            out.append({"value": value, "label": label})
+    return out[:3]
+
+
 def det_prose(title: str, sents: List[str]) -> Det:
     """Narrative text: a lead sentence, then the rest as flowing prose with each sentence's relation to the previous one."""
     from learnova.visuals.discourse import analyze
@@ -726,7 +917,11 @@ def det_prose(title: str, sents: List[str]) -> Det:
         return None
     rels = analyze(sents)
     body = [{"text": s, "rel": r["rel"], "cue": r["cue"]} for s, r in zip(sents[1:], rels[1:])]
-    return "PROSE", "flow", 0.6, {"lead": sents[0], "body": body}, "connected explanation — kept as readable text, relationships marked"
+    data: Dict[str, Any] = {"lead": sents[0], "body": body}
+    facts = prose_facts(sents)
+    if facts:
+        data["facts"] = facts
+    return "PROSE", "flow", 0.6, data, "connected explanation — kept as readable text, relationships marked" + (" (figures pulled into a side rail)" if facts else "")
 
 
 _MATH_VERB = re.compile(r"^(?:expand|solve|simplify|multiply|factor(?:ise|ize)?|combine|substitute|divide|subtract|add|differentiate|integrate|evaluate|compute|calculate|check|rearrange|collect|cancel|square|take)\b", re.I)
@@ -819,6 +1014,11 @@ def takeaway_for(family: str, d: Dict[str, Any]) -> str:
             ev = d["events"]; return f"{len(ev)} milestones between {ev[0]['date']} and {ev[-1]['date']}."
         if family == "COMPARE_TABLE" and d.get("kind") == "table":
             return f"{d.get('total_rows', len(d['rows']))} rows · {', '.join(h for h in d['headers'] if h)[:90]}"
+        if family == "COMPARE_TABLE" and (len(d["headers"]) >= 3 or len(d["rows"]) >= 3):
+            h = [x.lower() for x in d["headers"] if x]
+            noun = h[0] if h[0].endswith("s") else h[0] + "s"
+            crit = ", ".join(h[1:-1]) + (" and " if len(h) > 2 else "") + h[-1] if len(h) > 1 else ""
+            return f"{len(d['rows'])} {noun} compared on {crit}."
         if family == "COMPARE_TABLE":
             h, r = d["headers"], d["rows"][0]; return f"Key difference — {h[0]}: {r[0]}  |  {h[1]}: {r[1]}"[:170]
         if family == "COMPARE_VISUAL":
@@ -828,7 +1028,7 @@ def takeaway_for(family: str, d: Dict[str, Any]) -> str:
         if family in {"DEFINITION"}:
             return _strip_end(d["definition"]) + "."
         if family == "FORMULA_CALLOUT":
-            return f"Remember: {d['formula']}"
+            return "" if re.search(r"[⇌→]", d["formula"]) else f"Remember: {d['formula']}"
         if family in {"LAYERS", "HIERARCHY_NEST"}:
             lv = d["levels"]; return f"{len(lv)} levels, from {lv[0]['label'].lower()} to {lv[-1]['label'].lower()}."
         if family == "CAUSE_EFFECT":
@@ -842,6 +1042,28 @@ def takeaway_for(family: str, d: Dict[str, Any]) -> str:
     except Exception:
         pass
     return ""
+
+
+def dedupe_head_body(head: str, body: str) -> Tuple[str, str]:
+    """When the body just repeats the heading's words at its start, keep the heading and the remainder only:
+    ("A high pressure favours ammonia", "A high pressure favours ammonia because there are fewer…") → (heading, "because there are fewer…")."""
+    hw = re.findall(r"[a-z0-9']+", head.lower())
+    bw = body.split()
+    if len(hw) >= 2 and len(bw) > len(hw):
+        lead = re.findall(r"[a-z0-9']+", " ".join(bw[:len(hw) + 2]).lower())[:len(hw)]
+        if lead == hw:
+            rest = " ".join(bw[len(head.split()):]).lstrip(" ,;:-—")
+            if len(rest.split()) >= 2:
+                return head, rest
+    return head, body
+
+
+def _tidy_pairs(data: Dict[str, Any]) -> Dict[str, Any]:
+    for key, hk, bk in (("stages", "label", "detail"), ("steps", "label", "detail"), ("nodes", "label", "detail"), ("cards", "heading", "body")):
+        for it in data.get(key) or []:
+            if isinstance(it, dict) and it.get(hk) and it.get(bk):
+                it[hk], it[bk] = dedupe_head_body(str(it[hk]), str(it[bk]))
+    return data
 
 
 def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any = None) -> Decision:
@@ -883,7 +1105,10 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     add(det_function(title, sents))
     add(det_worked(title, sents))
     add(det_labelled(title, sents, text))
+    add(det_equation(title, sents))
+    add(det_glossary(title, sents))
     add(det_compare(title, sents))
+    add(det_parallel_table(title, sents))
     add(det_pros_cons(title, sents))
     add(det_matrix(title, sents))
     add(det_timeline(title, sents))
@@ -922,7 +1147,7 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
         cands.sort(key=lambda c: -c[2])
         fam, var, conf, data, why = cands[0]
         alts = [(c[0], c[2]) for c in cands[1:4]]
-        return Decision(fam, var, min(conf, 0.97), data, why, alts, takeaway=takeaway_for(fam, data))
+        return Decision(fam, var, min(conf, 0.97), _tidy_pairs(data), why, alts, takeaway=takeaway_for(fam, data))
     fam, var, conf, data, why = base or det_prose(title, sents) or ("KEY_POINTS", "grid", 0.5,
                                          {"cards": [{"heading": heading_for(s), "body": _strip_end(s)} for s in sents[:6]]},
                                          "no structure found — lossless key-point cards")

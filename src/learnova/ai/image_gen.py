@@ -83,6 +83,8 @@ def plan_image(title: str, text: str, family: str, data: Dict[str, Any], *, has_
         return ImagePlan(False, "the source already has a figure — keep that one")
     if family in _NO_IMAGE_FAMILIES:
         return ImagePlan(False, f"the {family.lower().replace('_', ' ')} visual is the content — an image would only crowd it")
+    if family == "PROSE" and data.get("facts"):
+        return ImagePlan(False, "the side panel shows this slide's figures instead of a picture")
     if family not in _CONCEPT_FAMILIES or not _size_ok(family, data):
         return ImagePlan(False, "no room beside the visual")
     if prev_drawn and total >= 4:
