@@ -5,8 +5,8 @@ from learnova.analysis import build_analysis
 from learnova.parsers.markdown_converter import from_typed_text
 from learnova.pipeline.orchestrator import PipelineConfig, generate
 
-LONG = " ".join(f"Concept number {i} explains one separate idea about topic {i} in some detail for students." for i in range(20))
-MD = f"## Big Section\n{LONG}\n\n## Tiny\nMachine learning is a branch of AI that learns from data.\n\n## Uses It\nMachine learning is used in spam filters."
+LONG = " ".join(f"Concept number {i} explains one separate idea about topic {i} in some detail for students." for i in range(50))
+MD =f"## Big Section\n{LONG}\n\n## Tiny\nMachine learning is a branch of AI that learns from data.\n\n## Uses It\nMachine learning is used in spam filters."
 
 
 def _run(md=MD):
@@ -17,7 +17,7 @@ def _run(md=MD):
 def test_every_sentence_survives_and_long_sections_split():
     res = _run()
     text = " ".join(" ".join(str(b) for b in e["improved"].get("bullets", [])) for e in res.final_deck)
-    assert all(f"Concept number {i} " in text for i in range(20)), "a sentence was dropped"
+    assert all(f"Concept number {i} " in text for i in range(50)), "a sentence was dropped"
     titles = [e["improved"]["title"] for e in res.final_deck]
     assert any("overview" in t for t in titles), "long section needs an overview slide"
     assert sum(1 for t in titles if t.startswith("Big Section")) >= 3

@@ -956,6 +956,85 @@ def _mind_map(c: _Canvas, data) -> bool:
     return True
 
 
+_REL_RGB = {
+    "contrast": RGBColor(0xC2, 0x41, 0x0C), "concession": RGBColor(0xC2, 0x41, 0x0C), "cause": RGBColor(0x1D, 0x4E, 0xD8),
+    "result": RGBColor(0x1D, 0x4E, 0xD8), "example": RGBColor(0x0F, 0x76, 0x6E), "addition": RGBColor(0x0F, 0x76, 0x6E),
+    "sequence": RGBColor(0x6D, 0x28, 0xD9), "purpose": RGBColor(0x6D, 0x28, 0xD9), "elaboration": RGBColor(0x64, 0x74, 0x8B),
+}
+_REL_TAG = {"contrast": "but", "concession": "although", "cause": "because", "result": "so", "example": "e.g.",
+            "addition": "also", "sequence": "then", "purpose": "in order to"}
+
+
+def _prose(c: _Canvas, data) -> bool:
+    """Plain text, no boxes: an emphasised lead sentence, then the rest as prose with relations marked
+    (coloured connectives, a small relation tag, examples indented)."""
+    from learnova.visuals.discourse import cue_spans
+
+    lead = str(data.get("lead", "")).strip()
+    body = [(str(b.get("text", "")).strip(), str(b.get("rel", "none"))) for b in (data.get("body") or []) if str(b.get("text", "")).strip()]
+    if not lead:
+        return False
+    bar_w = 0.09
+    lx = c.x + bar_w + PAD * 0.9
+    lw = c.w - (lx - c.x)
+    gap = 0.14
+
+    def tagged(text, rel):
+        tag = _REL_TAG.get(rel, "")
+        return (tag.upper() + "   " if tag else "") + text
+
+    def make(b):
+        ps = [(lead, b * 1.38, True, 0)] + [(tagged(t, r), b, False, 0) for t, r in body]
+        return ps
+
+    b = 24.0
+    while b > 11.0:
+        ps = make(b)
+        total = sum(L.paras_height([p], lw - (0.3 if i and body[i - 1][1] in {"example", "elaboration"} else 0)) for i, p in enumerate(ps)) + gap * (len(ps) + 0.5)
+        if total <= c.h * 0.96 and L.longest_word_fits([p[0] for p in ps], lw, b, False):
+            break
+        b -= 0.5
+    ps = make(b)
+    heights = [L.paras_height([p], lw - (0.3 if i and body[i - 1][1] in {"example", "elaboration"} else 0)) for i, p in enumerate(ps)]
+    total = sum(heights) + gap * (len(ps) + 0.5)
+    y = c.y + max(0.0, (c.h - total) / 2)
+    with c.group():
+        c.accent_bar(c.x, y + 0.04, heights[0] - 0.02, bar_w)
+        c.tb(lx, y, lw, heights[0], [P(lead, b * 1.38, True, c.t.primary_rgb)], anchor=MSO_ANCHOR.TOP)
+    y += heights[0] + gap * 1.5
+    for (text, rel), h in zip(body, heights[1:]):
+        indent = 0.3 if rel in {"example", "elaboration"} else 0.0
+        with c.group():
+            box = c.s.shapes.add_textbox(Inches(lx + indent), Inches(y), Inches(lw - indent), Inches(h))
+            tf = box.text_frame
+            tf.word_wrap = True
+            tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+            p = tf.paragraphs[0]
+            tag = _REL_TAG.get(rel, "")
+            if tag:
+                r0 = p.add_run()
+                r0.text = tag.upper() + "   "
+                r0.font.size = Pt(round(b * 0.62, 1))
+                r0.font.bold = True
+                r0.font.color.rgb = _REL_RGB.get(rel, c.t.primary_rgb)
+            pos = 0
+            for a, z, name in cue_spans(text) + [(len(text), len(text), "")]:
+                if a > pos:
+                    r1 = p.add_run()
+                    r1.text = text[pos:a]
+                    r1.font.size = Pt(round(b, 1))
+                    r1.font.color.rgb = c.t.text_rgb
+                if z > a:
+                    r2 = p.add_run()
+                    r2.text = text[a:z]
+                    r2.font.size = Pt(round(b, 1))
+                    r2.font.bold = True
+                    r2.font.color.rgb = _REL_RGB.get(name, c.t.primary_rgb)
+                pos = max(pos, z)
+        y += h + gap
+    return True
+
+
 # ── generic entry points used by ppt_builder ─────────────────────────────────
 def draw_cards(slide, theme, band, items: List[Tuple[str, str]], kind: str = "grid", numbered: bool = False) -> bool:
     """Card grid or arrow-linked process from ``(heading, body)`` pairs (heading may be empty)."""
@@ -1042,6 +1121,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             ok = _matrix(c, data)
         elif family == "REFERENCES":
             ok = _references(c, data)
+        elif family == "PROSE":
+            ok = _prose(c, data)
         elif family in {"LAYERS", "HIERARCHY_NEST"}:
             ok = _layers(c, {"levels": [{"label": x} if isinstance(x, str) else x for x in data.get("levels", [])]})
         elif family == "SET_DIAGRAM":

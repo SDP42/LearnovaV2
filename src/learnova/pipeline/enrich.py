@@ -79,8 +79,10 @@ def attach_key_terms(entries: List[dict], gl: Dict[str, Tuple[str, int]], per_sl
     return n
 
 
-def glossary_slides(entries: List[dict], gl: Dict[str, Tuple[str, int]], per_slide: int = 6, minimum: int = 4) -> int:
-    items = [(t, d) for t, (d, _) in gl.items() if len(d.split()) >= 3]
+def glossary_slides(entries: List[dict], gl: Dict[str, Tuple[str, int]], per_slide: int = 6, minimum: int = 4, max_terms: int = 12) -> int:
+    corpus = " ".join(str((e.get("original") or {}).get("text") or "") for e in entries).lower()
+    ranked = sorted(((corpus.count(t), t, d) for t, (d, _) in gl.items() if len(d.split()) >= 3), reverse=True)
+    items = [(t, d) for _, t, d in ranked[:max_terms]]
     if len(items) < minimum:
         return 0
     base = entries[0] if entries else None

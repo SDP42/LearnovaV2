@@ -44,7 +44,7 @@ _NO_IMAGE_FAMILIES = {
     "CIRCUIT", "CHEM_DIAGRAM", "PROCESS_CYCLIC",
 }
 _CONCEPT_FAMILIES = {"DEFINITION", "FORMULA_CALLOUT", "QUOTE", "KEY_POINTS", "CHECKLIST", "CAUSE_EFFECT", "LIST_STRUCTURED",
-                     "PROCESS_LINEAR", "TEXT"}
+                     "PROCESS_LINEAR", "TEXT", "PROSE"}
 MAX_SHARE = 0.45
 
 
@@ -61,6 +61,9 @@ def _size_ok(family: str, data: Dict[str, Any]) -> bool:
     """Is there room beside the visual for a side panel?"""
     if family == "KEY_POINTS":
         return len(data.get("cards") or []) <= 4
+    if family == "PROSE":
+        words = len(str(data.get("lead", "")).split()) + sum(len(str(b.get("text", "")).split()) for b in (data.get("body") or []))
+        return words <= 115
     if family == "CHECKLIST":
         return len(data.get("items") or []) <= 5
     if family == "PROCESS_LINEAR":

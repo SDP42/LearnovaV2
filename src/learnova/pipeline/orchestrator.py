@@ -405,7 +405,7 @@ def generate(
 
             result.improved = preserve_chunks(result.chunks)
             paginate_tables(result.improved)
-            plan_slides(result.improved, {"compact": 120, "balanced": 90, "detailed": 65}.get(config.slide_detail, 90))
+            plan_slides(result.improved, {"compact": 170, "balanced": 130, "detailed": 90}.get(config.slide_detail, 130))
             stats = _enrich_deck(result.improved)
             try:
                 from learnova.ai import assist
@@ -635,10 +635,11 @@ def generate(
 
     # 9. Quiz generation + interleaving
     def _quiz():
-        result.quizzes = generate_quizzes(result.improved, frequency=config.quiz_frequency, positions=config.quiz_positions or None)
+        _freq = max(config.quiz_frequency, -(-len(result.improved) // 8))  # never more than ~1 checkpoint per 8 slides
+        result.quizzes = generate_quizzes(result.improved, frequency=_freq, positions=config.quiz_positions or None)
         result.final_deck = interleave_quizzes_into_slides(
             result.improved, result.quizzes,
-            frequency=config.quiz_frequency,
+            frequency=_freq,
             inline=(config.quiz_style != "slide"),
             positions=config.quiz_positions or None,
         )

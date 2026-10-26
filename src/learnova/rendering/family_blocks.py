@@ -657,6 +657,47 @@ def _funnel(data: Dict[str, Any], theme) -> Optional[str]:
     return f'<div style="display:flex;flex-direction:column;gap:8px;margin-top:18px;{_FILL}justify-content:center;">{rows}</div>'
 
 
+_REL_STYLE = {  # relation → (label, colour)
+    "contrast": ("but", "#C2410C"), "concession": ("although", "#C2410C"), "cause": ("because", "#1D4ED8"),
+    "result": ("so", "#1D4ED8"), "example": ("e.g.", "#0F766E"), "addition": ("also", "#0F766E"),
+    "sequence": ("then", "#6D28D9"), "purpose": ("in order to", "#6D28D9"), "elaboration": ("", "#64748B"),
+}
+
+
+def _prose(data: Dict[str, Any], theme) -> Optional[str]:
+    """Plain, readable text — no boxes. A lead sentence, then the rest as prose with each sentence's relation marked."""
+    from learnova.visuals.discourse import cue_spans
+
+    lead = str(data.get("lead", "")).strip()
+    body = data.get("body") or []
+    if not lead:
+        return None
+    n_words = len(lead.split()) + sum(len(str(b.get("text", "")).split()) for b in body)
+    fs = 1.34 if n_words < 60 else 1.18 if n_words < 100 else 1.04
+    parts = [
+        f'<div style="display:flex;gap:18px;margin:6px 0 18px;"><div style="flex:none;width:6px;border-radius:3px;background:{theme.accent_hex};"></div>'
+        f'<div data-el="el.0" data-build="0" style="font-weight:700;font-size:{fs + 0.38:.2f}rem;line-height:1.3;color:{theme.primary_hex};">{_esc(lead)}</div></div>'
+    ]
+    rows = []
+    for i, b in enumerate(body):
+        text, rel = str(b.get("text", "")), str(b.get("rel", "none"))
+        html_text, pos = "", 0
+        for a, z, name in cue_spans(text):
+            col = _REL_STYLE.get(name, ("", theme.primary_hex))[1]
+            html_text += _esc(text[pos:a]) + f'<b style="color:{col};">{_esc(text[a:z])}</b>'
+            pos = z
+        html_text += _esc(text[pos:])
+        label, col = _REL_STYLE.get(rel, ("", ""))
+        tag = (f'<span style="display:inline-block;min-width:78px;font-size:.68rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;'
+               f'color:{col};padding-top:.45em;">{label}</span>') if label else '<span style="display:inline-block;min-width:78px;"></span>'
+        nest = "padding-left:14px;border-left:3px solid " + (col or "#CBD5E1") + "55;" if rel in {"example", "elaboration"} else ""
+        rows.append(
+            f'<div data-el="el.{i + 1}" data-build="{i + 1}" style="display:flex;gap:12px;align-items:flex-start;margin:0 0 .55em;">{tag}'
+            f'<div style="flex:1;font-size:{fs}rem;line-height:1.55;color:{theme.text_hex};{nest}">{html_text}</div></div>'
+        )
+    return f'<div style="margin-top:10px;min-height:400px;display:flex;flex-direction:column;justify-content:center;">{"".join(parts)}{"".join(rows)}</div>'
+
+
 def _references(data: Dict[str, Any], theme) -> Optional[str]:
     items = [str(x) for x in (data.get("items") or []) if str(x).strip()]
     if not items:
@@ -928,6 +969,7 @@ _BUILDERS = {
     "LIST_STRUCTURED": _cards,
     "KEY_POINTS": _key_points,
     "REFERENCES": _references,
+    "PROSE": _prose,
     "STAT_TILES": _stat_tiles,
     "CAUSE_EFFECT": _cause_effect,
     "LAYERS": _layers,

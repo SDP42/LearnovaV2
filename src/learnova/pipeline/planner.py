@@ -23,10 +23,10 @@ from typing import Dict, List
 
 from learnova.visuals.engine import _content_words, heading_for, short_label, split_sentences
 
-MAX_WORDS = 90      # visible words per slide before it is split
-MIN_PART = 35       # a trailing fragment shorter than this is merged back
+MAX_WORDS = 130     # visible words per slide before it is split (balanced)
+MIN_PART = 50       # a trailing fragment shorter than this is merged back
 SHORT_WORDS = 30    # below this a slide counts as "short" and gets enrichment
-HARD_CAP = 130      # self-correction: nothing may exceed this
+HARD_CAP = 190      # self-correction: nothing may exceed this
 
 
 def _wc(s: str) -> int:
@@ -65,6 +65,12 @@ def _jaccard(a: set, b: set) -> float:
     return len(a & b) / max(1, len(a | b))
 
 
+_CONTINUES = re.compile(r"^(?:however|therefore|thus|hence|consequently|as a result|for example|for instance|in addition|moreover|furthermore|"
+                         r"also|similarly|likewise|otherwise|instead|nevertheless|in contrast|on the other hand|this|these|those|such|"
+                         r"it|they|its|their|both|each of|in other words|that is|as a consequence|because of this|to do this|to achieve this)\b", re.I)
+_INTRO = re.compile(r"[:]\s*$|\b(?:following|as follows|below|these are)\b[^.]*$", re.I)
+
+
 def _group(sents: List[str], max_words: int = MAX_WORDS) -> List[List[str]]:
     min_part = max(30, int(max_words * 0.4))
     groups: List[List[str]] = []
@@ -75,8 +81,9 @@ def _group(sents: List[str], max_words: int = MAX_WORDS) -> List[List[str]]:
         shift = False
         if cur and cw >= 45:
             recent = set(_content_words(" ".join(cur[-3:])))
-            shift = _jaccard(recent, set(_content_words(s))) < 0.06
-        if cur and (cw + w > max_words or shift):
+            shift = _jaccard(recent, set(_content_words(s))) < 0.04
+        leans = bool(_CONTINUES.match(s.strip())) or (bool(cur) and bool(_INTRO.search(cur[-1])))
+        if cur and (cw + w > max_words or shift) and not (leans and cw + w <= max_words * 1.35):
             groups.append(cur)
             cur, cw = [], 0
         cur.append(s)
@@ -97,6 +104,40 @@ def _unique(title: str, used: Dict[str, int]) -> str:
     n = used.get(title.lower(), 0)
     used[title.lower()] = n + 1
     return title if n == 0 else f"{title} ({n + 1})"
+
+
+_SEC = re.compile(r"^\s*(\d+)(?:\.\d+)*[.)]?\s")
+
+
+def _section_of(entry: dict) -> str:
+    t = str((entry.get("improved") or {}).get("title") or "")
+    m = _SEC.match(t)
+    return m.group(1) if m else ""
+
+
+def _merge_small(entries: List[dict], max_words: int) -> List[dict]:
+    """Adjacent tiny slides from the same numbered section share one slide, each keeping its heading as a lead-in."""
+    out: List[dict] = []
+    for e in entries:
+        imp = e.get("improved") or {}
+        prev = out[-1] if out else None
+        pimp = (prev or {}).get("improved") or {}
+        small = lambda x: sum(_wc(b) for b in (x.get("bullets") or [])) < 55  # noqa: E731
+        if (prev is not None and _section_of(e) and _section_of(e) == _section_of(prev) and small(imp) and small(pimp)
+                and not _is_table_entry(e) and not _is_table_entry(prev) and not imp.get("is_overview") and not pimp.get("is_overview")
+                and not imp.get("part") and not pimp.get("part")
+                and sum(_wc(b) for b in imp.get("bullets", [])) + sum(_wc(b) for b in pimp.get("bullets", [])) <= max_words):
+            heading = re.sub(r"^\s*\d+(?:\.\d+)*[.)]?\s*", "", str(imp.get("title") or ""))
+            if not pimp.get("merged_first"):
+                first = re.sub(r"^\s*\d+(?:\.\d+)*[.)]?\s*", "", str(pimp.get("title") or ""))
+                pimp["bullets"] = [f"{first}. " + pimp["bullets"][0]] + list(pimp["bullets"][1:]) if pimp.get("bullets") else pimp.get("bullets", [])
+                pimp["merged_first"] = True
+            pimp["bullets"] = list(pimp["bullets"]) + ([f"{heading}. " + imp["bullets"][0]] + list(imp["bullets"][1:]) if imp.get("bullets") else [])
+            pimp["title"] = f"{pimp['title']} · {str(imp.get('title') or '').split(' ', 1)[0]}"
+            prev["original"]["text"] = (prev["original"].get("text", "") + "\n" + e["original"].get("text", "")).strip()
+            continue
+        out.append(e)
+    return out
 
 
 def plan_slides(entries: List[dict], max_words: int = MAX_WORDS) -> int:
@@ -127,13 +168,14 @@ def plan_slides(entries: List[dict], max_words: int = MAX_WORDS) -> int:
             e["improved"] = {"layout_type": "MINIMAL_TEXT", "title": _unique(title, used), "bullets": g, "takeaway": "",
                              "verbatim": [], "part": [k + 1, len(groups)], "short": sum(_wc(x) for x in g) < SHORT_WORDS}
             out.append(e)
-        if len(groups) >= 3:  # a map of the parts, placed before them
+        if len(groups) >= 4 and len(entries) < 40:  # a map of the parts, placed before them (short decks only)
             ov = copy.deepcopy(entry)
             lines = [f"{heading_for(l) if len(l.split()) > 4 else l}: {' '.join(g[0].split()[:16])}" for l, g in zip(labels[:6], groups[:6])]
             ov["original"]["text"] = "\n".join(lines)
             ov["improved"] = {"layout_type": "MINIMAL_TEXT", "title": _unique(f"{base}: overview", used), "bullets": lines, "takeaway": "",
                               "verbatim": [], "is_overview": True}
             out.insert(len(out) - len(groups), ov)
+    out = _merge_small(out, max_words)
     # self-correction: nothing over the hard cap; no empty slide
     final = []
     for e in out:

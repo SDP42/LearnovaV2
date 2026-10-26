@@ -41,7 +41,8 @@ def evaluate(verbose: bool = False) -> Dict[str, Any]:
     rows = []
     for c in gold:
         sp = _one_slide_plan(c)
-        fit = sp.family in c["ok"]
+        # connected prose may be shown as plain text-with-relationships wherever lossless key-point cards were acceptable
+        fit = sp.family in c["ok"] or (sp.family == "PROSE" and "KEY_POINTS" in c["ok"])
         cov = sp.family not in {"TEXT", "MINIMAL_TEXT", ""}
         has = bool(sp.data)
         rows.append({"id": c["id"], "got": sp.family, "ok": c["ok"], "fit": fit, "coverage": cov,

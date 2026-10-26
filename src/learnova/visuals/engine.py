@@ -629,8 +629,28 @@ def det_checklist_or_points(title: str, sents: List[str], bullets: List[str]) ->
     imperative = sum(1 for s in src if re.match(r"^(?:review|use|teach|practice|sleep|keep|avoid|make|ensure|check|always|never|try|start|stop|write|read|set|plan|build|test|drink|eat|take|run|add|remove|define|choose|ask|learn|focus)\b", s.strip(), re.I))
     if imperative >= max(3, int(len(src) * 0.6)):
         return "CHECKLIST", "ticks", 0.8, {"items": [{"text": _strip_end(s)} for s in src[:8]]}, "actionable tips"
+    # Connected prose — long sentences that lean on each other ("however", "because", "for example") — reads best as
+    # plain flowing text with its relationships marked, not as separate boxes. Boxes are for short parallel items.
+    from learnova.visuals.discourse import analyze
+
+    avg = sum(len(s.split()) for s in src) / len(src)
+    linked = sum(1 for r in analyze(src) if r["rel"] != "none")
+    if avg >= 13 or linked >= 2 or len(src) < 3:
+        return det_prose(title, src)
     heads = [{"heading": heading_for(s), "body": _strip_end(s)} for s in src[:6]]
     return "KEY_POINTS", "grid" if len(heads) <= 6 else "list", 0.55, {"cards": heads}, "discrete key points (lossless cards)"
+
+
+def det_prose(title: str, sents: List[str]) -> Det:
+    """Narrative text: a lead sentence, then the rest as flowing prose with each sentence's relation to the previous one."""
+    from learnova.visuals.discourse import analyze
+
+    sents = [_strip_end(s) + "." if not re.search(r"[.!?:]$", _strip_end(s)) else s.strip() for s in sents if s.strip()]
+    if not sents:
+        return None
+    rels = analyze(sents)
+    body = [{"text": s, "rel": r["rel"], "cue": r["cue"]} for s, r in zip(sents[1:], rels[1:])]
+    return "PROSE", "flow", 0.6, {"lead": sents[0], "body": body}, "connected explanation — kept as readable text, relationships marked"
 
 
 _MATH_VERB = re.compile(r"^(?:expand|solve|simplify|multiply|factor(?:ise|ize)?|combine|substitute|divide|subtract|add|differentiate|integrate|evaluate|compute|calculate|check|rearrange|collect|cancel|square|take)\b", re.I)
@@ -810,7 +830,7 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
         fam, var, conf, data, why = cands[0]
         alts = [(c[0], c[2]) for c in cands[1:4]]
         return Decision(fam, var, min(conf, 0.97), data, why, alts, takeaway=takeaway_for(fam, data))
-    fam, var, conf, data, why = base or ("KEY_POINTS", "grid", 0.5,
+    fam, var, conf, data, why = base or det_prose(title, sents) or ("KEY_POINTS", "grid", 0.5,
                                          {"cards": [{"heading": heading_for(s), "body": _strip_end(s)} for s in sents[:6]]},
                                          "no structure found — lossless key-point cards")
     return Decision(fam, var, conf, data, why, [], takeaway=takeaway_for(fam, data))

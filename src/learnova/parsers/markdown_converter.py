@@ -870,6 +870,20 @@ def convert_to_markdown(
     Convert a PPTX or PDF into the markdown IR. For PDFs, tables are then recovered natively
     (see ``pdf_tables``) so a table reaches the pipeline as a real grid, not as fragments.
     """
+    if str(path).lower().endswith(".pdf") and prefer_anydoc and not textbook_mode:
+        # Reports/papers: rebuild the logical structure from layout (headings, tables, lists, page furniture removed).
+        try:
+            if not is_multi_column_pdf(str(path)) and not is_slide_style_pdf(str(path)):
+                from learnova.parsers.pdf_structure import pdf_to_markdown
+
+                r = pdf_to_markdown(str(path))
+                if r:
+                    assets = _extract_native_assets(str(path), ".pdf", textbook_mode) if extract_images else []
+                    return MarkdownDocument(markdown=r["markdown"], source_name=r["title"] or (source_name or pathlib.Path(path).name),
+                                            source_type="pdf", converter="pdf-structure", assets=assets,
+                                            meta={"pages": r["pages"], "headings": r["headings"], "file_name": pathlib.Path(path).name})
+        except Exception:
+            logger.exception("structure-aware PDF reader failed; falling back to the generic converter")
     doc = _convert_to_markdown_impl(path, source_name, textbook_mode, use_cache, prefer_anydoc, extract_images)
     if str(path).lower().endswith(".pdf") and not re.search(r"\[TABLE DATA\]\n\|", doc.markdown or ""):
         from learnova.parsers.pdf_tables import inject_native_tables

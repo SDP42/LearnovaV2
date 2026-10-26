@@ -68,8 +68,8 @@ def page_tables(page) -> List[Dict]:
     return out
 
 
-def table_markdown(rows: List[List[str]]) -> str:
-    caps: List[str] = []
+def table_markdown(rows: List[List[str]], caption: str = "") -> str:
+    caps: List[str] = [caption] if caption else []
     while len(rows) > 2 and sum(1 for c in rows[0] if c) == 1:  # a spanning caption row, not a header
         caps.append(next(c for c in rows[0] if c))
         rows = rows[1:]
