@@ -467,7 +467,7 @@ def det_compare(title: str, sents: List[str]) -> Det:
         if subj_re.match(x):                         # drop the subject only when it opens the clause ("Bias is…"), never mid-sentence
             x = subj_re.sub("", x, count=1).strip(" ,;")
             x = re.sub(r"^(?:is|are|was|were|means|refers to)\s+", "", x, flags=re.I)
-        x = re.sub(r"[,;]?\s*(?:while|whereas|but|and)\s*$", "", x, flags=re.I).strip(" ,;")
+        x = re.sub(r"[,;]?\s*\b(?:while|whereas|but|and)\s*$", "", x, flags=re.I).strip(" ,;")
         x = re.sub(r"^(?:learning|models?|databases?|systems?|methods?|approach(?:es)?)\b\s*", "", x, flags=re.I)
         return _cap(_strip_end(x))
 
@@ -930,8 +930,9 @@ def prose_facts(sents: List[str]) -> List[Dict[str, str]]:
             out.append({"value": value, "label": label})
     for sent in sents:
         for value, label in _local_stats(sent):
-            strong = bool(re.search(r"[%$₹€£]|percent|million|billion|thousand|[a-z]", value))     # a bare "3" is not a headline figure
-            if value in seen or not strong or len(label.split()) > 4 or not label.strip():
+            strong = bool(re.search(r"[%$₹€£]|percent|million|billion|thousand|trillion", value))     # "16 hour" or a bare "3" is not a headline figure
+            ranged = bool(re.search(r"\d\s*(?:to|-|–)\s*$", sent[:max(0, sent.find(value.split()[0]))].rstrip() + " ")) or bool(re.search(re.escape(value.split()[0]) + r"\s*(?:to|-|–)\s*\d", sent))
+            if value in seen or not strong or ranged or len(label.split()) > 4 or not label.strip():
                 continue
             seen.add(value)
             out.append({"value": value, "label": label})
@@ -1074,25 +1075,42 @@ def takeaway_for(family: str, d: Dict[str, Any]) -> str:
     return ""
 
 
+def _no_article(t: str) -> str:
+    return re.sub(r"^(?:a|an|the)\s+", "", t.strip(), flags=re.I)
+
+
 def dedupe_head_body(head: str, body: str) -> Tuple[str, str]:
     """When the body just repeats the heading's words at its start, keep the heading and the remainder only:
     ("A high pressure favours ammonia", "A high pressure favours ammonia because there are fewer…") → (heading, "because there are fewer…")."""
-    hw = re.findall(r"[a-z0-9']+", head.lower())
-    bw = body.split()
+    head_core, body_na = _no_article(head), _no_article(body)
+    hw = re.findall(r"[a-z0-9']+", head_core.lower())
+    bw = body_na.split()
     if len(hw) >= 2 and len(bw) > len(hw):
         lead = re.findall(r"[a-z0-9']+", " ".join(bw[:len(hw) + 2]).lower())[:len(hw)]
         if lead == hw:
-            rest = " ".join(bw[len(head.split()):]).lstrip(" ,;:-—")
+            rest = " ".join(bw[len(head_core.split()):]).lstrip(" ,;:-—")
             if len(rest.split()) >= 2:
                 return head, rest
+            return "", body                      # the heading is the sentence's own opening: show the sentence once, no heading
     return head, body
 
 
 def _tidy_pairs(data: Dict[str, Any]) -> Dict[str, Any]:
     for key, hk, bk in (("stages", "label", "detail"), ("steps", "label", "detail"), ("nodes", "label", "detail"), ("cards", "heading", "body")):
-        for it in data.get(key) or []:
-            if isinstance(it, dict) and it.get(hk) and it.get(bk):
-                it[hk], it[bk] = dedupe_head_body(str(it[hk]), str(it[bk]))
+        items = [it for it in data.get(key) or [] if isinstance(it, dict)]
+        for it in items:
+            if it.get(hk) and it.get(bk):
+                orig_h, orig_b = str(it[hk]), str(it[bk])
+                it[hk], it[bk] = dedupe_head_body(orig_h, orig_b)
+                if not it[hk] and key != "cards":           # a flow step always keeps a heading: the whole short sentence, or the original pair
+                    short = len(_no_article(orig_b).split()) <= 9
+                    it[hk], it[bk] = (_cap(_no_article(orig_b).rstrip(".")), "") if short else (orig_h, orig_b)
+        # cards where most headings only echo their sentence read better as plain sentences — one style for the whole slide
+        if key == "cards" and items and sum(1 for it in items if not it.get(hk)) >= max(1, len(items) // 2):
+            for it in items:
+                if it.get(hk) and it.get(bk) and len(str(it[bk]).split()) <= 22:
+                    it[bk] = f"{it[hk]} {it[bk]}".strip() if _no_article(str(it[bk])).lower().startswith(("and ", "or ")) is False and not str(it[bk])[:1].isupper() else it[bk]
+                    it[hk] = ""
     return data
 
 

@@ -83,7 +83,7 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
         ev = d.get("events") or []
         if len(ev) >= 3:
             e = ev[len(ev) // 2]
-            return _make(seed, f"When did this happen: “{_clip(e['title'], 14)}”?", e["date"], [x["date"] for x in ev if x is not e] + ["1900", "2010"],
+            return _make(seed, f"When did this happen: “{_clip(e['title'], 14)}”?", e["date"], [x["date"] for x in ev if x is not e] + [str(int(re.search(r"\d{4}", e["date"]).group(0)) + d) for d in (-12, 15, 31) if re.search(r"\d{4}", e["date"])] + ["1900", "2010"],
                          f"{e['date']}: {e['title']}.")
     if fam in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT"}:
         st = d.get("stages") or d.get("nodes") or []

@@ -481,12 +481,12 @@ def _timeline(c: _Canvas, data) -> bool:
     n = len(ev)
     cy = c.y + c.h / 2
     step = c.w / n
-    cw = min(step * 1.9, 3.3)
-    ch = (c.h / 2) - 0.45
-    ch = min(ch, 2.6)
+    cw = min(step * 1.95, 3.7)
+    ch = (c.h / 2) - 0.4
+    ch = min(ch, 2.9)
     tw, th = cw - 2 * PAD, ch - 2 * PAD
     def make(b, e): return [P(str(e.get("date", "")), b * 1.35, True, _readable_accent(c.t)), P(str(e.get("title", "")), b, False, c.t.text_rgb, 3)]
-    b = min(c.fit_paras(lambda s, e=e: make(s, e), tw, th, 22, 10.5) for e in ev)
+    b = min(c.fit_paras(lambda s, e=e: make(s, e), tw, th, 24, 11) for e in ev)
     with c.group():
         c.shape(MSO_SHAPE.RECTANGLE, c.x, cy - 0.03, c.w, 0.06, _blend(c.t.primary_rgb, 0.4))
     for i, e in enumerate(ev):
@@ -1049,8 +1049,10 @@ def _prose(c: _Canvas, data) -> bool:
         """Width used to estimate a paragraph: the bold lead face (Poppins) runs wider than the estimate, so it gets extra margin."""
         return lw * 0.88 if i == 0 else lw - (0.3 if body[i - 1][1] in {"example", "elaboration"} else 0)
 
+    lead_k = 1.38 if len(lead.split()) <= 14 else 1.24 if len(lead.split()) <= 24 else 1.12     # a long lead sentence must not shout
+
     def make(b):
-        ps = [(lead, b * 1.38, True, 0)] + [(tagged(t, r), b, False, 0) for t, r in body]
+        ps = [(lead, b * lead_k, True, 0)] + [(tagged(t, r), b, False, 0) for t, r in body]
         return ps
 
     b = 24.0
@@ -1066,7 +1068,7 @@ def _prose(c: _Canvas, data) -> bool:
     y = c.y + max(0.0, (c.h - total) / 2)
     with c.group():
         c.accent_bar(c.x, y + 0.04, heights[0] - 0.02, bar_w)
-        c.tb(lx, y, lw, heights[0], [P(lead, b * 1.38, True, c.t.primary_rgb)], anchor=MSO_ANCHOR.TOP)
+        c.tb(lx, y, lw, heights[0], [P(lead, b * lead_k, True, c.t.primary_rgb)], anchor=MSO_ANCHOR.TOP)
     y += heights[0] + gap * 1.5
     for (text, rel), h in zip(body, heights[1:]):
         indent = 0.3 if rel in {"example", "elaboration"} else 0.0
