@@ -47,6 +47,7 @@ class Job:
     created_at: float = field(default_factory=time.time)
     result: Optional[PipelineResult] = None
     source_type: str = ""
+    expansion: Optional[dict] = None       # how a short prompt was turned into a lesson (mode, message, sections)
     _markdown_doc: Any = None
     _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
 
@@ -64,6 +65,8 @@ class Job:
             "stages": STAGES,
             "created_at": self.created_at,
         }
+        if self.expansion:
+            payload["expansion"] = self.expansion
         if self.result is not None:
             payload["result"] = self.result.summary()
         return payload

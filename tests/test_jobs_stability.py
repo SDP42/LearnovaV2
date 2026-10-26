@@ -98,3 +98,35 @@ def test_upload_formats_through_the_api(tmp_path, monkeypatch):
     assert any(j["status"] == "awaiting_review" for j in jobs)
     assert c.post(f"/api/jobs/{jobs[0]['id']}/cancel", headers=h).status_code == 200
     assert c.get("/api/health").json()["database"] is True
+
+
+def test_short_prompt_is_expanded_into_a_lesson(monkeypatch):
+    import os
+    os.environ["LEARNOVA_RATE_LIMIT"] = "off"
+    from fastapi.testclient import TestClient
+    from apps.api.main import app
+    from learnova.ai import lesson_writer as lw
+
+    fake = "# Gradient Descent\n\n" + "\n\n".join(
+        f"## Section {i}\n" + " ".join(["Gradient descent lowers a loss by stepping downhill."] * 8) for i in range(1, 9))
+
+    monkeypatch.setattr(lw, "_llm", lambda prompt, audience, tone, detail: fake)
+    c = TestClient(app)
+    ph = "+919000000088"
+    otp = c.post("/api/auth/otp/request", json={"phone": ph}).json()["dev_otp"]
+    h = {"Authorization": "Bearer " + c.post("/api/auth/otp/verify", json={"phone": ph, "code": otp}).json()["token"]}
+    r = c.post("/api/jobs/typed", json={"text": "Gradient descent for beginners", "title": "Typed Syllabus"}, headers=h).json()
+    assert r["expansion"]["mode"] == "llm" and r["expansion"]["sections"] == 8
+    md = c.get(f"/api/jobs/{r['id']}/markdown", headers=h).json()["markdown"]
+    assert md.count("## ") == 8
+    assert c.post("/api/jobs/typed", json={"text": "Gradient descent for beginners", "expand": False}, headers=h).json().get("expansion") is None
+    assert lw.is_prompt("Gradient descent for beginners") and not lw.is_prompt("# Notes\n- a\n- b")
+
+
+def test_lesson_validation_rejects_thin_output():
+    from learnova.ai import lesson_writer as lw
+
+    assert not lw._valid("# T\n\n## A\nshort\n\n## B\nshort", 9)
+    good = "# T\n\n" + "\n\n".join(f"## S{i}\n" + "word " * 50 for i in range(8))
+    assert lw._valid(good, 9)
+    assert not lw._valid("# T\n\n## A\nAs an AI I cannot do that. " + "word " * 100, 4)

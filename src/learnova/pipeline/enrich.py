@@ -159,9 +159,83 @@ def attach_prompts(entries: List[dict]) -> int:
     return n
 
 
+def _lead(entry: dict, max_words: int = 20) -> str:
+    imp = entry.get("improved") or {}
+    first = next((str(b).strip() for b in (imp.get("bullets") or []) if str(b).strip() and not str(b).startswith("###")), "")
+    first = re.sub(r"^(?:first(?:ly)?|second(?:ly)?|next|then|finally|however|also)\b[,:]?\s*", "", first, flags=re.I)
+    words = first.split()
+    if len(words) > max_words:
+        cut = " ".join(words[:max_words])
+        m = re.search(r".*[.;:]", cut)
+        first = m.group(0) if m and len(m.group(0).split()) >= 6 else cut.rstrip(",;: ") + "…"
+    return first
+
+
+def summary_slide(entries: List[dict], minimum_slides: int = 3, max_items: int = 7) -> int:
+    """A closing "Key takeaways" slide: one line per section, taken from the deck's own text (nothing invented)."""
+    import copy
+
+    skip = lambda imp: (str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary") or imp.get("is_overview") or imp.get("is_summary"))  # noqa: E731
+    content = [e for e in entries if not skip(e.get("improved") or {})]
+    if len(content) < minimum_slides:
+        return 0
+    seen, picks = set(), []
+    for e in content:
+        imp = e.get("improved") or {}
+        key = str(imp.get("section") or imp.get("title") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        lead = _lead(e)
+        title = re.sub(r"\s*\(\d+/\d+\)$", "", str(imp.get("title") or key)).strip()
+        if lead and title:
+            picks.append((title, lead))
+    if len(picks) < 3:
+        return 0
+    if len(picks) > max_items:                       # even sample across the deck
+        step = len(picks) / max_items
+        picks = [picks[int(i * step)] for i in range(max_items)]
+    base = copy.deepcopy(content[0])
+    lines = [f"{t[:38]}: {l}" for t, l in picks]
+    base["original"] = {**(base.get("original") or {}), "text": "\n".join(lines), "title": "Key takeaways"}
+    base["original"].pop("image", None)
+    base["improved"] = {"layout_type": "MINIMAL_TEXT", "title": "Key takeaways", "bullets": lines, "takeaway": "", "verbatim": [],
+                        "is_summary": True}
+    entries.append(base)
+    return 1
+
+
+def agenda_slide(entries: List[dict], minimum_sections: int = 4, max_items: int = 8) -> int:
+    """An opening "Agenda" roadmap: the deck's own section titles, in order."""
+    import copy
+
+    titles: List[str] = []
+    for e in entries:
+        imp = e.get("improved") or {}
+        if str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary") or imp.get("is_summary") or imp.get("is_agenda"):
+            continue
+        t = re.sub(r"\s*\(\d+/\d+\)$", "", str(imp.get("section") or imp.get("title") or "")).strip()
+        t = re.sub(r"^[^:]{2,30}:\s*overview$", lambda m: m.group(0).split(":")[0], t, flags=re.I)
+        if t and t.lower() not in {x.lower() for x in titles}:
+            titles.append(t)
+    if len(titles) < minimum_sections:
+        return 0
+    titles = titles[:max_items]
+    base = copy.deepcopy(entries[0])
+    base["original"] = {**(base.get("original") or {}), "text": "\n".join(titles), "title": "Agenda"}
+    base["original"].pop("image", None)
+    base["improved"] = {"layout_type": "FLOWCHART", "title": "Agenda", "bullets": titles, "takeaway": "", "verbatim": [], "is_agenda": True,
+                        "visual_data": {"family": "PROCESS_LINEAR", "variant": "flowchart", "forced": True, "source": "rules",
+                                        "data": {"stages": [{"label": t[:44], "detail": ""} for t in titles]}}}
+    entries.insert(0, base)
+    return 1
+
+
 def enrich_deck(entries: List[dict]) -> Dict[str, int]:
     gl = build_glossary(entries)
     kt = attach_key_terms(entries, gl)
     pr = attach_prompts(entries)
     gs = glossary_slides(entries, gl)
-    return {"glossary_terms": len(gl), "slides_with_terms": kt, "prompts": pr, "glossary_slides": gs}
+    ss = summary_slide(entries)
+    ag = agenda_slide(entries)
+    return {"glossary_terms": len(gl), "slides_with_terms": kt, "prompts": pr, "glossary_slides": gs, "summary_slides": ss, "agenda_slides": ag}

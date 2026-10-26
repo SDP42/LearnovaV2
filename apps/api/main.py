@@ -233,6 +233,10 @@ class MarkdownUpdate(BaseModel):
 class TypedInput(BaseModel):
     text: str
     title: str = "Typed Syllabus"
+    expand: bool = True            # a short request ("Gradient descent for beginners") is written out into a full lesson
+    audience: str = ""
+    tone: str = ""
+    detail: str = "balanced"       # compact | balanced | detailed — how many sections the written lesson has
 
 
 class ThemeSpec(BaseModel):
@@ -448,18 +452,31 @@ async def create_job(
 
 @app.post("/api/jobs/typed", status_code=201)
 def create_typed_job(payload: TypedInput, user_id: str = Depends(current_user)) -> dict:
-    if not payload.text.strip():
+    text = payload.text
+    if not text.strip():
         raise HTTPException(status_code=400, detail="text must not be empty")
+    if len(text) > 400_000:
+        raise HTTPException(status_code=413, detail="that is too much text for one deck (limit 400,000 characters) — split it into parts")
+
+    from learnova.ai import lesson_writer
+    from learnova.pipeline import job_db
+
+    title, expansion = payload.title, None
+    if payload.expand and lesson_writer.is_prompt(text):
+        result = lesson_writer.expand(text, audience=payload.audience, tone=payload.tone, detail=payload.detail)
+        text, expansion = result.markdown, result.to_dict()
+        if title in {"", "Typed Syllabus"}:
+            m = __import__("re").match(r"#\s+(.+)", text)
+            title = m.group(1).strip() if m else title
 
     store = get_store()
-    job = store.create(source_name=payload.title, user_id=user_id)
-    doc = from_typed_text(payload.text, source_name=payload.title)
+    job = store.create(source_name=title, user_id=user_id)
+    doc = from_typed_text(text, source_name=title)
     job._markdown_doc = doc
     job.markdown = doc.markdown
     job.status = "awaiting_review"
     job.source_type = "typed"
-    from learnova.pipeline import job_db
-
+    job.expansion = expansion
     job_db.save(job, "typed")
     return job.to_dict()
 

@@ -81,7 +81,8 @@ def verify_deck(label, job_id, h, min_slides=1):
 
 
 SAMPLE = (ROOT / "demo" / "sample_syllabus.md").read_text()
-SHORT = "Gradient descent for beginners"
+SHORT = "Colour theory for designers"          # covered by the built-in lesson library, so it works without an AI key
+UNKNOWN = "Quantum error correction codes"     # not in the library: needs an AI key
 
 
 def sc_typed(h):
@@ -103,6 +104,14 @@ def sc_short(h):
     check("short: generated", j and j["status"] == "done", f"{dt:.1f}s {j and j.get('error')}")
     if j and j["status"] == "done":
         verify_deck("short", jid, h, min_slides=5)
+
+
+def sc_unknown(h):
+    print("short prompt, nothing to match")
+    r = client.post("/api/jobs/typed", json={"text": UNKNOWN, "title": UNKNOWN}, headers=h).json()
+    ex = r.get("expansion") or {}
+    llm = ex.get("mode") == "llm"
+    check("unknown prompt: told what to do", ex.get("mode") in {"llm", "none"} and (llm or "AI key" in ex.get("message", "")), str(ex)[:90])
 
 
 def sc_md(h):
@@ -190,7 +199,7 @@ def sc_concurrent(h):
     check("concurrent: all finished", done == 3, f"{done}/3 in {time.time() - t0:.1f}s")
 
 
-SCENARIOS = {"typed": sc_typed, "short": sc_short, "md": sc_md, "pdf": sc_pdf, "pptx": sc_pptx, "errors": sc_errors, "concurrent": sc_concurrent}
+SCENARIOS = {"typed": sc_typed, "short": sc_short, "unknown": sc_unknown, "md": sc_md, "pdf": sc_pdf, "pptx": sc_pptx, "errors": sc_errors, "concurrent": sc_concurrent}
 
 if __name__ == "__main__":
     which = sys.argv[1:] or list(SCENARIOS)
