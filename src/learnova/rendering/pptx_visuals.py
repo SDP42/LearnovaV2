@@ -1188,6 +1188,19 @@ def _outline(c: _Canvas, data) -> bool:
 
     fits = [c.fit_paras(lambda b, g_=g: make(b, g_), cw - 2 * PAD, chh - 2 * PAD, 20, 10) for g in groups]
     b = _shared(fits)
+
+    def fits_at_b(g_) -> bool:
+        return L.paras_height([(q.text, q.size, q.bold, q.before) for q in make(b, g_)], cw - 2 * PAD) <= chh - 1.6 * PAD
+
+    trimmed = []
+    for g in groups:                                       # a card that cannot hold all its points at a readable size drops the last ones
+        items = list(g.get("items") or [])
+        dropped = 0
+        while len(items) > 1 and not fits_at_b({**g, "items": items + ([f"+{dropped} more"] if dropped else [])}):
+            items.pop()
+            dropped += 1
+        trimmed.append({**g, "items": items + ([f"+{dropped} more"] if dropped else [])})
+    groups = trimmed
     y = c.y
     if lead:
         with c.group():

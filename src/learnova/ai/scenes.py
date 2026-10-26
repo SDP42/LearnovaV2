@@ -372,14 +372,36 @@ SCENES: Dict[str, Tuple[Scene, str]] = {
 _DEFAULT_ORDER = ["book", "orbit", "network", "flow"]
 
 
-def choose_scene(title: str, text: str, avoid: Optional[List[str]] = None, seed: str = "") -> str:
-    blob = f"{title} {title} {text}".lower()
-    scores = {name: len(re.findall(pat, blob)) for name, (_, pat) in SCENES.items() if pat != r"$^"}
-    # a topic word in the TITLE outweighs incidental words in the body
-    for name, (_, pat) in SCENES.items():
+# On a tie the subject-specific scene beats the generic one ("financial institution" in a linguistics slide must not win a chart).
+_TIE_ORDER = ["speech", "tree", "lab", "bio", "physics", "math", "history", "earth", "health", "society", "window", "network", "flow", "chart", "book"]
+
+
+def _scores(blob: str, title: str) -> Dict[str, float]:
+    scores = {name: float(len(re.findall(pat, blob))) for name, (_, pat) in SCENES.items() if pat != r"$^"}
+    for name, (_, pat) in SCENES.items():                 # a topic word in the TITLE outweighs incidental words in the body
         if pat != r"$^" and re.search(pat, (title or "").lower()):
             scores[name] += 2
-    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+    return scores
+
+
+def deck_prior(texts: List[str]) -> Dict[str, float]:
+    """The deck's own subject: its two strongest scenes get a bonus on every slide, so an NLP lecture is not drawn as a finance chart."""
+    totals: Dict[str, float] = {}
+    for t in texts:
+        for name, sc in _scores(str(t).lower(), "").items():
+            totals[name] = totals.get(name, 0.0) + sc
+    top = sorted(((n, v) for n, v in totals.items() if v >= 6), key=lambda kv: -kv[1])[:2]
+    return {n: (1.6 if k == 0 else 0.8) for k, (n, _) in enumerate(top)}
+
+
+def choose_scene(title: str, text: str, avoid: Optional[List[str]] = None, seed: str = "", prior: Optional[Dict[str, float]] = None) -> str:
+    blob = f"{title} {title} {text}".lower()
+    scores = _scores(blob, title)
+    for name, bonus in (prior or {}).items():
+        if scores.get(name, 0) > 0:                       # the deck's subject only breaks ties between scenes the slide itself supports
+            scores[name] += bonus
+    rank = {n: i for i, n in enumerate(_TIE_ORDER)}
+    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], rank.get(kv[0], 99)))
     avoid = avoid or []
     for name, sc in ranked:
         if sc > 0 and name not in avoid[-1:]:
@@ -408,13 +430,13 @@ def _context(title: str, text: str, seed: int) -> Dict:
 
 
 def scene_illustration(title: str, text: str, primary: str, accent: str, seed: str, kind: str = "panel", width: int = 800,
-                       avoid: Optional[List[str]] = None, scene: Optional[str] = None) -> Dict:
+                       avoid: Optional[List[str]] = None, scene: Optional[str] = None, prior: Optional[Dict[str, float]] = None) -> Dict:
     """{"svg", "png", "scene", "alt"} for one slide."""
     W = width
     H = int(width * 1.25) if kind == "panel" else int(width * 0.62)
     r = random.Random(int(hashlib.sha1(f"{seed}|{title}".encode()).hexdigest()[:8], 16))
     P = Pal(primary, accent)
-    name = scene or choose_scene(title, text, avoid, seed)
+    name = scene or choose_scene(title, text, avoid, seed, prior)
     fn = SCENES[name][0]
     icons = pick_icons(f"{title} {text}", 5)
     ctx = _context(title, text, r.randint(0, 5))

@@ -160,13 +160,14 @@ def _cache_path(key: str) -> pathlib.Path:
     return d / f"{key}.png"
 
 
-def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str, *, use_ai: bool = True, title: str = "", style: str = "", avoid: Optional[List[str]] = None) -> Dict[str, Any]:
+def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str, *, use_ai: bool = True, title: str = "", style: str = "", avoid: Optional[List[str]] = None,
+                   prior: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
     """The picture for one slide: an AI image when a provider is configured (and allowed), otherwise the vector illustrator."""
     from learnova.ai import image_providers as ip
 
     style = style or os.getenv("LEARNOVA_IMAGE_STYLE", "flat")
     ai_on = use_ai and bool(ip.provider_name())
-    key = hashlib.sha1(f"{plan.subject}|{primary_hex}|{accent_hex}|{plan.kind}|{ip.provider_name() if ai_on else 'scene2'}|{style}|{','.join((avoid or [])[-1:])}".encode()).hexdigest()[:24]
+    key = hashlib.sha1(f"{plan.subject}|{primary_hex}|{accent_hex}|{plan.kind}|{ip.provider_name() if ai_on else 'scene2'}|{style}|{','.join((avoid or [])[-1:])}|{sorted((prior or {}).items())}".encode()).hexdigest()[:24]
     cp = _cache_path(key)
     provider = "cache"
     data: Optional[bytes] = cp.read_bytes() if cp.exists() else None
@@ -180,7 +181,7 @@ def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str, *, use_ai
         if not data:
             from learnova.ai.scenes import scene_illustration
 
-            d = scene_illustration(title or plan.subject[:60], plan.subject, primary_hex, accent_hex, plan.subject[:40], plan.kind, avoid=avoid or [])
+            d = scene_illustration(title or plan.subject[:60], plan.subject, primary_hex, accent_hex, plan.subject[:40], plan.kind, avoid=avoid or [], prior=prior)
             data, scene_meta = d["png"], {"svg": d["svg"], "scene": d["scene"], "alt": d["alt"]}
         try:
             cp.write_bytes(data)
@@ -205,6 +206,9 @@ def illustrate_deck(final_deck: List[dict], theme, mode: str = "auto") -> int:
     plan = plan_deck(final_deck)
     drawn, prev, total, ai_used = 0, False, len(final_deck), 0
     scenes_used: List[str] = []
+    from learnova.ai.scenes import deck_prior
+
+    prior = deck_prior([f"{(e.get('improved') or {}).get('title', '')} {' '.join(str(b) for b in ((e.get('improved') or {}).get('bullets') or []))}" for e in final_deck])
     max_ai = int(os.getenv("LEARNOVA_IMAGE_MAX", "8"))      # cost control: at most this many generated images per deck
     for i, (entry, sp) in enumerate(zip(final_deck, plan.slides)):
         imp = entry.get("improved") if isinstance(entry.get("improved"), dict) else None
@@ -220,7 +224,7 @@ def illustrate_deck(final_deck: List[dict], theme, mode: str = "auto") -> int:
             imp.pop("illustration", None)
             continue
         use_ai = mode != "vector" and ai_used < max_ai
-        imp["illustration"] = generate_image(ip, theme.primary_hex, theme.accent_hex, use_ai=use_ai, title=str(imp.get("title", "")), avoid=scenes_used)
+        imp["illustration"] = generate_image(ip, theme.primary_hex, theme.accent_hex, use_ai=use_ai, title=str(imp.get("title", "")), avoid=scenes_used, prior=prior)
         if imp["illustration"].get("scene"):
             scenes_used.append(imp["illustration"]["scene"])
         ai_used += imp["illustration"].get("provider") not in {"vector", "cache"}

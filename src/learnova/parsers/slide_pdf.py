@@ -61,6 +61,21 @@ class _Line:
         self.x0, self.y0, self.x1, self.y1, self.size, self.bold, self.text, self.font, self.glyph = x0, y0, x1, y1, size, bold, text, font, glyph
 
 
+def _join_spans(spans) -> str:
+    """Span text with a space wherever the layout leaves a gap but the text has none ("Naive Bayes" + "to" → "Bayes to", "Dan" + "Jurafsky")."""
+    out = ""
+    prev = None
+    for sp in spans:
+        t = sp["text"]
+        if prev is not None and out and t and not out[-1].isspace() and not t[0].isspace():
+            gap = sp["bbox"][0] - prev["bbox"][2]
+            if gap > 0.2 * max(sp["size"], prev["size"]) and out[-1] not in "-–—(/" and t[0] not in ".,;:!?)-/":
+                out += " "
+        out += t
+        prev = sp
+    return out
+
+
 def _page_lines(page) -> List[_Line]:
     out: List[_Line] = []
     for b in page.get_text("dict")["blocks"]:
@@ -70,7 +85,7 @@ def _page_lines(page) -> List[_Line]:
             spans = [s for s in l["spans"] if s["text"].strip()]
             if not spans:
                 continue
-            text = re.sub(r"\s+", " ", _clean_text("".join(s["text"] for s in l["spans"]))).strip()
+            text = re.sub(r"\s+", " ", _clean_text(_join_spans(l["spans"]))).strip()
             s0 = spans[0]
             size = max(s["size"] for s in spans)
             bold = any(s["flags"] & 16 or "bold" in s["font"].lower() for s in spans)
@@ -335,8 +350,11 @@ def _items(body: List[_Line]) -> List[Dict[str, Any]]:
         elif inline:
             cur = {"key": l.x0, "text": text, "text_x": l.x0 + l.size * 1.2, "y1": l.y1, "size": l.size, "bullet": True}
             items.append(cur)
-        elif (cur and abs(l.x0 - cur["text_x"]) <= 12 and 0 <= l.y0 - cur["y1"] <= l.size * 1.1
-              and not (_SENT_END.search(cur["text"]) and l.text[:1].isupper() and len(cur["text"].split()) > 12)):
+        elif (cur and ((abs(l.x0 - cur["text_x"]) <= 12 and 0 <= l.y0 - cur["y1"] <= l.size * 1.1
+                        and not (_SENT_END.search(cur["text"]) and l.text[:1].isupper() and len(cur["text"].split()) > 12))
+                       # a lower-case line straight under an unfinished one continues it, even when the indent drifts a little
+                       or (abs(l.x0 - cur["text_x"]) <= 48 and 0 <= l.y0 - cur["y1"] <= l.size * 1.5 and l.text[:1].islower()
+                           and not _SENT_END.search(cur["text"])))):
             cur["text"] = f"{cur['text']} {l.text}"
             cur["y1"] = l.y1
         else:
@@ -476,6 +494,20 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
         pages.append({"page": pi, "title": title, "items": [{"level": i["level"], "text": i["text"]} for i in items], "tables": [t["rows"] for t in tables],
                       "figure": figure, "kind": kind, "labels": labels, "words": words, "ocr": ocr_used, "figure_text": "" if ocr_used else figure_text,
                       "preview": _preview_jpeg(page) if want_previews else None})
+
+    # a credit line read by OCR ("Dan Jurafsky") that opens or closes many pages is page furniture, not content
+    ends = Counter()
+    for pg in pages:
+        for it in (pg["items"][:1] + pg["items"][-1:]):
+            if len(it["text"].split()) <= 4 and len(it["text"]) <= 28:
+                ends[_norm(it["text"])] += 1
+    credit = {k for k, v in ends.items() if k and v >= max(5, n // 20)}
+    if credit:
+        for pg in pages:
+            kept = [it for it in pg["items"] if _norm(it["text"]) not in credit]
+            if len(kept) != len(pg["items"]):
+                pg["items"] = kept
+                pg["words"] = sum(len(i["text"].split()) for i in kept)
 
     # a title page: the biggest text of page 1 plus the lines under it
     deck_title, subtitle = "", ""
