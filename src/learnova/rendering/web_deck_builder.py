@@ -970,6 +970,27 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             }});
         }})();
 
+        // "Explain it step by step": the full interactive explainer in an overlay
+        function lvExplain(uid) {{
+            var t = document.getElementById(uid + '-doc');
+            if (!t) return;
+            var o = document.createElement('div');
+            o.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,14,10,.78);display:flex;align-items:center;justify-content:center;padding:2vh 2vw;';
+            var f = document.createElement('iframe');
+            f.srcdoc = t.textContent.split('<\\/script>').join('</script>');
+            f.style.cssText = 'width:min(1040px,96vw);height:94vh;border:0;border-radius:18px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.5);';
+            var x = document.createElement('button');
+            x.textContent = '✕ Close';
+            x.style.cssText = 'position:absolute;top:14px;right:18px;border:0;border-radius:999px;padding:8px 16px;font-weight:800;cursor:pointer;';
+            var close = function () {{ o.remove(); document.removeEventListener('keydown', onKey, true); }};
+            var onKey = function (e) {{ if (e.key === 'Escape') {{ e.stopPropagation(); close(); }} e.stopPropagation(); }};
+            x.onclick = close;
+            o.appendChild(f); o.appendChild(x);
+            document.addEventListener('keydown', onKey, true);
+            document.body.appendChild(o);
+            f.focus();
+        }}
+
         // "Match the terms": pick a term, then a meaning
         var lvPick = null, lvDone = 0;
         function lvMatchPick(btn, side) {{

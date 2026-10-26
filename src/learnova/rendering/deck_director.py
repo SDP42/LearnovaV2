@@ -442,6 +442,23 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk)}
         if (imp.get("is_glossary") or re.match(r"^(?:glossary|key terms?)\b", title, re.I)) and family == "LIST_STRUCTURED" and isinstance(data, dict):
             data = {**data, "flip": True}                      # web deck: term on the front, meaning on the back
+        # A problem that can be solved on the slide (with numbers or a grammar): show it solved, step by step, with the reasoning.
+        if (existing_layout != "QUIZ" and family not in {"FIGURE", "COMPARE_TABLE", "TIMELINE"}
+                    and not (imp.get("is_summary") or imp.get("is_glossary") or imp.get("is_activity") or imp.get("is_agenda") or imp.get("is_overview"))):
+            try:
+                _cue = re.search(r"\b(solve|find|calculate|compute|what is|determine|evaluate|simplify|differentiate|integrate|how (?:much|many)|probability of|derive|parse|example|exercise|problem|numerical|solution|grammar)\b",
+                                 f"{title} {vms_source}", re.I)
+                if _cue or family == "WORKED_EXAMPLE":
+                    from learnova.explain import find_and_solve
+
+                    _ex = find_and_solve(title, vms_source, data if family == "WORKED_EXAMPLE" and isinstance(data, dict) else None)
+                    if _ex:
+                        treatment, family, variant, data = "STEPPER", "STEPPER", "steps", _ex.to_dict()
+                        visual_reason = f"a {_ex.kind} that can be solved on the slide — shown step by step with the reasoning ({_ex.source})"
+                        engine_conf = max(engine_conf, 0.92)
+                        params = {"notes": [], "takeaway": "", "footer": []}               # the slide already ends with the answer
+            except Exception:
+                logger.warning("explainer detection failed", exc_info=True)
         # A slide that *is* a picture (a diagram, a table or a chart image from the source deck): keep it as a figure, large and zoomable —
         # never run a text detector on its title.
         _img = (original or {}).get("image") if isinstance(original, dict) else None

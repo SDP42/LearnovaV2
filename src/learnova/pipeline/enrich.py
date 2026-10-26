@@ -255,7 +255,7 @@ def agenda_slide(entries: List[dict], minimum_sections: int = 4, max_items: int 
     base["original"].pop("image", None)
     base["improved"] = {"layout_type": "FLOWCHART", "title": "Agenda", "bullets": titles, "takeaway": "", "verbatim": [], "is_agenda": True,
                         "visual_data": {"family": "PROCESS_LINEAR", "variant": "flowchart", "forced": True, "source": "rules",
-                                        "data": {"stages": [{"label": t[:44], "detail": ""} for t in titles]}}}
+                                        "data": {"stages": [{"label": t[:44], "detail": ""} for t in titles], "agenda": True}}}
     entries.insert(0, base)
     return 1
 

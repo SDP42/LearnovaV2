@@ -98,11 +98,28 @@ def _text_fill(shape) -> float:
     return min(1.0, L.block_height(texts, w, pt, spacing_pt=4.0) / h)
 
 
+def _broken_words(shape) -> List[str]:
+    """Words wider than their text box at their own size — they would be cut mid-word ("Quadrati/c")."""
+    if not shape.has_text_frame or not shape.text_frame.word_wrap:
+        return []
+    tf = shape.text_frame
+    room = _in(shape.width) - _in(tf.margin_left or 0) - _in(tf.margin_right or 0)
+    out: List[str] = []
+    for p in tf.paragraphs:
+        for r in p.runs:
+            pt = r.font.size.pt if r.font and r.font.size else 18.0
+            for piece in L._pieces(r.text):
+                if L.word_width_in(piece, pt, bool(r.font and r.font.bold)) > room + 0.01:
+                    out.append(piece)
+    return out
+
+
 def audit_slide(slide, index: int) -> Dict[str, Any]:
     grid = [[False] * _GRID_X for _ in range(_GRID_Y)]
     bottoms: List[float] = []
     sparse: List[Dict[str, Any]] = []
     overflow: List[str] = []
+    broken: List[str] = []
     sizes: List[float] = []
     fonts = set()
     edges = set()
@@ -114,6 +131,7 @@ def audit_slide(slide, index: int) -> Dict[str, Any]:
         right, bottom = left + w, top + h
         sizes += _runs_pt(sh)
         fonts.update(_fonts(sh))
+        broken += _broken_words(sh)
         if sh.has_text_frame and sh.text_frame.text.strip():
             words += len(sh.text_frame.text.split())
             if top >= _BAND_TOP - 0.05:
@@ -163,6 +181,8 @@ def audit_slide(slide, index: int) -> Dict[str, Any]:
         flags.append("floating text in big box")
     if overflow:
         flags.append("overflow")
+    if broken:
+        flags.append("word breaks: " + ", ".join(sorted(set(broken))[:4]))
     return {
         "index": index, "coverage": round(coverage, 2), "bottom_gap": gap, "words": words,
         "sparse_cards": sparse, "overflow": overflow, "min_pt": min(sizes) if sizes else None,

@@ -128,11 +128,11 @@ def stepper_cards_html(data: Dict[str, Any], theme: Any, uid: str) -> str:
                   f'<b style="flex:none;width:28px;height:28px;border-radius:50%;background:{c["primary"]};color:{_on_color(c["primary"])};display:grid;place-items:center;font-size:.9rem;">{k + 1}</b>'
                   f'<div style="min-width:0"><div style="font-weight:800;color:{c["primary"]};font-size:1rem;">{_esc(s.title)}</div>{math}'
                   f'<div style="font-size:.86rem;line-height:1.4;color:{c["text"]};margin-top:3px;">{_esc(s.explain[:190])}</div></div></div>')
-    srcdoc = _esc(explainer_html(ex, theme))
+    doc = explainer_html(ex, theme).replace("</script>", "<\\/script>")           # raw-text holder: nothing in it is parsed or run by the deck
     cols = "1fr 1fr" if len(steps) > 4 else "1fr"
     return (f'<div id="{uid}" style="margin-top:6px;">'
             f'<div data-el="el.0" data-build="0" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;"><div style="flex:1;background:{c["primary"]}12;border:2px solid {c["primary"]};border-radius:12px;padding:8px 14px;font-size:1.1rem;font-weight:700;">{_esc(ex.problem)}</div>'
             f'<button onclick="lvExplain(\'{uid}\')" style="all:unset;cursor:pointer;background:{c["primary"]};color:{_on_color(c["primary"])};font-weight:800;border-radius:999px;padding:8px 18px;font-size:.9rem;white-space:nowrap;">Explain it step by step ▶</button></div>'
             f'<div style="display:grid;grid-template-columns:{cols};gap:9px;">{cards}</div>'
             f'<div data-el="el.{len(steps) + 1}" data-build="{len(steps) + 1}" style="margin-top:10px;background:{c["primary"]};color:{_on_color(c["primary"])};border-radius:12px;padding:9px 16px;font-weight:800;font-size:1.15rem;">Answer: {_esc(ex.answer)}</div>'
-            f'<template id="{uid}-doc">{srcdoc}</template></div>')
+            f'<script type="text/plain" id="{uid}-doc">{doc}</script></div>')

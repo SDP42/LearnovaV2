@@ -466,7 +466,7 @@ def det_agenda(title: str, sents: List[str], outline: Optional[List[Dict[str, An
         items = parts if len(parts) >= 3 else items
     if not (3 <= len(items) <= 12):
         return None
-    return "PROCESS_LINEAR", "agenda", 0.92, {"stages": [{"label": _cap(i[:48]), "detail": ""} for i in items[:10]]}, f"an agenda of {len(items)} topics"
+    return "PROCESS_LINEAR", "agenda", 0.92, {"stages": [{"label": _cap(i[:48]), "detail": ""} for i in items[:10]], "agenda": True}, f"an agenda of {len(items)} topics"
 
 
 def det_pros_cons(title: str, sents: List[str]) -> Det:

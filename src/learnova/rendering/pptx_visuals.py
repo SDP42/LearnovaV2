@@ -20,6 +20,7 @@ degrades to a plain bullet list.
 from __future__ import annotations
 
 import io
+import re
 import math
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
@@ -166,6 +167,8 @@ class _Canvas:
         tf.word_wrap = True
         tf.vertical_anchor = anchor
         tf.margin_left, tf.margin_top, tf.margin_right, tf.margin_bottom = (Inches(v) for v in inset)
+        room = (w if w > 0 else shp.width / 914400.0) - inset[0] - inset[2]
+        shrink = L.word_scale([(q.text, q.size, q.bold) for q in paras], room)     # never cut a word across two lines
         first = True
         for para in paras:
             if not str(para.text).strip():
@@ -179,7 +182,7 @@ class _Canvas:
                 _bullet(p, bullet_color or self.t.accent_rgb)
             r = p.add_run()
             r.text = str(para.text)
-            r.font.size = Pt(round(para.size, 1))
+            r.font.size = Pt(round(para.size * shrink, 1))
             r.font.bold = para.bold
             r.font.color.rgb = para.color or self.t.text_rgb
         return shp
@@ -395,10 +398,10 @@ def _process(c: _Canvas, data, cyclic: bool, foot_text: str = "") -> bool:
             items.append((str(st), ""))
     if len(items) < 2:
         return False
-    return _flow(c, items, cyclic, foot_text or ("↻  and the cycle repeats" if cyclic else ""))
+    return _flow(c, items, cyclic, foot_text or ("↻  and the cycle repeats" if cyclic else ""), max_pt=20 if data.get("agenda") else 30)
 
 
-def _flow(c: _Canvas, items: List[Tuple[str, str]], cyclic: bool = False, foot_text: str = "") -> bool:
+def _flow(c: _Canvas, items: List[Tuple[str, str]], cyclic: bool = False, foot_text: str = "", max_pt: float = 30) -> bool:
     n = len(items)
     per = n if n <= 4 else math.ceil(n / 2)
     foot = 0.5 if foot_text else 0.0
@@ -416,13 +419,14 @@ def _flow(c: _Canvas, items: List[Tuple[str, str]], cyclic: bool = False, foot_t
             return cw - 2 * PAD - BADGE_D - 0.18, h_full - 2 * PAD
         return cw - 2 * PAD, h_full - 2 * PAD - BADGE_D - 0.16
     lb = _lone_bold(items)
-    fits = [c.fit_paras(lambda b, h_=h, d_=d: c.pair(h_, d_, b, lone_bold=lb), *tbox(ch_full), 30, 10.5) for h, d in items]
+    fits = [c.fit_paras(lambda b, h_=h, d_=d: c.pair(h_, d_, b, lone_bold=lb), *tbox(ch_full), max_pt, 10.5) for h, d in items]
     b = _shared(fits)
     sz = [min(f, b) for f in fits]
     tw0 = tbox(ch_full)[0]
     need = max(L.paras_height([(p.text, p.size, p.bold, p.before) for p in c.pair(h, d, z, lone_bold=lb)], tw0) for (h, d), z in zip(items, sz))
     need_h = need + 2 * PAD + (0 if horiz else BADGE_D + 0.16)
-    ch = min(ch_full, max(need_h * 1.3, ch_full * 0.6, 1.4))
+    bare = not any(d for _, d in items)               # labels only (an agenda): cards hug the text instead of stretching
+    ch = min(ch_full, max(need_h * 1.3, 1.4) if bare else max(need_h * 1.3, ch_full * 0.6, 1.4))
     total = rows * ch + GUT * (rows - 1) + foot
     oy = max(0.0, (c.h - total) / 2)
     for i, (lab, det) in enumerate(items):
@@ -472,6 +476,31 @@ def _worked(c: _Canvas, data) -> bool:
             c.badge(c.x + PAD, y + (rh - BADGE_D) / 2, i + 1)
             c.tb(c.x + 2 * PAD + BADGE_D, y + 0.08, tw, rh - 0.16, make(b, st, rs), anchor=MSO_ANCHOR.MIDDLE)
     return True
+
+
+def _stepper(c: _Canvas, data) -> bool:
+    """A solved problem: each step a numbered row (title + working, then the plain-language reason), the answer in a band below."""
+    steps = [x for x in (data.get("steps") or []) if x.get("title")]
+    if len(steps) < 2:
+        return False
+    if len(steps) > 6:
+        steps = steps[:5] + steps[-1:]
+    rows = []
+    for st in steps:
+        work = [m for m in (st.get("math") or []) if m][-1:] or [""]
+        work_s = re.sub(r"\[\[|\]\]", "", work[0])
+        rows.append({"step": f"{st['title']}  —  {work_s}" if work_s and len(work_s) <= 48 else str(st["title"]), "reason": str(st.get("explain", ""))[:170]})
+    band_h = 0.7
+    h0 = c.h
+    c.h = h0 - band_h - GUT * 0.6
+    ok = _worked(c, {"rows": rows})
+    c.h = h0
+    if ok and data.get("answer"):
+        with c.group():
+            box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y + h0 - band_h, c.w, band_h, c.t.primary_rgb, radius=0.2)
+            sz = c.fit([f"Answer: {data['answer']}"], c.w - 2 * PAD, band_h - 0.12, 22, 12, bold=True)
+            c.tb(0, 0, 0, 0, [P(f"Answer: {data['answer']}", sz, True, _on(c.t.primary_rgb))], MSO_ANCHOR.MIDDLE, PP_ALIGN.LEFT, shape=box, inset=(PAD, 0.04, PAD, 0.04))
+    return ok
 
 
 def _timeline(c: _Canvas, data) -> bool:
@@ -1298,6 +1327,8 @@ def draw_family(slide, sp, theme, band) -> bool:
     try:
         if family in {"PROCESS_LINEAR", "PROCESS_CYCLIC"}:
             ok = _process(c, data, family == "PROCESS_CYCLIC")
+        elif family == "STEPPER":
+            ok = _stepper(c, data)
         elif family == "WORKED_EXAMPLE":
             ok = _worked(c, data)
         elif family == "TIMELINE":

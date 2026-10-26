@@ -748,6 +748,18 @@ def _prose(data: Dict[str, Any], theme) -> Optional[str]:
             f'<div style="font-size:.7rem;font-weight:800;letter-spacing:.1em;color:{theme.subtext_hex};">AT A GLANCE</div>{chips}</div></div>')
 
 
+def _stepper(data: Dict[str, Any], theme) -> Optional[str]:
+    """A solved problem as stacked step cards (one per click) with a button that opens the full interactive explainer."""
+    import hashlib
+
+    from learnova.explain.render import stepper_cards_html
+
+    if len(data.get("steps") or []) < 2:
+        return None
+    uid = "ex" + hashlib.sha1(str(data.get("problem", "")).encode()).hexdigest()[:8]
+    return stepper_cards_html(data, theme, uid)
+
+
 def _outline(data: Dict[str, Any], theme) -> Optional[str]:
     """Nested bullets as grouped cards, each card revealing on its own click; childless siblings as chips."""
     groups = [g for g in (data.get("groups") or []) if g.get("heading")][:6]
@@ -1077,6 +1089,7 @@ _BUILDERS = {
     "MATRIX_GRID": _matrix_2x2,
     "MIND_MAP": _mind_map,
     "OUTLINE": _outline,
+    "STEPPER": _stepper,
     "CHART_CATEGORICAL": _bar_chart,
     "CHART_RANKING": _bar_chart,
     "CHART_TREND": _line_chart,

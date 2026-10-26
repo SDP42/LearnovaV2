@@ -20,6 +20,7 @@ than average) so the error lands on "a bit small" rather than "overflowing".
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
@@ -138,10 +139,35 @@ def paras_height(paras: Sequence[Tuple[str, float, bool, float]], width_in: floa
     return total
 
 
+# A word cut in two ("Quadrati/c") is the ugliest wrap there is, and it happens when the viewer's machine substitutes a
+# wider face for the deck font — so the one-word check is stricter than the line estimate above.
+_WORD_SLACK = 1.16
+_SOFT_BREAK = re.compile(r"(?<=[-\u2010-\u2014/])")          # PowerPoint wraps after a hyphen or slash
+
+
+def _pieces(text: str) -> List[str]:
+    """Unbreakable runs of characters: words, further split where a hyphen or slash allows a line break."""
+    return [piece for word in str(text).split() for piece in _SOFT_BREAK.split(word) if piece]
+
+
+def word_width_in(piece: str, font_pt: float, bold: bool = False) -> float:
+    return len(piece) * font_pt * (_BOLD_RATIO if bold else _GLYPH_RATIO) * _WORD_SLACK / 72.0
+
+
 def longest_word_fits(texts: Sequence[str], width_in: float, font_pt: float, bold: bool = False) -> bool:
-    ratio = _BOLD_RATIO if bold else _GLYPH_RATIO
-    longest = max((len(w) for t in texts for w in str(t).split()), default=0)
-    return longest * font_pt * ratio / 72.0 <= width_in
+    longest = max((len(w) for t in texts for w in _pieces(t)), default=0)
+    return longest * font_pt * (_BOLD_RATIO if bold else _GLYPH_RATIO) * _WORD_SLACK / 72.0 <= width_in
+
+
+def word_scale(paras: Sequence[Tuple[str, float, bool]], width_in: float, floor: float = 0.62) -> float:
+    """Factor (≤1) by which every paragraph must shrink so no unbreakable word is wider than the box."""
+    scale = 1.0
+    for text, size, bold in paras:
+        for piece in _pieces(text):
+            need = word_width_in(piece, size, bold)
+            if need > width_in > 0:
+                scale = min(scale, width_in / need)
+    return max(floor, scale)
 
 
 def fit_font_size(texts: Sequence[str], width_in: float, height_in: float,

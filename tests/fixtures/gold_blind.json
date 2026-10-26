@@ -260,7 +260,8 @@
   "title": "Expanding a Binomial",
   "text": "Expand (x + 3)(x + 2). Multiply each term: x*x + x*2 + 3*x + 3*2. Simplify: x^2 + 2x + 3x + 6. Combine like terms: x^2 + 5x + 6.",
   "ok": [
-   "WORKED_EXAMPLE"
+   "WORKED_EXAMPLE",
+   "STEPPER"
   ]
  },
  {
