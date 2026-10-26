@@ -85,7 +85,7 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
             e = ev[len(ev) // 2]
             return _make(seed, f"When did this happen: “{_clip(e['title'], 14)}”?", e["date"], [x["date"] for x in ev if x is not e] + [str(int(re.search(r"\d{4}", e["date"]).group(0)) + d) for d in (-12, 15, 31) if re.search(r"\d{4}", e["date"])] + ["1900", "2010"],
                          f"{e['date']}: {e['title']}.")
-    if fam in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT"}:
+    if fam in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT"} and not d.get("agenda"):
         st = d.get("stages") or d.get("nodes") or []
         if len(st) >= 3:
             i = min(1, len(st) - 2)
@@ -96,6 +96,13 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
         a, b = d["headers"][:2]
         clean = lambda t: re.sub(r"[,;]?\s*(?:while|whereas|but|and)\s*$", "", str(t).strip(), flags=re.I)
         rows = [[clean(x[0]), clean(x[1])] for x in d["rows"] if x[0] and x[1]]
+        short = lambda t: len(str(t).split()) <= 5
+        if len(rows) >= 4 and all(short(x[0]) and short(x[1]) for x in rows):      # a lookup table (word → category): ask for one entry
+            k = r.randrange(len(rows))
+            q = _make(seed, f"What is the {b} of “{rows[k][0]}”?", rows[k][1], [x[1] for j, x in enumerate(rows) if j != k],
+                      f"{rows[k][0]} → {rows[k][1]}.", "apply")
+            if q:
+                return q
         if len(rows) >= 2:
             return _make(seed, f"Which statement describes {a}?", rows[0][0], [rows[0][1], rows[1][1], rows[1][0]] + pool_defs[:3],
                          f"{a}: {rows[0][0]}. {b}: {rows[0][1]}.", "apply")

@@ -1123,6 +1123,8 @@ def takeaway_for(family: str, d: Dict[str, Any]) -> str:
     """A one-line synthesis written from the visual's data ('' when the visual already says it all)."""
     try:
         if family in {"PROCESS_LINEAR", "PROCESS_CYCLIC"}:
+            if d.get("agenda"):
+                return ""                                       # a contents slide needs no synthesis
             st = d["stages"]; return f"{len(st)} steps — from “{st[0]['label']}” to “{st[-1]['label']}”" + (", then it repeats." if family.endswith("CYCLIC") else ".")
         if family == "TIMELINE":
             ev = d["events"]; return f"{len(ev)} milestones between {ev[0]['date']} and {ev[-1]['date']}."

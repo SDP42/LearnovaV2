@@ -398,6 +398,9 @@ def _process(c: _Canvas, data, cyclic: bool, foot_text: str = "") -> bool:
             items.append((str(st), ""))
     if len(items) < 2:
         return False
+    if data.get("agenda") and len(items) >= 5:                   # a long agenda reads as a two-column numbered list, not tiny chevrons
+        _grid(c, items, numbered=True, cols=2, icons=False)
+        return True
     return _flow(c, items, cyclic, foot_text or ("↻  and the cycle repeats" if cyclic else ""), max_pt=20 if data.get("agenda") else 30)
 
 
