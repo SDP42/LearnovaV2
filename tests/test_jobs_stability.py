@@ -130,3 +130,60 @@ def test_lesson_validation_rejects_thin_output():
     good = "# T\n\n" + "\n\n".join(f"## S{i}\n" + "word " * 50 for i in range(8))
     assert lw._valid(good, 9)
     assert not lw._valid("# T\n\n## A\nAs an AI I cannot do that. " + "word " * 100, 4)
+
+
+def test_provider_keys_and_image_generation(tmp_path, monkeypatch):
+    import base64, io, os
+    import httpx
+    from PIL import Image
+    from learnova.ai import image_providers as ip
+
+    monkeypatch.setattr(ip, "_env_path", lambda: tmp_path / ".env")
+    for v in ("GEMINI_API_KEY", "GEMINI_IMAGE_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "LEARNOVA_IMAGE_PROVIDER"):
+        monkeypatch.delenv(v, raising=False)
+    ip.reset()
+    assert ip.provider_name() == "" and ip.generate("x") is None            # no key: callers fall back to the vector illustrator
+
+    ip.save_key("gemini", "AIza" + "x" * 30)
+    assert "GEMINI_API_KEY" in (tmp_path / ".env").read_text() and ip.provider_name() == "gemini"
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 30), (10, 120, 200)).save(buf, "PNG")
+    seen = {}
+
+    def handler(req):
+        seen["key"] = req.headers.get("x-goog-api-key")
+        seen["body"] = req.content.decode()
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"inlineData": {"mimeType": "image/png", "data": base64.b64encode(buf.getvalue()).decode()}}]}}]})
+
+    png = ip.generate(ip.style_prompt("a flask of liquid", "#1D4ED8", "#FFC93C"), client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert png and png[:4] == b"\x89PNG" and seen["key"].startswith("AIza") and "no text" in seen["body"].lower()
+
+    # a rejected key pauses the provider instead of failing every slide
+    bad = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(403, json={"error": "denied"})))
+    assert ip.generate("x", client=bad) is None
+    assert ip.status()["paused"] is True
+    ip.remove_key("gemini")
+    assert "GEMINI_API_KEY" not in (tmp_path / ".env").read_text() and ip.provider_name() == ""
+
+
+def test_providers_api_never_echoes_the_key(tmp_path, monkeypatch):
+    import os
+    os.environ["LEARNOVA_RATE_LIMIT"] = "off"
+    from fastapi.testclient import TestClient
+    from apps.api.main import app
+    from learnova.ai import image_providers as ip
+
+    monkeypatch.setattr(ip, "_env_path", lambda: tmp_path / ".env")
+    monkeypatch.setattr(ip, "verify_key", lambda p, k, client=None: True)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    c = TestClient(app)
+    ph = "+919000000099"
+    otp = c.post("/api/auth/otp/request", json={"phone": ph}).json()["dev_otp"]
+    h = {"Authorization": "Bearer " + c.post("/api/auth/otp/verify", json={"phone": ph, "code": otp}).json()["token"]}
+    assert c.post("/api/providers", json={"provider": "groq", "key": "short"}, headers=h).status_code == 400
+    secret = "gsk_" + "a1b2" * 10
+    r = c.post("/api/providers", json={"provider": "groq", "key": secret}, headers=h)
+    assert r.status_code == 200 and secret not in r.text
+    assert next(p for p in r.json()["providers"] if p["id"] == "groq")["configured"] is True
+    r = c.delete("/api/providers/groq", headers=h)
+    assert next(p for p in r.json()["providers"] if p["id"] == "groq")["configured"] is False

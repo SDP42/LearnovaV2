@@ -165,48 +165,40 @@ def _cache_path(key: str) -> pathlib.Path:
     return d / f"{key}.png"
 
 
-def _gemini(subject: str) -> Optional[bytes]:
-    if os.getenv("LEARNOVA_IMAGE_AI", "0") != "1" or not os.getenv("GEMINI_API_KEY"):
-        return None
-    try:
-        from google import genai
+def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str, *, use_ai: bool = True, title: str = "", style: str = "") -> Dict[str, Any]:
+    """The picture for one slide: an AI image when a provider is configured (and allowed), otherwise the vector illustrator."""
+    from learnova.ai import image_providers as ip
 
-        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-        prompt = (f"A clean, flat vector-style educational illustration for a presentation slide about: {subject[:300]}. "
-                  "Bright friendly colours, no text, no watermark, simple shapes, white-to-light background.")
-        resp = client.models.generate_content(model=os.getenv("LEARNOVA_IMAGE_MODEL", "gemini-2.5-flash-image"), contents=prompt)
-        for part in resp.candidates[0].content.parts:
-            if getattr(part, "inline_data", None) and part.inline_data.data:
-                return part.inline_data.data
-    except Exception as exc:  # fall through to the vector illustrator
-        logger.info("gemini image failed (%s) — using vector illustration", exc)
-    return None
-
-
-def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str) -> Dict[str, Any]:
-    key = hashlib.sha1(f"{plan.subject}|{primary_hex}|{accent_hex}|{plan.kind}|{os.getenv('LEARNOVA_IMAGE_AI', '0')}".encode()).hexdigest()[:24]
+    style = style or os.getenv("LEARNOVA_IMAGE_STYLE", "flat")
+    ai_on = use_ai and bool(ip.provider_name())
+    key = hashlib.sha1(f"{plan.subject}|{primary_hex}|{accent_hex}|{plan.kind}|{ip.provider_name() if ai_on else 'vector'}|{style}".encode()).hexdigest()[:24]
     cp = _cache_path(key)
     provider = "cache"
-    if cp.exists():
-        data = cp.read_bytes()
-    else:
-        data = _gemini(plan.subject)
-        provider = "gemini" if data else "vector"
+    data: Optional[bytes] = cp.read_bytes() if cp.exists() else None
+    if data is None:
+        if ai_on:
+            data = ip.generate(ip.style_prompt(plan.subject, primary_hex, accent_hex, style), "3:4" if plan.kind == "panel" else "4:3")
+            provider = ip.provider_name() if data else "vector"
+        else:
+            provider = "vector"
         if not data:
             data = vector_illustration(plan.icons, primary_hex, accent_hex, plan.subject, plan.kind)
         try:
             cp.write_bytes(data)
         except OSError:
             pass
-    return {"bytes": data, "ext": "png", "provider": provider, "icons": plan.icons[:4], "reason": plan.reason}
+    return {"bytes": data, "ext": "png", "provider": provider, "icons": plan.icons[:4], "reason": plan.reason,
+            "alt": f"Illustration: {title or plan.subject[:80]}"}
 
 
-def illustrate_deck(final_deck: List[dict], theme) -> int:
-    """Plan + generate an illustration for each eligible slide. Returns how many were drawn."""
+def illustrate_deck(final_deck: List[dict], theme, mode: str = "auto") -> int:
+    """Plan + generate an illustration for each eligible slide. ``mode``: "auto" (AI when a key is set, else vector), "vector", or "ai".
+    Returns how many were drawn."""
     from learnova.rendering.deck_director import plan_deck
 
     plan = plan_deck(final_deck)
-    drawn, prev, total = 0, False, len(final_deck)
+    drawn, prev, total, ai_used = 0, False, len(final_deck), 0
+    max_ai = int(os.getenv("LEARNOVA_IMAGE_MAX", "8"))      # cost control: at most this many generated images per deck
     for i, (entry, sp) in enumerate(zip(final_deck, plan.slides)):
         imp = entry.get("improved") if isinstance(entry.get("improved"), dict) else None
         if imp is None:
@@ -220,6 +212,8 @@ def illustrate_deck(final_deck: List[dict], theme) -> int:
         if not ip.draw:
             imp.pop("illustration", None)
             continue
-        imp["illustration"] = generate_image(ip, theme.primary_hex, theme.accent_hex)
+        use_ai = mode != "vector" and ai_used < max_ai
+        imp["illustration"] = generate_image(ip, theme.primary_hex, theme.accent_hex, use_ai=use_ai, title=str(imp.get("title", "")))
+        ai_used += imp["illustration"].get("provider") not in {"vector", "cache"}
         drawn += 1
     return drawn

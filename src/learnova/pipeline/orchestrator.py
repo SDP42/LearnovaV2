@@ -80,6 +80,7 @@ class PipelineConfig:
     enable_quizzes: bool = True
     # Draw concept illustrations where the policy says an image adds meaning (offline vector engine).
     enable_illustrations: bool = True
+    image_mode: str = "auto"            # auto (AI image when a key is set, else vector) | vector | ai | off
     build_pptx: bool = True
     build_html: bool = True
     prefer_anydoc: bool = True
@@ -684,9 +685,9 @@ def generate(
         from learnova.rendering.theme_engine import resolve_theme
 
         theme = resolve_theme(result.source_name, config.theme_id, config.theme_spec)
-        return f"{illustrate_deck(result.final_deck, theme)} illustration(s)"
+        return f"{illustrate_deck(result.final_deck, theme, config.image_mode)} illustration(s)"
 
-    runner.run("illustrate", _illustrate, skip=not config.enable_illustrations, skip_reason="disabled")
+    runner.run("illustrate", _illustrate, skip=(not config.enable_illustrations) or config.image_mode == "off", skip_reason="disabled")
 
     # 7. Engagement scoring
     def _score():

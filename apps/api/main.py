@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import sys
 import tempfile
 from typing import Any, Dict, List, Optional
@@ -258,6 +259,7 @@ class GenerateRequest(BaseModel):
     enable_vision_ocr: bool = True
     enable_quizzes: bool = True
     enable_illustrations: bool = True
+    images: str = "auto"                   # auto | vector | ai | off — "ai" and "auto" use a generated image when an image key is configured
     build_pptx: bool = True
     build_html: bool = True
     content_mode: str = "preserve"
@@ -283,6 +285,7 @@ def _config_from(request: GenerateRequest, textbook_mode: bool = False) -> Pipel
         quiz_positions=request.quiz_positions or None,
         quiz_style=request.quiz_style,
         enable_illustrations=request.enable_illustrations,
+        image_mode=request.images if request.images in {"auto", "vector", "ai", "off"} else "auto",
         textbook_mode=textbook_mode,
         enable_vision_ocr=request.enable_vision_ocr,
         enable_quizzes=request.enable_quizzes,
@@ -692,6 +695,71 @@ class AssistPrompt(BaseModel):
     text: str
 
 
+class ProviderKey(BaseModel):
+    provider: str
+    key: str
+
+
+_PROVIDER_INFO = {
+    "gemini": ("Google Gemini", "Rewriting, quizzes, the tutor and (with the image model) generated pictures. Free key at aistudio.google.com."),
+    "groq": ("Groq", "Fast rewriting and quizzes. Free key at console.groq.com."),
+    "nvidia": ("NVIDIA NIM", "Higher-quality rewriting; automatic fallback. Free key at build.nvidia.com."),
+    "gemini_image": ("Image generation key", "Optional separate Gemini key used only for slide pictures; falls back to the Gemini key above."),
+}
+
+
+def _providers_state() -> dict:
+    from learnova.ai import assist, image_providers
+
+    st = image_providers.status()
+    return {
+        "llm": assist.llm_available(), "image_ai": st["configured"], "image_provider": st["provider"], "image_model": st["model"],
+        "editable": _keys_editable(),
+        "providers": [{"id": k, "name": v[0], "hint": v[1], "configured": bool(os.getenv(image_providers.key_vars()[k]))} for k, v in _PROVIDER_INFO.items()],
+    }
+
+
+def _keys_editable() -> bool:
+    return os.getenv("OTP_DEV_MODE", "1") == "1" or os.getenv("LEARNOVA_ALLOW_KEY_UI", "") == "1"
+
+
+@app.get("/api/providers")
+def providers_status(user_id: str = Depends(current_user)) -> dict:
+    return _providers_state()
+
+
+@app.post("/api/providers")
+def providers_save(body: ProviderKey, user_id: str = Depends(current_user)) -> dict:
+    """Store an API key on this server (never echoed back or logged) and switch the matching features on."""
+    from learnova.ai import image_providers
+
+    if not _keys_editable():
+        raise HTTPException(status_code=403, detail="Keys are configured on the server (.env) in this deployment.")
+    provider, key = body.provider.strip().lower(), body.key.strip()
+    if provider not in _PROVIDER_INFO:
+        raise HTTPException(status_code=400, detail="unknown provider")
+    if not (16 <= len(key) <= 300) or re.search(r"\s", key):
+        raise HTTPException(status_code=400, detail="that does not look like an API key")
+    verified = image_providers.verify_key(provider, key)
+    if verified is False:
+        raise HTTPException(status_code=400, detail="the provider rejected this key — check it and try again")
+    image_providers.save_key(provider, key)
+    logger.info("api key saved for provider %s (verified=%s)", provider, verified)
+    return {**_providers_state(), "verified": verified}
+
+
+@app.delete("/api/providers/{provider}")
+def providers_remove(provider: str, user_id: str = Depends(current_user)) -> dict:
+    from learnova.ai import image_providers
+
+    if not _keys_editable():
+        raise HTTPException(status_code=403, detail="Keys are configured on the server (.env) in this deployment.")
+    if provider not in _PROVIDER_INFO:
+        raise HTTPException(status_code=400, detail="unknown provider")
+    image_providers.remove_key(provider)
+    return _providers_state()
+
+
 @app.get("/api/assist/status")
 def assist_status(user_id: str = Depends(current_user)) -> dict:
     from learnova.ai import assist
@@ -702,7 +770,7 @@ def assist_status(user_id: str = Depends(current_user)) -> dict:
     except Exception:
         providers = []
     return {"llm": assist.llm_available(), "providers": providers,
-            "image_ai": os.getenv("LEARNOVA_IMAGE_AI", "0") == "1" and bool(os.getenv("GEMINI_API_KEY"))}
+            "image_ai": __import__("learnova.ai.image_providers", fromlist=["x"]).status()["configured"]}
 
 
 class ChatTurn(BaseModel):

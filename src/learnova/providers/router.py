@@ -350,6 +350,12 @@ def _build_default_chain() -> List[tuple[str, LLMProvider]]:
 _default_router: Optional[LLMRouter] = None
 
 
+def reset_router() -> None:
+    """Drop the shared router so the next call re-reads API keys (after a key is added or removed in Settings)."""
+    global _default_router
+    _default_router = None
+
+
 def get_router() -> LLMRouter:
     """Process-wide shared router (providers hold reusable HTTP sessions)."""
     global _default_router
