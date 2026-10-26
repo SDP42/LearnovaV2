@@ -594,8 +594,44 @@ class AssistPrompt(BaseModel):
 @app.get("/api/assist/status")
 def assist_status(user_id: str = Depends(current_user)) -> dict:
     from learnova.ai import assist
+    from learnova.providers.router import get_router
 
-    return {"llm": assist.llm_available()}
+    try:
+        providers = get_router().provider_names
+    except Exception:
+        providers = []
+    return {"llm": assist.llm_available(), "providers": providers,
+            "image_ai": os.getenv("LEARNOVA_IMAGE_AI", "0") == "1" and bool(os.getenv("GEMINI_API_KEY"))}
+
+
+class ChatTurn(BaseModel):
+    role: str
+    content: str
+
+
+class ChatIn(BaseModel):
+    message: str
+    persona: str = "teacher"
+    history: list[ChatTurn] = []
+
+
+@app.get("/api/tutor/personas")
+def tutor_personas(user_id: str = Depends(current_user)) -> dict:
+    from learnova.ai import tutor
+
+    return {"personas": tutor.list_personas(), "default": tutor.DEFAULT_PERSONA}
+
+
+@app.post("/api/decks/{deck_id}/chat")
+def deck_chat(deck_id: str, body: ChatIn, user_id: str = Depends(current_user)) -> dict:
+    """Persona-based tutor grounded in one deck (LLM when a key is set; own logic otherwise)."""
+    from learnova.ai import tutor
+
+    if deck_library.get_deck(user_id, deck_id) is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    stored = deck_library.read_slides(user_id, deck_id) or {}
+    return tutor.answer(body.message[:1200], stored.get("slides") or [], body.persona,
+                        [t.model_dump() for t in body.history][-12:])
 
 
 @app.post("/api/assist/slide")

@@ -976,7 +976,7 @@ def _prose(c: _Canvas, data) -> bool:
         return False
     bar_w = 0.09
     lx = c.x + bar_w + PAD * 0.9
-    lw = c.w - (lx - c.x)
+    lw = (c.w - (lx - c.x)) * 0.93   # conservative: real fonts wrap earlier than the estimate
     gap = 0.14
 
     def tagged(text, rel):

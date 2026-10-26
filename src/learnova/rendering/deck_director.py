@@ -289,6 +289,8 @@ def _residual_notes(text: str, data: Dict[str, Any], limit: int = 4) -> List[str
 
     covered = set(_WORD.findall(_json.dumps(data, default=str).lower()))
     out: List[str] = []
+    # table scaffolding and planner markers are not prose
+    text = "\n".join(l for l in (text or "").split("\n") if not l.strip().startswith("|") and l.strip() != "[TABLE DATA]" and not l.startswith("###"))
     for s_ in split_sentences(text):
         words = [w for w in _WORD.findall(s_.lower()) if len(w) > 3]
         if not words:
@@ -326,10 +328,12 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         # "(1/2)" slides is still detected from the whole) AND the improved
         # bullets (which, after enhancement, can carry structure — a worked
         # example's derivation lines — that the raw chunk did not).
-        vms_source = "\n".join(
-            p for p in (str((original or {}).get("text") or "").strip(),
-                        "\n".join(bullets)) if p
-        ) or text
+        _otext = str((original or {}).get("text") or "").strip()
+        _norm = lambda t: re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()  # noqa: E731
+        # the bullets repeat the source text in preserve mode — add them only when they bring something new
+        _bl = _norm(" ".join(bullets))
+        _dup = bool(_otext) and (_bl in _norm(_otext) or "### " in _otext or "[TABLE DATA]" in _otext)
+        vms_source = (_otext if _dup else "\n".join(p for p in (_otext, "\n".join(bullets)) if p)) or text
         vd = select_visual(vms_source, title)
 
         # The visual_data stage may have already extracted (via LLM) the exact

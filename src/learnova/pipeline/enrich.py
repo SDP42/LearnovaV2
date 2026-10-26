@@ -56,23 +56,37 @@ def build_glossary(entries: List[dict]) -> Dict[str, Tuple[str, int]]:
     return gl
 
 
-def attach_key_terms(entries: List[dict], gl: Dict[str, Tuple[str, int]], per_slide: int = 3) -> int:
+def attach_key_terms(entries: List[dict], gl: Dict[str, Tuple[str, int]], per_slide: int = 2, regap: int = 12) -> int:
+    """
+    A term is explained where a student first meets it after its definition, then only again after ``regap`` slides —
+    and a term that runs through most of the deck (its central topic) is explained once, not on every slide.
+    """
+    texts = [str((e.get("original") or {}).get("text") or "") for e in entries]
+    n_slides = max(1, len(entries))
+    freq = {t: sum(1 for x in texts if re.search(rf"(?<![\w]){re.escape(t)}(?![\w])", x, re.I)) for t in gl}
+    last_shown: Dict[str, int] = {}
     n = 0
     for i, e in enumerate(entries):
         imp = e.get("improved") or {}
         if str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary"):
             continue
-        text = str((e.get("original") or {}).get("text") or "")
+        text = texts[i]
         if "[TABLE DATA]" in text:
             continue
         hits = []
         for term, (d, src) in gl.items():
             if src == i:  # the slide that defines it already explains it
                 continue
+            central = freq.get(term, 0) > 0.3 * n_slides and n_slides >= 10
+            if term in last_shown and (central or i - last_shown[term] < regap):
+                continue
             if re.search(rf"(?<![\w]){re.escape(term)}(?![\w])", text, re.I):
                 hits.append((len(term), term, d))
         hits.sort(reverse=True)
-        kt = [{"term": t if t.isupper() or len(t) < 4 else t[:1].upper() + t[1:], "definition": d} for _, t, d in hits[:per_slide]]
+        chosen = hits[:per_slide]
+        kt = [{"term": t if t.isupper() or len(t) < 4 else t[:1].upper() + t[1:], "definition": d} for _, t, d in chosen]
+        for _, t, _ in chosen:
+            last_shown[t] = i
         if kt:
             imp["key_terms"] = kt
             n += 1
