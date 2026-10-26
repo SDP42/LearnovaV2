@@ -478,6 +478,14 @@ def _worked(c: _Canvas, data) -> bool:
     return True
 
 
+_SUP = str.maketrans("0123456789+-n", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿ")
+
+
+def _superscripts(text: str) -> str:
+    """``x^2`` → ``x²`` (a caret is source-code notation, not something to show on a slide)."""
+    return re.sub(r"\^\(?([0-9+\-n]{1,3})\)?", lambda m: m.group(1).translate(_SUP), text)
+
+
 def _stepper(c: _Canvas, data) -> bool:
     """A solved problem: each step a numbered row (title + working, then the plain-language reason), the answer in a band below."""
     steps = [x for x in (data.get("steps") or []) if x.get("title")]
@@ -488,8 +496,13 @@ def _stepper(c: _Canvas, data) -> bool:
     rows = []
     for st in steps:
         work = [m for m in (st.get("math") or []) if m][-1:] or [""]
-        work_s = re.sub(r"\[\[|\]\]", "", work[0])
-        rows.append({"step": f"{st['title']}  —  {work_s}" if work_s and len(work_s) <= 48 else str(st["title"]), "reason": str(st.get("explain", ""))[:170]})
+        work_s = _superscripts(re.sub(r"\[\[|\]\]", "", work[0]))
+        reason = str(st.get("explain", ""))
+        if len(steps) >= 5:                                     # a long solution: the lead sentence only, so the type can stay readable
+            reason = re.split(r"(?<=[.!?])\s+(?=[A-Z])", reason, maxsplit=1)[0]
+            if len(reason) > 105:
+                reason = reason[:105].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+        rows.append({"step": f"{st['title']}  —  {work_s}" if work_s and len(work_s) <= 48 else str(st["title"]), "reason": reason[:170]})
     band_h = 0.7
     h0 = c.h
     c.h = h0 - band_h - GUT * 0.6
