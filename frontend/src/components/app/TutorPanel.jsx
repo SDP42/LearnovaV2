@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Mic, MicOff, Send, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import * as api from "@/api";
+import { isTypingTarget } from "@/components/app/ShortcutsOverlay";
 
 const SUGGESTIONS = ["Summarise this deck", "Quiz me", "Explain slide 2", "What are the key terms?"];
 
@@ -210,7 +211,7 @@ export default function TutorPanel({ deckId, open, onClose, onJumpToSlide }) {
                 </button>
               ) : null}
               <input value={text} onChange={(e) => setText(e.target.value)} placeholder={listening ? "Listening…" : "Ask about this deck…"} aria-label="Message the tutor" maxLength={1200}
-                className="h-10 min-w-0 flex-1 rounded-full border border-[#E8D8C9] bg-[#FFFAF5] px-4 text-[14px] text-[#402B25] outline-none placeholder:text-[#8A7468] focus:border-[#D95D39] focus:ring-2 focus:ring-[#F47B4533]" />
+                className="h-10 min-w-0 flex-1 rounded-full border border-[#E8D8C9] bg-[#FFFAF5] px-4 text-[14px] text-[#402B25] outline-none placeholder:text-[#765F53] focus:border-[#D95D39] focus:ring-2 focus:ring-[#F47B4533]" />
               <button type="submit" disabled={!text.trim() || busy} aria-label="Send"
                 className="grid size-10 shrink-0 place-items-center rounded-full bg-[#F47B45] text-[#2A1A14] transition hover:bg-[#D95D39] hover:text-white disabled:opacity-50"><Send className="size-4" /></button>
             </form>
@@ -224,12 +225,28 @@ export default function TutorPanel({ deckId, open, onClose, onJumpToSlide }) {
 /** Floating launcher; keeps its own open state so a page only needs <TutorLauncher deckId=… />. */
 export function TutorLauncher({ deckId, onJumpToSlide, className = "" }) {
   const [open, setOpen] = useState(false);
+
+  // T toggles the tutor from anywhere on the page (not while typing); Esc closes it.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") return setOpen(false);
+      if ((e.key === "t" || e.key === "T") && !isTypingTarget(e.target)) {
+        e.preventDefault();
+        setOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <>
       {!open ? (
-        <button onClick={() => setOpen(true)} aria-label="Ask the tutor"
-          className={`fixed bottom-5 right-5 z-40 flex h-12 items-center gap-2 rounded-full bg-[#402B25] px-5 text-[14px] font-semibold text-[#FFFAF5] shadow-lg transition hover:-translate-y-0.5 hover:bg-[#2E1E19] ${className}`}>
+        <button onClick={() => setOpen(true)} aria-label="Ask the tutor (T)" title="Ask the tutor (T)"
+          className={`fixed bottom-5 right-5 z-40 flex h-12 items-center gap-2 rounded-full bg-[#402B25] px-5 text-[14px] font-semibold text-[#FFFAF5] shadow-lg transition duration-150 hover:-translate-y-0.5 hover:bg-[#2E1E19] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F47B45] ${className}`}>
           <Sparkles className="size-4 text-[#F47B45]" /> Ask the tutor
+          <kbd className="ml-0.5 hidden rounded bg-[#FFFAF5]/15 px-1.5 text-[11px] font-semibold sm:inline">T</kbd>
         </button>
       ) : null}
       <TutorPanel deckId={deckId} open={open} onClose={() => setOpen(false)} onJumpToSlide={onJumpToSlide} />

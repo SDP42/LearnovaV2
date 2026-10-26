@@ -3,11 +3,11 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { Command, Search } from "lucide-react";
 import { useAuth } from "@/auth";
-import { Toaster } from "sonner";
 import AppSidebar, { AccountMenu, MobileTabs } from "@/components/app/AppSidebar";
 import CommandPalette from "@/components/app/CommandPalette";
 import AssistantWidget from "@/components/app/AssistantWidget";
 import { ShellCtx } from "@/components/app/AppLayout";
+import ShortcutsOverlay, { APP_SHORTCUTS, useShortcutsKey } from "@/components/app/ShortcutsOverlay";
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || "");
 
@@ -20,6 +20,8 @@ export default function AppShell() {
   const [titleEl, setTitleEl] = useState(null);
   const [actionsEl, setActionsEl] = useState(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  useShortcutsKey(useCallback(() => setHelpOpen((o) => !o), []));
 
   const newDeck = useCallback(() => navigate("/app", { state: { focus: Date.now() } }), [navigate]);
 
@@ -47,10 +49,10 @@ export default function AppShell() {
     <div data-learnova-app data-lv-shell className="min-h-svh bg-[#FFFAF5] text-[#402B25]">
       <AppSidebar onNew={newDeck} />
       <div className="lv-shell-main flex min-h-svh min-w-0 flex-col">
-        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-3 border-b bg-white/85 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b bg-[#FFFAF5] px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-1.5 text-[13px]">
-            <span className="hidden text-[#8A7468] sm:inline">Learnova</span>
-            <span className="hidden text-[#C0CBE0] sm:inline">/</span>
+            <span className="hidden text-[#765F53] sm:inline">Learnova</span>
+            <span aria-hidden className="hidden text-[#B8A396] sm:inline">/</span>
             <span ref={setTitleEl} className="truncate font-semibold text-[#402B25]" />
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -58,17 +60,17 @@ export default function AppShell() {
             <button
               onClick={() => setPaletteOpen(true)}
               aria-label="Search (Command K)"
-              className="flex h-8 items-center gap-2 rounded-full border bg-[#FFFAF5] px-3 text-[13px] text-[#7C6659] transition-colors hover:border-[#DCC6B4] hover:bg-white sm:w-56"
+              className="flex h-10 items-center gap-2 rounded-full border bg-white px-3.5 text-[13px] text-[#765F53] transition duration-150 hover:-translate-y-px hover:border-[#E3A98B] hover:shadow-[0_8px_18px_-10px_rgb(64_43_37/0.3)] max-sm:w-10 max-sm:justify-center max-sm:px-0 sm:w-60"
             >
               <Search className="size-3.5" />
               <span className="hidden flex-1 text-left sm:inline">Search…</span>
-              <kbd className="hidden items-center gap-0.5 rounded border bg-white px-1 text-[11px] sm:inline-flex">
+              <kbd className="hidden items-center gap-0.5 rounded border bg-[#FFFAF5] px-1 text-[11px] sm:inline-flex">
                 {isMac ? <Command className="size-2.5" /> : "Ctrl"}K
               </kbd>
             </button>
             <div className="md:hidden">
               <AccountMenu align="end" side="bottom">
-                <button aria-label="Account" className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-[#C2502A] to-[#6B9B72] text-xs font-bold text-white">
+                <button aria-label="Account" className="grid size-10 place-items-center rounded-full bg-[#F47B45] text-[13px] font-bold text-[#2A1A14]">
                   {initial}
                 </button>
               </AccountMenu>
@@ -91,7 +93,7 @@ export default function AppShell() {
       <MobileTabs onNew={newDeck} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} onNew={newDeck} />
       <AssistantWidget />
-      <Toaster position="bottom-right" richColors closeButton toastOptions={{ style: { fontFamily: "inherit" } }} />
+      <ShortcutsOverlay open={helpOpen} onOpenChange={setHelpOpen} groups={APP_SHORTCUTS} />
     </div>
   );
 }

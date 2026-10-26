@@ -37,7 +37,7 @@ export default function ImageEditor({ src, onSave, onClose }) {
 
     // committed highlights
     ctx.lineWidth = 3;
-    ctx.strokeStyle = "#8b7bf5";
+    ctx.strokeStyle = "#F47B45";
     ctx.fillStyle = "rgba(139,123,245,0.12)";
     boxes.forEach((b) => {
       ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -67,7 +67,7 @@ export default function ImageEditor({ src, onSave, onClose }) {
         ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
         ctx.restore();
       } else {
-        ctx.strokeStyle = "#8b7bf5";
+        ctx.strokeStyle = "#F47B45";
         ctx.fillStyle = "rgba(139,123,245,0.12)";
         ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
         ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);

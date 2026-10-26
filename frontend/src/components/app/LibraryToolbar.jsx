@@ -25,16 +25,16 @@ export default function LibraryToolbar({
       <div className="flex flex-wrap items-center gap-2">
         {onQuery ? (
           <div className="relative min-w-0 flex-1 sm:max-w-sm">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8A7468]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#765F53]" />
             <input
               value={query}
               onChange={(e) => onQuery(e.target.value)}
               placeholder={placeholder}
               aria-label={placeholder}
-              className="h-9 w-full rounded-full border border-[#E8D8C9] bg-white pl-9 pr-8 text-[14px] outline-none transition placeholder:text-[#8A7468] focus:border-[#E3A98B] focus:shadow-[0_0_0_3px_rgb(194_80_42/0.10)]"
+              className="h-9 w-full rounded-full border border-[#E8D8C9] bg-white pl-9 pr-8 text-[14px] outline-none transition placeholder:text-[#765F53] focus:border-[#E3A98B] focus:shadow-[0_0_0_3px_rgb(194_80_42/0.10)]"
             />
             {query ? (
-              <button onClick={() => onQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded-full text-[#8A7468] hover:bg-[#EEF3FB]">
+              <button onClick={() => onQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded-full text-[#765F53] hover:bg-[#F3E6DA]">
                 <X className="size-3.5" />
               </button>
             ) : null}
@@ -45,7 +45,7 @@ export default function LibraryToolbar({
           {sorts ? (
             <Select value={sort} onValueChange={onSort}>
               <SelectTrigger aria-label="Sort" className="h-9 w-auto gap-1.5 rounded-full border-[#E8D8C9] bg-white px-3 text-[13px] font-medium shadow-none">
-                <span className="text-[#8A7468]">Sort:</span>
+                <span className="text-[#765F53]">Sort:</span>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent align="end">
@@ -91,7 +91,7 @@ export default function LibraryToolbar({
                 "shrink-0 rounded-full border px-3.5 py-1 text-[13px] font-medium transition",
                 chip === c.id
                   ? "border-[#C2502A] bg-[#FCE5D6] text-[#8F3A18]"
-                  : "border-[#E8D8C9] bg-white text-[#664F44] hover:border-[#B9CBEA]"
+                  : "border-[#E8D8C9] bg-white text-[#664F44] hover:border-[#DCC6B4]"
               )}
             >
               {c.label}

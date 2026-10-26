@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import AppLayout from "@/components/app/AppLayout";
 import { PageHeader } from "@/components/app/Page";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 const SECTIONS = [
   {
@@ -61,9 +63,10 @@ const SECTIONS = [
   {
     h: "Keyboard shortcuts",
     body: [
-      "Presenter view — → / Space / PageDown: next (advances a build, then the slide) · ← / PageUp: previous · Home / End: first / last · F: fullscreen · B or . : blackout · P: pause the timer · R: reset the timer.",
+      "Presenter view — → / Space / PageDown: next (advances a build, then the slide) · ← / PageUp: previous · Home / End: first / last · F: fullscreen · B or . : blackout · W: white screen · L: laser · D: pen · G: slide sorter · P: pause the timer · R: reset the timer · T: tutor · ?: cheat sheet.",
+      "Editor — ↑ ↓ ← →: move between slides · T: open the tutor · ?: cheat sheet.",
+      "Anywhere in the app — Cmd/Ctrl + K: search decks and actions · N: new deck · ?: cheat sheet.",
       "Diagram editor — scroll: zoom at cursor · drag: pan · toolbar: fit, reset, download SVG/PNG, fullscreen · the Mermaid source is editable inline.",
-      "Sidebar — Cmd/Ctrl + B: collapse.",
     ],
   },
   {
@@ -93,43 +96,79 @@ const SECTIONS = [
 ];
 
 export default function Docs() {
+  const [active, setActive] = useState(slug(SECTIONS[0].h));
+
+  // Highlight the section being read.
+  useEffect(() => {
+    const els = SECTIONS.map((s) => document.getElementById(slug(s.h))).filter(Boolean);
+    if (!("IntersectionObserver" in window) || !els.length) return undefined;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (hit) setActive(hit.target.id);
+      },
+      { rootMargin: "-80px 0px -65% 0px", threshold: 0 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   return (
     <AppLayout title="Help">
-      <div className="flex max-w-3xl flex-col gap-4">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <PageHeader title="Help" subtitle="How the engine works and how to get more out of it." />
 
-        <Card className="lv-card">
-          <CardContent className="p-5">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              On this page
-            </p>
-            <ul className="mt-2 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start">
+          {/* phone: scrolling chips · desktop: sticky contents */}
+          <nav aria-label="On this page" className="lv-no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:hidden">
+            {SECTIONS.map((s) => (
+              <a
+                key={s.h}
+                href={`#${slug(s.h)}`}
+                className={cn(
+                  "inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-[13px] font-semibold transition-colors",
+                  active === slug(s.h) ? "border-[#C2502A] bg-[#FCE5D6] text-[#8F3A18]" : "border-[#E8D8C9] bg-white text-[#4F3A31]"
+                )}
+              >
+                {s.h.length > 30 ? s.h.slice(0, 28) + "…" : s.h}
+              </a>
+            ))}
+          </nav>
+          <nav aria-label="On this page" className="sticky top-20 hidden rounded-2xl border bg-white p-3 lg:block">
+            <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#715A4E]">On this page</p>
+            <ul className="flex max-h-[70vh] flex-col gap-0.5 overflow-y-auto">
               {SECTIONS.map((s) => (
                 <li key={s.h}>
                   <a
                     href={`#${slug(s.h)}`}
-                    className="text-muted-foreground hover:text-foreground"
+                    aria-current={active === slug(s.h) ? "true" : undefined}
+                    className={cn(
+                      "block rounded-lg px-2.5 py-1.5 text-[13px] leading-5 transition-colors",
+                      active === slug(s.h) ? "bg-[#FCE5D6] font-semibold text-[#8F3A18]" : "text-[#5A453B] hover:bg-[#F3E6DA]"
+                    )}
                   >
                     {s.h}
                   </a>
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
+          </nav>
 
-        {SECTIONS.map((s) => (
-          <Card key={s.h} id={slug(s.h)} className="lv-card scroll-mt-20">
-            <CardContent className="flex flex-col gap-2 p-5">
-              <h3 className="font-medium">{s.h}</h3>
-              {s.body.map((p, i) => (
-                <p key={i} className="text-sm leading-relaxed text-muted-foreground">
-                  {p}
-                </p>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
+          <div className="flex min-w-0 flex-col gap-4">
+            {SECTIONS.map((s) => (
+              <Card key={s.h} id={slug(s.h)} className="lv-card scroll-mt-24">
+                <CardContent className="flex flex-col gap-2.5 p-5 sm:p-6">
+                  <h2 className="t-h2">{s.h}</h2>
+                  {s.body.map((p, i) => (
+                    <p key={i} className="text-[14px] leading-7 text-[#4F3A31]">
+                      {p}
+                    </p>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

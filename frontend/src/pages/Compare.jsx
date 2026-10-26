@@ -5,7 +5,6 @@ import * as api from "@/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
@@ -72,7 +71,7 @@ function SlideRow({ s }) {
   const delta = c.words_delta ?? 0;
   return (
     <Card className="grid overflow-hidden md:grid-cols-2">
-      <div className="space-y-2 bg-muted/40 p-4">
+      <div className="space-y-2 bg-[#F7EFE8] p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Original · {s.index}</p>
           <Badge variant="outline">{b.visual || "text only"}</Badge>
@@ -83,7 +82,7 @@ function SlideRow({ s }) {
       </div>
       <div className="space-y-2 border-t p-4 md:border-l md:border-t-0">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-primary">New slide</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#B44A22]">New slide</p>
           <div className="flex flex-wrap gap-1">
             {a.family_label ? <Badge>{a.family_label}</Badge> : null}
             <Badge variant={delta <= 0 ? "success" : "warning"}>{delta > 0 ? "+" : ""}{delta} words</Badge>
@@ -94,17 +93,17 @@ function SlideRow({ s }) {
         {a.bullets?.length ? (
           <ul className="list-disc space-y-0.5 pl-5 text-sm">{a.bullets.map((x, i) => <li key={i}>{x}</li>)}</ul>
         ) : null}
-        {a.takeaway ? <p className="rounded-md bg-primary/10 px-2 py-1 text-sm font-medium">{a.takeaway}</p> : null}
+        {a.takeaway ? <p className="rounded-lg bg-[#FCE5D6] px-2.5 py-1.5 text-sm font-medium text-[#6B2A10]">{a.takeaway}</p> : null}
         {a.notes?.length ? <p className="text-xs italic text-muted-foreground">Notes: {a.notes.join(" ")}</p> : null}
         {a.has_illustration ? (
           <Badge variant="secondary" className="gap-1 whitespace-normal"><ImageIcon className="size-3 shrink-0" /> {a.illustration_reason || "Illustration"}</Badge>
         ) : null}
         <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-          <span className={cn("font-medium", missing.length ? "text-red-600" : "text-emerald-700")}>
+          <span className={cn("font-semibold", missing.length ? "text-[#A53125]" : "text-[#2F5D37]")}>
             Facts kept {c.facts_kept ?? 0}/{c.facts_total ?? 0}
           </span>
           {missing.map((m, i) => (
-            <span key={i} className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-red-700" title={m.kind}>{m.value}</span>
+            <span key={i} className="rounded-full border border-[#F0B9B2] bg-[#FBE9E7] px-2 py-0.5 text-[#8E2A1F]" title={m.kind}>{m.value}</span>
           ))}
         </div>
       </div>
@@ -124,7 +123,7 @@ function Quiz({ s }) {
         {(q.options ?? []).map((o, i) => {
           const ok = o === q.correct || i === q.correct || String.fromCharCode(65 + i) === q.correct;
           return (
-            <li key={i} className={cn("flex items-center gap-2 rounded-md border px-2 py-1", ok && "border-emerald-300 bg-emerald-50 text-emerald-900")}>
+            <li key={i} className={cn("flex items-center gap-2 rounded-lg border px-2.5 py-1.5", ok && "border-[#6B9B72] bg-[#E6F2E8] text-[#2F5D37]")}>
               {ok ? <Check className="size-4 shrink-0" /> : <span className="size-4 shrink-0" />} {o}
             </li>
           );
@@ -163,22 +162,22 @@ export default function Compare() {
   const shown = onlyMissing ? content.filter((s) => s.change?.facts_missing?.length) : content;
 
   return (
-    <div data-learnova-app className="min-h-svh bg-background">
-      <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
-        <Button asChild variant="ghost" size="icon">
+    <div data-learnova-app className="min-h-svh bg-[#FFFAF5] text-[#402B25]">
+      <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-white px-3 sm:px-4">
+        <Button asChild variant="ghost" size="icon" className="rounded-full">
           <Link to={`/app/preview/${jobId}`} aria-label="Back to preview"><ArrowLeft /></Link>
         </Button>
-        <GitCompare className="size-4 text-primary" />
+        <GitCompare className="size-4 text-[#B44A22]" />
         <h1 className="truncate font-semibold">Before vs after{data?.summary?.source_name ? ` · ${data.summary.source_name}` : ""}</h1>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-6 p-4">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         {state === "loading" ? (
           <div className="space-y-4" role="status" aria-label="Loading comparison">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+              {Array.from({ length: 6 }).map((_, i) => <div key={i} className="lv-skel h-24 rounded-2xl" />)}
             </div>
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48" />)}
+            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="lv-skel h-48 rounded-2xl" />)}
           </div>
         ) : state === "empty" ? (
           <Card className="grid place-items-center gap-3 p-10 text-center">
@@ -187,7 +186,7 @@ export default function Compare() {
             <Button asChild variant="outline" size="sm"><Link to={`/app/preview/${jobId}`}>Back to preview</Link></Button>
           </Card>
         ) : state === "error" ? (
-          <Card className="flex items-center gap-3 border-red-200 bg-red-50 p-4 text-red-700">
+          <Card className="flex items-center gap-3 border-[#F0B9B2] bg-[#FBE9E7] p-4 text-[#8E2A1F]">
             <AlertTriangle className="size-5 shrink-0" /> <span className="text-sm">Could not load the comparison: {error}</span>
           </Card>
         ) : (

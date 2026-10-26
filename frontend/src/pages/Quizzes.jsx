@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BrainCircuit, Lightbulb, RotateCcw, Target, Trophy } from "lucide-react";
+import { Lightbulb, RotateCcw, Target, Trophy } from "lucide-react";
+import { toast } from "sonner";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
 import QuizCard from "@/components/app/QuizCard";
@@ -14,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { PageContainer, PageHeader } from "@/components/app/Page";
 import { EmptyState } from "@/components/app/states";
 import { QuizIllustration } from "@/components/app/Illustrations";
@@ -66,7 +66,7 @@ export default function Quizzes() {
                 value={jobId}
                 onValueChange={(v) => setParams(v ? { job: v } : {})}
               >
-                <SelectTrigger className="w-56">
+                <SelectTrigger className="w-full sm:w-56">
                   <SelectValue placeholder="Choose a deck" />
                 </SelectTrigger>
                 <SelectContent>
@@ -89,7 +89,7 @@ export default function Quizzes() {
 
         {!jobId ? (
           decks === null ? (
-            <Skeleton className="h-72 rounded-2xl" />
+            <div className="lv-skel h-72 rounded-2xl" />
           ) : (
             <EmptyState
               illustration={<QuizIllustration />}
@@ -103,7 +103,7 @@ export default function Quizzes() {
             />
           )
         ) : quizzes === null ? (
-          <Skeleton className="h-72" />
+          <div className="lv-skel h-72 rounded-2xl" />
         ) : total === 0 ? (
           <Card>
             <CardContent className="p-10 text-center text-sm text-muted-foreground">
@@ -113,7 +113,7 @@ export default function Quizzes() {
         ) : done ? (
           <Card className="mx-auto w-full max-w-xl">
             <CardHeader className="items-center gap-2 text-center">
-              <Trophy className="size-8 text-primary" />
+              <span className="grid size-14 place-items-center rounded-2xl bg-[#FCE5D6] text-[#8F3A18]"><Trophy className="size-7" /></span>
               <CardTitle>
                 {score} / {total} correct
               </CardTitle>
@@ -140,9 +140,9 @@ export default function Quizzes() {
               <span className="tabular-nums">
                 {at + 1} / {total}
               </span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#EFE1D4]">
                 <div
-                  className="h-full rounded-full bg-primary transition-all"
+                  className="h-full rounded-full bg-[#F47B45] transition-all duration-500"
                   style={{ width: `${(at / total) * 100}%` }}
                 />
               </div>
@@ -156,9 +156,12 @@ export default function Quizzes() {
               position={at + 1}
               total={total}
               onNext={(wasCorrect) => {
-                if (wasCorrect) setScore((s) => s + 1);
-                if (at + 1 >= total) setDone(true);
-                else setAt((i) => i + 1);
+                const next = score + (wasCorrect ? 1 : 0);
+                if (wasCorrect) setScore(next);
+                if (at + 1 >= total) {
+                  setDone(true);
+                  toast.success(`Quiz complete — ${next} / ${total} correct`);
+                } else setAt((i) => i + 1);
               }}
             />
           </div>
@@ -166,7 +169,7 @@ export default function Quizzes() {
 
         <Card className="lv-card">
           <CardHeader className="flex flex-row items-center gap-2">
-            <Lightbulb className="size-4 text-primary" />
+            <Lightbulb className="size-4 text-[#B44A22]" />
             <CardTitle className="text-base">Why checkpoint quizzes</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm leading-relaxed text-muted-foreground">
@@ -181,7 +184,7 @@ export default function Quizzes() {
               plausible distractors and a one-line explanation revealed after you
               answer. Change how often they appear with{" "}
               <span className="font-medium text-foreground">Quiz every N</span> in{" "}
-              <Link to="/app/settings" className="underline">Settings</Link>.
+              <Link to="/app/settings" className="font-semibold text-[#8F3A18] underline">Settings</Link>.
             </p>
             <p className="text-xs">
               Quiz generation needs an LLM key (Groq or NVIDIA). The extractive

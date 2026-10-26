@@ -47,29 +47,29 @@ export default function QuizCard({ quiz, position = 1, total = 1, onNext }) {
               disabled={submitted}
               onClick={() => setChoice(i)}
               className={cn(
-                "flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors",
-                !submitted && isChoice && "border-primary bg-primary/5",
-                !submitted && !isChoice && "hover:bg-muted/40",
-                submitted && isCorrect && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
-                submitted && isChoice && !isCorrect && "border-rose-500 bg-rose-50 dark:bg-rose-950/40",
+                "flex min-h-12 items-center gap-3 rounded-xl border bg-white p-3 text-left text-sm transition duration-150",
+                !submitted && isChoice && "border-[#C2502A] bg-[#FDEEE3] ring-2 ring-[#C2502A]/20",
+                !submitted && !isChoice && "hover:-translate-y-px hover:border-[#E3A98B] hover:bg-[#FFFAF5]",
+                submitted && isCorrect && "border-[#6B9B72] bg-[#E6F2E8] text-[#2F5D37]",
+                submitted && isChoice && !isCorrect && "border-[#C0392B] bg-[#FBE9E7] text-[#8E2A1F]",
                 submitted && "cursor-default"
               )}
             >
               <span
                 className={cn(
                   "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
-                  isChoice && !submitted && "border-primary text-primary",
-                  submitted && isCorrect && "border-emerald-500 text-emerald-600",
-                  submitted && isChoice && !isCorrect && "border-rose-500 text-rose-600"
+                  isChoice && !submitted && "border-[#C2502A] text-[#8F3A18]",
+                  submitted && isCorrect && "border-[#3F6B47] text-[#2F5D37]",
+                  submitted && isChoice && !isCorrect && "border-[#C0392B] text-[#8E2A1F]"
                 )}
               >
                 {LETTERS[i]}
               </span>
               <span className="flex-1">{optionText(opt)}</span>
               {submitted && isCorrect ? (
-                <CheckCircle2 className="size-4 text-emerald-600" />
+                <CheckCircle2 className="size-4 text-[#3F6B47]" />
               ) : submitted && isChoice ? (
-                <XCircle className="size-4 text-rose-600" />
+                <XCircle className="size-4 text-[#C0392B]" />
               ) : null}
             </button>
           );
@@ -78,15 +78,15 @@ export default function QuizCard({ quiz, position = 1, total = 1, onNext }) {
         {submitted ? (
           <div
             className={cn(
-              "mt-2 rounded-lg border p-3 text-sm",
+              "mt-2 rounded-xl border p-3 text-sm",
               correct
-                ? "border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30"
-                : "border-rose-500/40 bg-rose-50 dark:bg-rose-950/30"
+                ? "border-[#6B9B72]/50 bg-[#E6F2E8] text-[#2F5D37]"
+                : "border-[#C0392B]/40 bg-[#FBE9E7] text-[#8E2A1F]"
             )}
           >
             <p className="font-medium">{correct ? "✓ Correct" : "Not quite"}</p>
             {quiz.explanation ? (
-              <p className="mt-1 text-muted-foreground">{quiz.explanation}</p>
+              <p className="mt-1 text-[#4F3A31]">{quiz.explanation}</p>
             ) : null}
           </div>
         ) : null}

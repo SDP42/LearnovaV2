@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, animate, motion, useReducedMotion } from "framer-motion";
 import { BookOpenText, Brain, Check, LayoutPanelTop, ListChecks, PackageCheck, Play, RotateCcw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,43 @@ const ORDER = [
   "quiz", "illustrate", "score",
   "build_pptx", "build_html",
 ];
+
+// What the backend is doing right now, in plain words (keys = real stage names).
+const STAGE_LABEL = {
+  convert: "Reading your document",
+  chunk: "Splitting it into sections",
+  vision_ocr: "Reading text inside images",
+  index: "Indexing the content",
+  layout: "Choosing a layout for each slide",
+  visual_plan: "Planning the visuals",
+  visual_data: "Pulling out figures and data",
+  expand: "Expanding the explanations",
+  enhance: "Adding examples and analogies",
+  density: "Tuning how much text each slide holds",
+  quiz: "Writing checkpoint questions",
+  illustrate: "Illustrating the slides",
+  score: "Scoring every slide",
+  build_pptx: "Building the PowerPoint",
+  build_html: "Building the web deck",
+};
+
+/** Eases a number toward its target so the percentage glides instead of jumping. */
+function useTween(value) {
+  const reduce = useReducedMotion();
+  const [v, setV] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (reduce) {
+      setV(value);
+      prev.current = value;
+      return undefined;
+    }
+    const c = animate(prev.current, value, { duration: 0.6, ease: "easeOut", onUpdate: (x) => setV(Math.round(x)) });
+    prev.current = value;
+    return () => c.stop();
+  }, [value, reduce]);
+  return v;
+}
 
 const TIPS = [
   "Tip: press Present, then S, to open the speaker view with notes and a timer.",
@@ -54,9 +91,9 @@ function MiniSlide({ i, newest }) {
       <div className="h-1.5 w-2/3 rounded-full bg-[#C2502A]" />
       {v === 0 && (
         <>
-          <div className="h-1 w-full rounded-full bg-[#DCE6F5]" />
-          <div className="h-1 w-5/6 rounded-full bg-[#DCE6F5]" />
-          <div className="h-1 w-3/4 rounded-full bg-[#DCE6F5]" />
+          <div className="h-1 w-full rounded-full bg-[#EFE1D4]" />
+          <div className="h-1 w-5/6 rounded-full bg-[#EFE1D4]" />
+          <div className="h-1 w-3/4 rounded-full bg-[#EFE1D4]" />
         </>
       )}
       {v === 1 && (
@@ -76,7 +113,7 @@ function MiniSlide({ i, newest }) {
       {v === 3 && (
         <>
           <div className="mt-0.5 flex-1 rounded bg-[#FCE5D6]" />
-          <div className="h-1 w-1/2 rounded-full bg-[#DCE6F5]" />
+          <div className="h-1 w-1/2 rounded-full bg-[#EFE1D4]" />
         </>
       )}
       {newest ? <div className="lv-skel pointer-events-none absolute inset-0 !bg-transparent opacity-70" /> : null}
@@ -85,6 +122,7 @@ function MiniSlide({ i, newest }) {
 }
 
 function Ring({ pct, done }) {
+  const shown = useTween(pct);
   const R = 44;
   const C = 2 * Math.PI * R;
   return (
@@ -108,7 +146,7 @@ function Ring({ pct, done }) {
         {done ? (
           <Check className="size-9 text-[#6B9B72]" strokeWidth={3} />
         ) : (
-          <span className="font-[Bricolage_Grotesque] text-2xl font-bold tabular-nums text-[#402B25]">{pct}%</span>
+          <span className="font-[Bricolage_Grotesque] text-2xl font-bold tabular-nums text-[#402B25]">{shown}%</span>
         )}
       </div>
     </div>
@@ -186,8 +224,29 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
           <div className="min-w-0">
             <p className="t-card">{done ? "Your deck is ready" : "Building your deck"}</p>
             {title ? <p className="t-meta mt-0.5 line-clamp-2">{title}</p> : null}
-            <p className="t-meta mt-1 text-[#C2502A]">{done ? "All done" : eta}</p>
+            <p className="t-meta mt-1 font-semibold text-[#B44A22]">{done ? "All done" : eta}</p>
           </div>
+        </div>
+        <div className="mb-5">
+          <div
+            className="relative h-2 overflow-hidden rounded-full bg-[#EFE1D4]"
+            role="progressbar"
+            aria-label="Deck progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+          >
+            <motion.div
+              className={cn("h-full rounded-full", done ? "bg-[#6B9B72]" : "bg-[#F47B45]")}
+              initial={false}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: reduce ? 0 : 0.6, ease: "easeOut" }}
+            />
+            {!done && !reduce ? <span className="lv-skel pointer-events-none absolute inset-0 !bg-transparent opacity-60" /> : null}
+          </div>
+          <p className="mt-2 min-h-[18px] text-[12.5px] font-medium text-[#5A453B]" aria-live="polite">
+            {done ? "Ready to open" : STAGE_LABEL[stage] ? `${STAGE_LABEL[stage]}…` : "Getting started…"}
+          </p>
         </div>
         <ol className="flex flex-col gap-1.5">
           {PHASES.map((p) => {
@@ -198,15 +257,15 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                 key={p.key}
                 className={cn(
                   "flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 transition-colors",
-                  st === "active" && "border-[#BFD3FA] bg-[#FDEEE3]"
+                  st === "active" && "border-[#E3A98B] bg-[#FDEEE3]"
                 )}
               >
                 <span
                   className={cn(
                     "relative grid size-11 shrink-0 place-items-center rounded-xl transition-all",
-                    st === "todo" && "bg-[#EEF3FB] text-[#9AA9C6]",
+                    st === "todo" && "bg-[#F3E6DA] text-[#765F53]",
                     st === "active" && "lv-glow-blue bg-[#C2502A] text-white",
-                    st === "done" && "bg-[#6B9B72]/15 text-[#0E9F7B]"
+                    st === "done" && "bg-[#6B9B72]/20 text-[#2F5D37]"
                   )}
                 >
                   <AnimatePresence mode="wait" initial={false}>
@@ -228,10 +287,10 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                   </AnimatePresence>
                 </span>
                 <span className="min-w-0">
-                  <span className={cn("block text-[15px] font-semibold leading-5", st === "todo" ? "text-[#8A7468]" : "text-[#402B25]")}>
+                  <span className={cn("block text-[15px] font-semibold leading-5", st === "todo" ? "text-[#765F53]" : "text-[#402B25]")}>
                     {p.label}
                   </span>
-                  <span className="block truncate text-[12px] leading-4 text-[#7C6659]">{p.sub}</span>
+                  <span className="block truncate text-[12px] leading-4 text-[#715A4E]">{p.sub}</span>
                 </span>
               </li>
             );
@@ -260,7 +319,7 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                     <MiniSlide i={i} newest={!done && i === visible - 1} />
                   </motion.div>
                 ) : (
-                  <div className="h-full rounded-lg border border-dashed border-[#B9CBEA] bg-white/40" />
+                  <div className="h-full rounded-lg border border-dashed border-[#DCC6B4] bg-white/40" />
                 )}
               </div>
             );
@@ -304,7 +363,7 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.25 }}
-                className="text-center text-[13px] text-[#664F44]"
+                className="text-center text-[13px] text-[#4F3A31]"
               >
                 {TIPS[tip]}
               </motion.p>

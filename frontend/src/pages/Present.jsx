@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { TutorLauncher } from "@/components/app/TutorPanel";
+import ShortcutsOverlay, { PRESENT_SHORTCUTS } from "@/components/app/ShortcutsOverlay";
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -36,17 +37,17 @@ function clock() {
 /** Mini render of one slide — used for NEXT and the filmstrip. */
 function SlideMini({ slide, index, className }) {
   return (
-    <div className={cn("rounded-md border border-white/10 bg-white/[0.04] p-2 text-left", className)}>
-      <div className="mb-1 flex items-center justify-between text-[10px] text-neutral-400">
+    <div className={cn("rounded-md border border-[#FFFAF5]/12 bg-[#FFFAF5]/[0.05] p-2 text-left", className)}>
+      <div className="mb-1 flex items-center justify-between text-[10px] text-[#CDB8A8]">
         <span>{index}</span>
         {slide?.variant || slide?.family ? (
-          <span className="rounded bg-white/10 px-1 py-px">{slide.variant || slide.family}</span>
+          <span className="rounded bg-[#FFFAF5]/10 px-1 py-px">{slide.variant || slide.family}</span>
         ) : null}
       </div>
-      <p className="line-clamp-2 text-xs font-medium text-neutral-100">
+      <p className="line-clamp-2 text-xs font-medium text-[#FFFAF5]">
         {slide?.title || "—"}
       </p>
-      <ul className="mt-1 space-y-0.5 text-[10px] text-neutral-400">
+      <ul className="mt-1 space-y-0.5 text-[10px] text-[#CDB8A8]">
         {(slide?.bullets ?? []).slice(0, 2).map((b, i) => (
           <li key={i} className="line-clamp-1">• {b}</li>
         ))}
@@ -188,7 +189,7 @@ export default function Present() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (/^[0-9]$/.test(e.key)) return typeDigit(e.key);
       if (e.key === "Enter" && digits) {
@@ -215,6 +216,7 @@ export default function Present() {
       } else if (e.key === "w" || e.key === "W") {
         setWhite((v) => !v);
       } else if (e.key === "?") {
+        e.preventDefault();
         setHelp((v) => !v);
       } else if (["ArrowRight", "PageDown", " "].includes(e.key)) {
         e.preventDefault();
@@ -226,13 +228,13 @@ export default function Present() {
         jump(0);
       } else if (e.key === "End") {
         jump((deck?.slides?.length ?? 0));
-      } else if (e.key === "f") {
+      } else if (e.key === "f" || e.key === "F") {
         startShow();
       } else if (e.key === "b" || e.key === "B" || e.key === ".") {
         toggleBlackout();
-      } else if (e.key === "p") {
+      } else if (e.key === "p" || e.key === "P") {
         setRunning((r) => !r);
-      } else if (e.key === "r") {
+      } else if (e.key === "r" || e.key === "R") {
         setElapsed(0);
       }
     };
@@ -305,7 +307,7 @@ export default function Present() {
     e.currentTarget.setPointerCapture?.(e.pointerId);
     const ctx = canvasRef.current.getContext("2d");
     const [x, y] = pt(e);
-    ctx.strokeStyle = "#ef4444";
+    ctx.strokeStyle = "#F47B45";
     ctx.lineWidth = 4;
     ctx.lineCap = ctx.lineJoin = "round";
     ctx.beginPath();
@@ -341,23 +343,23 @@ export default function Present() {
   }, [curSlide, pos.h]);
 
   return (
-    <div data-learnova-app className="flex h-svh flex-col bg-neutral-950 text-neutral-100">
+    <div data-learnova-app className="flex h-svh flex-col bg-[#1B120F] text-[#FFFAF5]">
       {/* header */}
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/10 px-3 text-sm">
-        <Button asChild variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10">
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#FFFAF5]/12 px-3 text-sm">
+        <Button asChild variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10">
           <Link to={`/app/preview/${jobId}`}><X /></Link>
         </Button>
         <span className="truncate font-medium">
           {deck?.summary?.source_name || "Presenter view"}
         </span>
-        <span className="hidden text-xs text-neutral-500 sm:inline">
-          ← → navigate · B black · W white · L laser · D pen · G sorter · ? help
+        <span className="hidden text-xs text-[#FFFAF5]0 sm:inline">
+          ← → navigate · B black · W white · L laser · D pen · G sorter · T tutor · ? help
         </span>
         <div className="ml-auto flex items-center gap-2">
           <span
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs",
-              audienceOpen ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-neutral-400"
+              audienceOpen ? "bg-[#6B9B72]/25 text-[#BFE0C4]" : "bg-[#FFFAF5]/10 text-[#CDB8A8]"
             )}
           >
             <Circle className={cn("size-2 fill-current", audienceOpen && "animate-pulse")} />
@@ -374,8 +376,8 @@ export default function Present() {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_380px]">
         {/* ── current slide ─────────────────────────────────────────────── */}
-        <div className="flex min-w-0 flex-col gap-3 bg-black p-4">
-          <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white">
+        <div className="flex min-w-0 flex-col gap-3 bg-[#120C0A] p-4">
+          <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-[#FFFAF5]/12 bg-white">
             {htmlUrl ? (
               <iframe
                 ref={mainRef}
@@ -416,7 +418,7 @@ export default function Present() {
               >
                 {laser ? (
                   <span
-                    className="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 shadow-[0_0_14px_6px_rgba(239,68,68,0.6)]"
+                    className="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F47B45] shadow-[0_0_14px_6px_rgba(244,123,69,0.55)]"
                     style={{ left: laser.x, top: laser.y }}
                   />
                 ) : null}
@@ -424,20 +426,20 @@ export default function Present() {
             ) : null}
             {white ? <div className="absolute inset-0 z-20 bg-white" /> : null}
             {blackout ? (
-              <div className="absolute inset-0 z-20 grid place-items-center bg-black text-sm text-neutral-500">
+              <div className="absolute inset-0 z-20 grid place-items-center bg-black text-sm text-[#FFFAF5]0">
                 Screen blacked out — press B
               </div>
             ) : null}
             {digits ? (
               <span className="absolute bottom-3 right-3 z-30 rounded-md bg-black/80 px-3 py-1.5 font-mono text-lg text-white">
-                {digits}<span className="ml-2 text-xs text-neutral-400">↵ go to slide</span>
+                {digits}<span className="ml-2 text-xs text-[#CDB8A8]">↵ go to slide</span>
               </span>
             ) : null}
           </div>
 
           {/* transport + step dots */}
           <div className="flex items-center justify-between gap-3">
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => jump(0)} title="First slide">
+            <Button variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={() => jump(0)} title="First slide">
               <SkipBack />
             </Button>
             <div className="flex flex-1 items-center justify-center gap-3">
@@ -446,7 +448,7 @@ export default function Present() {
               </Button>
               <div className="text-center">
                 <p className="text-sm font-medium tabular-nums">
-                  {pos.h + 1} <span className="text-neutral-500">/ {total}</span>
+                  {pos.h + 1} <span className="text-[#FFFAF5]0">/ {total}</span>
                 </p>
                 {steps > 1 ? (
                   <div className="mt-1 flex justify-center gap-1">
@@ -457,7 +459,7 @@ export default function Present() {
                         title={`Reveal step ${i + 1}`}
                         className={cn(
                           "h-1.5 w-4 rounded-full transition-colors hover:opacity-80",
-                          i <= pos.f ? "bg-primary" : "bg-white/15"
+                          i <= pos.f ? "bg-primary" : "bg-[#FFFAF5]/20"
                         )}
                       />
                     ))}
@@ -468,51 +470,51 @@ export default function Present() {
                 Next <ChevronRight />
               </Button>
             </div>
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => jump(nContent)} title="Last slide">
+            <Button variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={() => jump(nContent)} title="Last slide">
               <SkipForward />
             </Button>
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={toggleBlackout} title="Blackout (B)">
+            <Button variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={toggleBlackout} title="Blackout (B)">
               <Square className={blackout ? "fill-current" : ""} />
             </Button>
             {[
               ["laser", Target, "Laser pointer (L)"],
               ["pen", Pencil, "Pen (D)"],
             ].map(([k, Icon, label]) => (
-              <Button key={k} variant="ghost" size="icon" className={cn("text-neutral-300 hover:bg-white/10", tool === k && "bg-primary/30 text-white")} onClick={() => setTool((t) => (t === k ? "none" : k))} title={label}>
+              <Button key={k} variant="ghost" size="icon" className={cn("text-[#E8D8C9] hover:bg-[#FFFAF5]/10", tool === k && "bg-primary/30 text-white")} onClick={() => setTool((t) => (t === k ? "none" : k))} title={label}>
                 <Icon />
               </Button>
             ))}
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={clearInk} title="Clear ink (E)">
+            <Button variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={clearInk} title="Clear ink (E)">
               <Eraser />
             </Button>
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => setSorter(true)} title="Slide sorter (G)">
+            <Button variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={() => setSorter(true)} title="Slide sorter (G)">
               <Grid3X3 />
             </Button>
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={() => setHelp(true)} title="Shortcuts (?)">
+            <Button variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={() => setHelp(true)} title="Shortcuts (?)">
               <Keyboard />
             </Button>
-            <Button variant="ghost" size="icon" className="text-neutral-300 hover:bg-white/10" onClick={startShow} title="Fullscreen (F)">
+            <Button variant="ghost" size="icon" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={startShow} title="Fullscreen (F)">
               <Maximize2 />
             </Button>
           </div>
         </div>
 
         {/* ── right rail ────────────────────────────────────────────────── */}
-        <aside className="flex min-h-0 flex-col gap-3 border-t border-white/10 p-3 lg:border-l lg:border-t-0">
+        <aside className="flex min-h-0 flex-col gap-3 border-t border-[#FFFAF5]/12 p-3 lg:border-l lg:border-t-0">
           {/* timer */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="rounded-xl border border-[#FFFAF5]/12 bg-[#FFFAF5]/[0.04] p-3">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-mono text-4xl font-semibold tabular-nums text-neutral-50">
+                <p className="font-mono text-4xl font-semibold tabular-nums text-[#FFFAF5]">
                   {fmt(elapsed)}
                 </p>
-                <p className="mt-0.5 text-xs text-neutral-500">elapsed · {now}</p>
+                <p className="mt-0.5 text-xs text-[#FFFAF5]0">elapsed · {now}</p>
               </div>
               <div className="flex gap-1">
-                <Button size="icon" variant="ghost" className="size-8 text-neutral-300 hover:bg-white/10" onClick={() => setRunning((r) => !r)} title="Play / pause (P)">
+                <Button size="icon" variant="ghost" className="size-8 text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={() => setRunning((r) => !r)} title="Play / pause (P)">
                   {running ? <Pause /> : <Play />}
                 </Button>
-                <Button size="icon" variant="ghost" className="size-8 text-neutral-300 hover:bg-white/10" onClick={() => setElapsed(0)} title="Reset (R)">
+                <Button size="icon" variant="ghost" className="size-8 text-[#E8D8C9] hover:bg-[#FFFAF5]/10" onClick={() => setElapsed(0)} title="Reset (R)">
                   <RotateCcw />
                 </Button>
               </div>
@@ -521,7 +523,7 @@ export default function Present() {
 
           {/* next */}
           <div>
-            <p className="mb-1 text-xs uppercase tracking-wide text-neutral-400">Next</p>
+            <p className="mb-1 text-xs uppercase tracking-wide text-[#CDB8A8]">Next</p>
             {nextSlide ? (
               <>
                 {htmlUrl ? (
@@ -532,7 +534,7 @@ export default function Present() {
                 {!nextReady ? <SlideMini slide={nextSlide} index={pos.h + 2} className="border-primary/25 bg-primary/[0.06]" /> : null}
               </>
             ) : (
-              <div className="rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-neutral-500">
+              <div className="rounded-md border border-[#FFFAF5]/12 bg-[#FFFAF5]/[0.05] p-3 text-sm text-[#FFFAF5]0">
                 End of deck
               </div>
             )}
@@ -540,16 +542,16 @@ export default function Present() {
 
           {/* notes */}
           <div className="flex min-h-0 flex-1 flex-col">
-            <p className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-neutral-400">
+            <p className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-[#CDB8A8]">
               Speaker notes
               {curSlide?.summary_directive ? (
-                <span className="rounded bg-white/10 px-1.5 py-px text-[10px] tracking-normal">
+                <span className="rounded bg-[#FFFAF5]/10 px-1.5 py-px text-[10px] tracking-normal">
                   {curSlide.summary_directive}
                 </span>
               ) : null}
             </p>
-            <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-white/10 bg-white/[0.03] p-3">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-neutral-200">
+            <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-[#FFFAF5]/12 bg-[#FFFAF5]/[0.04] p-3">
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[#F3E6DA]">
                 {notes}
               </pre>
             </div>
@@ -558,7 +560,7 @@ export default function Present() {
       </div>
 
       {/* ── deck scrubber ──────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-3 border-t border-white/10 bg-neutral-950 px-3 pt-2 text-[11px] text-neutral-500">
+      <div className="flex shrink-0 items-center gap-3 border-t border-[#FFFAF5]/12 bg-[#1B120F] px-3 pt-2 text-[11px] text-[#FFFAF5]0">
         <span className="tabular-nums">{pos.h + 1}</span>
         <input
           type="range"
@@ -566,23 +568,23 @@ export default function Present() {
           max={total - 1}
           value={Math.min(pos.h, total - 1)}
           onChange={(e) => jump(Number(e.target.value))}
-          className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-primary"
+          className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-[#FFFAF5]/20 accent-primary"
         />
         <span className="tabular-nums">{total}</span>
       </div>
 
       {/* ── filmstrip (jump to slide) ───────────────────────────────────── */}
-      <div ref={filmRef} className="flex shrink-0 gap-2 overflow-x-auto bg-neutral-950 p-2">
+      <div ref={filmRef} className="flex shrink-0 gap-2 overflow-x-auto bg-[#1B120F] p-2">
         <button
           data-h="0"
           onClick={() => jump(0)}
           className={cn(
             "w-28 shrink-0 rounded-md border p-2 text-left text-[10px] transition-colors",
-            pos.h === 0 ? "border-primary bg-primary/10" : "border-white/10 hover:bg-white/[0.06]"
+            pos.h === 0 ? "border-primary bg-primary/10" : "border-[#FFFAF5]/12 hover:bg-white/[0.06]"
           )}
         >
-          <span className="text-neutral-400">Title</span>
-          <p className="mt-1 line-clamp-2 font-medium text-neutral-100">
+          <span className="text-[#CDB8A8]">Title</span>
+          <p className="mt-1 line-clamp-2 font-medium text-[#FFFAF5]">
             {deck?.summary?.source_name || "Learnova"}
           </p>
         </button>
@@ -593,7 +595,7 @@ export default function Present() {
             onClick={() => jump(i + 1)}
             className={cn(
               "w-28 shrink-0 rounded-md border p-2 transition-colors",
-              pos.h === i + 1 ? "border-primary bg-primary/10" : "border-white/10 hover:bg-white/[0.06]"
+              pos.h === i + 1 ? "border-primary bg-primary/10" : "border-[#FFFAF5]/12 hover:bg-white/[0.06]"
             )}
           >
             <SlideMini slide={s} index={i + 1} className="border-0 bg-transparent p-0" />
@@ -603,9 +605,9 @@ export default function Present() {
 
       {sorter ? (
         <div className="fixed inset-0 z-50 overflow-auto bg-black/90 p-6" onClick={() => setSorter(false)}>
-          <div className="mb-4 flex items-center justify-between text-sm text-neutral-300">
+          <div className="mb-4 flex items-center justify-between text-sm text-[#E8D8C9]">
             <span>Slide sorter · click a slide to jump</span>
-            <Button size="icon" variant="ghost" className="text-neutral-300 hover:bg-white/10"><X /></Button>
+            <Button size="icon" variant="ghost" className="text-[#E8D8C9] hover:bg-[#FFFAF5]/10"><X /></Button>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" onClick={(e) => e.stopPropagation()}>
             {[{ title: deck?.summary?.source_name || "Title", variant: "title" }, ...slides].map((sl, i) => (
@@ -615,7 +617,7 @@ export default function Present() {
                   jump(i);
                   setSorter(false);
                 }}
-                className={cn("rounded-lg border p-1 text-left transition-colors", pos.h === i ? "border-primary bg-primary/10" : "border-white/10 hover:bg-white/10")}
+                className={cn("rounded-lg border p-1 text-left transition-colors", pos.h === i ? "border-primary bg-primary/10" : "border-[#FFFAF5]/12 hover:bg-[#FFFAF5]/10")}
               >
                 <SlideMini slide={sl} index={i + 1} className="aspect-video border-0 bg-transparent" />
               </button>
@@ -624,37 +626,11 @@ export default function Present() {
         </div>
       ) : null}
 
-      {help ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-6" onClick={() => setHelp(false)}>
-          <div className="w-full max-w-md rounded-xl border border-white/10 bg-neutral-900 p-5 text-sm" onClick={(e) => e.stopPropagation()}>
-            <p className="mb-3 font-semibold">Keyboard shortcuts</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
-              {[
-                ["← → / Space", "Previous / next"],
-                ["Home / End", "First / last slide"],
-                ["Digits + Enter", "Jump to slide number"],
-                ["F5 / F", "Start slideshow (fullscreen)"],
-                ["L", "Laser pointer"],
-                ["D", "Pen (E clears ink)"],
-                ["G", "Slide sorter"],
-                ["B / W", "Black / white screen"],
-                ["P / R", "Pause / reset timer"],
-                ["Esc", "Exit tools and overlays"],
-                ["?", "This cheat sheet"],
-              ].map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt><kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs">{k}</kbd></dt>
-                  <dd className="text-neutral-300">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
-      ) : null}
+      <ShortcutsOverlay open={help} onOpenChange={setHelp} groups={PRESENT_SHORTCUTS} title="Presenter shortcuts" dark />
 
       <TutorLauncher deckId={jobId} onJumpToSlide={(i) => jump(i + 1)} className="bottom-24" />
 
-      {error ? <p className="bg-red-950/60 px-4 py-2 text-sm text-red-300">{error}</p> : null}
+      {error ? <p className="bg-[#4A1F18] px-4 py-2 text-sm text-[#FFD2CB]">{error}</p> : null}
     </div>
   );
 }

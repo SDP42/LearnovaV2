@@ -7,6 +7,7 @@ import {
   Home,
   LayoutGrid,
   LogOut,
+  MoreHorizontal,
   Plus,
   Presentation,
   Settings,
@@ -40,7 +41,7 @@ function Avatar({ user, size = 32 }) {
   return (
     <span
       style={{ width: size, height: size }}
-      className="grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#C2502A] to-[#6B9B72] text-xs font-bold text-white"
+      className="grid shrink-0 place-items-center rounded-full bg-[#F47B45] text-[13px] font-bold text-[#2A1A14]"
     >
       {initial}
     </span>
@@ -75,16 +76,24 @@ export function AccountMenu({ children, align = "start", side = "top" }) {
   );
 }
 
+/** Tooltips only matter when the rail is collapsed to icons (<1100px). */
 function RailTip({ label, children }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right" className="max-[1099px]:block min-[1100px]:hidden">
+      <TooltipContent
+        side="right"
+        sideOffset={10}
+        className="border border-[#E8D8C9] bg-[#FFFAF5] text-[12px] font-semibold text-[#402B25] max-[1099px]:block min-[1100px]:hidden"
+      >
         {label}
       </TooltipContent>
     </Tooltip>
   );
 }
+
+const linkBase =
+  "relative flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium text-[#E8D8C9] transition-[background-color,color,transform] duration-150 hover:bg-[#FFFAF5]/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F47B45] max-[1099px]:justify-center max-[1099px]:px-0";
 
 export default function AppSidebar({ onNew }) {
   const { pathname } = useLocation();
@@ -96,33 +105,33 @@ export default function AppSidebar({ onNew }) {
     <TooltipProvider delayDuration={100}>
       <aside
         aria-label="Primary"
-        className="fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col border-r bg-white md:flex min-[1100px]:w-[248px]"
+        className="fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col bg-[#402B25] text-[#FFFAF5] md:flex min-[1100px]:w-[248px]"
       >
-        <div className="flex h-12 items-center gap-2 px-4 max-[1099px]:justify-center max-[1099px]:px-0">
-          <Link to="/app" className="flex items-center gap-2.5">
-            <span className="grid size-7 place-items-center rounded-lg bg-[#C2502A] text-white shadow-sm">
-              <Sparkles className="size-4" />
+        <div className="flex h-14 items-center gap-2 px-4 max-[1099px]:justify-center max-[1099px]:px-0">
+          <Link to="/app" className="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F47B45]" aria-label="Learnova home">
+            <span className="grid size-8 place-items-center rounded-[10px] bg-[#F47B45] text-[#2A1A14] shadow-sm">
+              <Sparkles className="size-[18px]" />
             </span>
-            <span className="font-[Bricolage_Grotesque] text-[17px] font-bold tracking-tight text-[#402B25] max-[1099px]:hidden">
+            <span className="font-[Bricolage_Grotesque] text-[19px] font-bold tracking-tight text-[#FFFAF5] max-[1099px]:hidden">
               Learnova
             </span>
           </Link>
         </div>
 
-        <div className="px-3 pb-2 pt-2 max-[1099px]:px-3">
+        <div className="px-3 pb-2 pt-1">
           <RailTip label="New deck (N)">
             <button
               onClick={onNew}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#402B25] text-[14px] font-semibold text-white shadow-sm transition hover:bg-[#2E1E19] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C2502A]"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#F47B45] text-[14px] font-bold text-[#2A1A14] shadow-[0_8px_20px_-8px_rgb(244_123_69/0.7)] transition duration-150 hover:-translate-y-0.5 hover:bg-[#FF8A58] active:translate-y-0 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FFFAF5]"
             >
-              <Plus className="size-4" />
+              <Plus className="size-[18px]" strokeWidth={2.5} />
               <span className="max-[1099px]:hidden">New deck</span>
-              <kbd className="ml-1 rounded bg-white/15 px-1.5 text-[11px] font-medium max-[1099px]:hidden">N</kbd>
+              <kbd className="ml-1 rounded bg-[#2A1A14]/15 px-1.5 text-[11px] font-semibold max-[1099px]:hidden">N</kbd>
             </button>
           </RailTip>
         </div>
 
-        <nav className="flex flex-col gap-0.5 px-3 pt-2">
+        <nav aria-label="Main" className="flex flex-col gap-1 px-3 pt-2">
           {NAV.map((item) => {
             const active = item.match(pathname);
             return (
@@ -130,12 +139,9 @@ export default function AppSidebar({ onNew }) {
                 <Link
                   to={item.to}
                   aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "relative flex h-9 items-center gap-3 rounded-lg px-3 text-[14px] font-medium text-[#5A453B] transition-colors hover:bg-[#F7EFE8] hover:text-[#402B25] max-[1099px]:justify-center max-[1099px]:px-0",
-                    active && "lv-pill-active font-semibold hover:bg-[#FCE5D6] hover:text-[#8F3A18]"
-                  )}
+                  className={cn(linkBase, active && "lv-rail-active font-semibold text-white")}
                 >
-                  <item.icon className="size-[18px] shrink-0" />
+                  <item.icon className={cn("size-[18px] shrink-0", active && "text-[#F47B45]")} />
                   <span className="max-[1099px]:hidden">{item.title}</span>
                 </Link>
               </RailTip>
@@ -143,21 +149,21 @@ export default function AppSidebar({ onNew }) {
           })}
         </nav>
 
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 max-[1099px]:hidden">
+        <div className="mt-6 min-h-0 flex-1 overflow-y-auto px-3 max-[1099px]:hidden">
           {recent.length ? (
             <>
-              <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8A7468]">Recent</p>
-              <ul className="flex flex-col gap-0.5">
+              <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#B8A396]">Recent</p>
+              <ul className="flex flex-col gap-1">
                 {recent.map((d) => (
                   <li key={deckId(d)}>
                     <Link
                       to={`/app/preview/${deckId(d)}`}
-                      className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#F7EFE8]"
+                      className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors hover:bg-[#FFFAF5]/10 focus-visible:outline-2 focus-visible:outline-[#F47B45]"
                     >
-                      <span className="w-12 shrink-0 overflow-hidden rounded-md border">
+                      <span className="w-12 shrink-0 overflow-hidden rounded-md ring-1 ring-[#FFFAF5]/20">
                         <DeckThumb id={deckId(d)} title={deckTitle(d)} />
                       </span>
-                      <span className="line-clamp-2 text-[13px] font-medium leading-4 text-[#4F3A31]">{deckTitle(d)}</span>
+                      <span className="line-clamp-2 text-[13px] font-medium leading-4 text-[#E8D8C9]">{deckTitle(d)}</span>
                     </Link>
                   </li>
                 ))}
@@ -166,27 +172,25 @@ export default function AppSidebar({ onNew }) {
           ) : null}
         </div>
 
-        <div className="mt-auto flex flex-col gap-0.5 border-t p-3 max-[1099px]:items-center">
+        <div className="mt-auto flex flex-col gap-1 border-t border-[#FFFAF5]/12 p-3 max-[1099px]:items-stretch">
           <RailTip label="Settings">
             <Link
               to="/app/settings"
-              className={cn(
-                "relative flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[14px] font-medium text-[#5A453B] transition-colors hover:bg-[#F7EFE8] max-[1099px]:justify-center max-[1099px]:px-0",
-                pathname.startsWith("/app/settings") && "lv-pill-active font-semibold"
-              )}
+              aria-current={pathname.startsWith("/app/settings") ? "page" : undefined}
+              className={cn(linkBase, "w-full", pathname.startsWith("/app/settings") && "lv-rail-active font-semibold text-white")}
             >
-              <Settings className="size-[18px]" />
+              <Settings className={cn("size-[18px]", pathname.startsWith("/app/settings") && "text-[#F47B45]")} />
               <span className="max-[1099px]:hidden">Settings</span>
             </Link>
           </RailTip>
           <AccountMenu>
-            <button className="mt-1 flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-[#F7EFE8] max-[1099px]:justify-center max-[1099px]:p-1">
+            <button className="mt-1 flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-[#FFFAF5]/10 focus-visible:outline-2 focus-visible:outline-[#F47B45] max-[1099px]:justify-center max-[1099px]:p-1.5">
               <Avatar user={user} />
               <span className="min-w-0 flex-1 max-[1099px]:hidden">
-                <span className="block truncate text-[13px] font-semibold text-[#402B25]">{user?.fullName || "Account"}</span>
-                <span className="block truncate text-[11px] text-[#8A7468]">{user?.phone || "Signed in"}</span>
+                <span className="block truncate text-[13px] font-semibold text-[#FFFAF5]">{user?.fullName || "Account"}</span>
+                <span className="block truncate text-[11px] text-[#CDB8A8]">{user?.phone || "Signed in"}</span>
               </span>
-              <ChevronsUpDown className="size-4 text-[#8A7468] max-[1099px]:hidden" />
+              <ChevronsUpDown className="size-4 text-[#CDB8A8] max-[1099px]:hidden" />
             </button>
           </AccountMenu>
         </div>
@@ -195,34 +199,69 @@ export default function AppSidebar({ onNew }) {
   );
 }
 
-/** Mobile (<768px): bottom 5-tab bar. */
+/** Mobile (<768px): dark-brown bottom bar — 4 destinations, a centre "new deck" action and a More menu. */
 export function MobileTabs({ onNew }) {
   const { pathname } = useLocation();
-  const tabs = [NAV[0], NAV[1], null, NAV[2], NAV[4]];
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const tabs = [NAV[0], NAV[1], null, NAV[2]];
+  const more = [NAV[3], NAV[4], NAV[5], { title: "Settings", to: "/app/settings", icon: Settings }];
+  const moreActive = more.some((m) => (m.match ? m.match(pathname) : pathname.startsWith(m.to)));
+  const tab = "relative flex h-full min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-[#E8D8C9] transition-colors active:bg-[#FFFAF5]/10";
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 grid h-16 grid-cols-5 items-center border-t bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid h-16 grid-cols-5 items-stretch border-t border-[#FFFAF5]/10 bg-[#402B25] pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       {tabs.map((t, i) =>
         t ? (
           <Link
             key={t.to}
             to={t.to}
-            className={cn(
-              "flex flex-col items-center gap-0.5 py-1 text-[11px] font-medium text-[#7C6659]",
-              t.match(pathname) && "text-[#C2502A]"
-            )}
+            aria-current={t.match(pathname) ? "page" : undefined}
+            className={cn(tab, t.match(pathname) && "text-[#F47B45]")}
           >
             <t.icon className="size-5" />
             {t.title.replace("My ", "")}
+            {t.match(pathname) ? <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-[#F47B45]" /> : null}
           </Link>
         ) : (
-          <button key={i} onClick={onNew} aria-label="New deck" className="mx-auto grid size-12 -translate-y-3 place-items-center rounded-full bg-[#402B25] text-white shadow-lg">
-            <Plus className="size-6" />
+          <button
+            key={i}
+            onClick={onNew}
+            aria-label="New deck"
+            className="mx-auto mt-[-14px] grid size-[52px] place-items-center self-start rounded-full bg-[#F47B45] text-[#2A1A14] shadow-[0_8px_20px_-6px_rgb(0_0_0/0.5)] ring-4 ring-[#FFFAF5] transition active:scale-95"
+          >
+            <Plus className="size-6" strokeWidth={2.6} />
           </button>
         )
       )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className={cn(tab, moreActive && "text-[#F47B45]")} aria-label="More">
+            <MoreHorizontal className="size-5" />
+            More
+            {moreActive ? <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-[#F47B45]" /> : null}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="end" className="mb-2 w-52">
+          {more.map((m) => (
+            <DropdownMenuItem key={m.to} className="h-11 text-[14px]" onSelect={() => navigate(m.to)}>
+              <m.icon className="size-4" /> {m.title}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="h-11 text-[14px]"
+            onSelect={async () => {
+              await signOut();
+              navigate("/");
+            }}
+          >
+            <LogOut className="size-4" /> Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </nav>
   );
 }

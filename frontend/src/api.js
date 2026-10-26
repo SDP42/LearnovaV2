@@ -156,6 +156,21 @@ export async function listThemes() {
   return json(await fetch(`${BASE}/api/themes`));
 }
 
+/**
+ * The 240-palette library → {total, categories, palettes:[{id,name,category,mode,
+ * primary,secondary,accent,background,card,text,subtext,tags}]}. Fetched once
+ * (the whole library is ~50 KB) and filtered client-side; cached with the
+ * stale-while-revalidate helper. Rejects when the server has no palette API.
+ */
+export function listPalettes() {
+  return swr("palettes:all", async () => json(await fetch(`${BASE}/api/palettes?limit=240`)));
+}
+
+/** The 12 structural templates → {default, templates:[{id,name,description,header,title_layout,card_radius,card_border,decoration,footer}]}. */
+export function listTemplates() {
+  return swr("templates:all", async () => json(await fetch(`${BASE}/api/templates`)));
+}
+
 export async function getConfig() {
   return json(await fetch(`${BASE}/api/config`));
 }

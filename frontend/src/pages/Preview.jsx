@@ -8,6 +8,7 @@ import {
   FileDown,
   GitCompare,
   History,
+  Keyboard,
   Loader2,
   ChevronDown,
   Pencil,
@@ -48,6 +49,7 @@ import { cn } from "@/lib/utils";
 import ImageEditor from "@/components/app/ImageEditor";
 import { Image as ImageIcon } from "lucide-react";
 import { TutorLauncher } from "@/components/app/TutorPanel";
+import ShortcutsOverlay, { PREVIEW_SHORTCUTS, isTypingTarget, useShortcutsKey } from "@/components/app/ShortcutsOverlay";
 
 const FAMILIES = [
   ["", "Auto — let the engine choose"],
@@ -95,6 +97,8 @@ export default function Preview() {
   const [figSrc, setFigSrc] = useState(null); // object URL while the figure editor is open
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  useShortcutsKey(useCallback(() => setHelpOpen((o) => !o), []));
 
   const loadDeck = useCallback(() => {
     api.getDeck(jobId).then(setDeck).catch((e) => setError(e.message));
@@ -128,6 +132,7 @@ export default function Preview() {
     setMeta((m) => ({ ...m, version: r.version }));
     loadDeck();
     loadHtml();
+    toast.success("Figure saved");
   }
 
   const loadHtml = useCallback(() => {
@@ -177,14 +182,17 @@ export default function Preview() {
 
   async function download(artifact) {
     const name = `Learnova_${summary?.source_name || "deck"}.${artifact}`;
+    const t = toast.loading(`Preparing ${artifact.toUpperCase()}…`);
     try {
-      await api.downloadArtifact(api.jobDownloadPath(jobId, artifact), name);
-    } catch {
       try {
+        await api.downloadArtifact(api.jobDownloadPath(jobId, artifact), name);
+      } catch {
         await api.downloadArtifact(api.deckDownloadPath(jobId, artifact), name);
-      } catch (e) {
-        setError(e.message);
       }
+      toast.success(`${artifact === "pptx" ? "PowerPoint" : "Web deck"} downloaded`, { id: t });
+    } catch (e) {
+      setError(e.message);
+      toast.error(e.message || "Download failed", { id: t });
     }
   }
 
@@ -203,8 +211,10 @@ export default function Preview() {
       setDirty(false);
       loadDeck();
       loadHtml();
+      toast.success(`Saved · v${r.version} re-rendered`);
     } catch (e) {
       setError(e.message);
+      toast.error(e.message || "Couldn’t save your changes");
     } finally {
       setSaving(false);
     }
@@ -220,8 +230,10 @@ export default function Preview() {
       setDirty(false);
       loadDeck();
       loadHtml();
+      toast.success(`Restored version ${v}`);
     } catch (e) {
       setError(e.message);
+      toast.error(e.message || "Couldn’t restore that version");
     } finally {
       setSaving(false);
     }
@@ -271,15 +283,14 @@ export default function Preview() {
     setAiResult(null);
   }
 
-  // ↑ / ↓ move through slides
+  // ↑ ↓ ← → move through slides (not while typing or inside an open menu)
   useEffect(() => {
     const onKey = (e) => {
-      const t = e.target;
-      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('[role="listbox"],[role="menu"]'))) return;
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelected((i) => Math.max(0, Math.min((deck?.slides?.length || 1) - 1, i + (e.key === "ArrowDown" ? 1 : -1))));
-      }
+      if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+      const dir = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      setSelected((i) => Math.max(0, Math.min((deck?.slides?.length || 1) - 1, i + dir)));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -299,7 +310,7 @@ export default function Preview() {
       className="flex items-center justify-between gap-2 rounded-lg border border-[#E8D8C9] bg-white px-3 py-2 text-left text-[13px] font-medium text-[#402B25] transition hover:border-[#E3A98B] hover:bg-[#FFFAF5] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {label}
-      {aiBusy === label ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5 text-[#C2502A]" />}
+      {aiBusy === label ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5 text-[#B44A22]" />}
     </button>
   );
 
@@ -307,12 +318,12 @@ export default function Preview() {
     ? { text: "Saving…", cls: "bg-[#FDEEE3] text-[#8F3A18]", icon: <Loader2 className="size-3 animate-spin" /> }
     : dirty
     ? { text: "Unsaved changes", cls: "bg-[#FFF3D6] text-[#8A5A00]", icon: <span className="size-1.5 rounded-full bg-[#FFC93C]" /> }
-    : { text: `Saved${meta.version > 1 ? ` · v${meta.version}` : ""}`, cls: "bg-[#E2F8F1] text-[#0B7A5E]", icon: <Check className="size-3" /> };
+    : { text: `Saved${meta.version > 1 ? ` · v${meta.version}` : ""}`, cls: "bg-[#E6F2E8] text-[#3F6B47]", icon: <Check className="size-3" /> };
 
   return (
     <div data-learnova-app data-lv-shell className="flex h-svh flex-col bg-[#FFFAF5] text-[#402B25]">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-white px-3">
-        <Button asChild variant="ghost" size="icon" className="size-8 shrink-0" title="Back to My Decks">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-white px-3 sm:px-4">
+        <Button asChild variant="ghost" size="icon" className="size-10 shrink-0 rounded-full" title="Back to My Decks">
           <Link to="/app/presentations" aria-label="Back to My Decks">
             <ArrowLeft />
           </Link>
@@ -333,7 +344,7 @@ export default function Preview() {
         <div className="flex shrink-0 items-center gap-1.5">
           {editing ? (
             <>
-              <Button size="sm" onClick={save} disabled={saving || !dirty} className="bg-[#C2502A] hover:bg-[#8F3A18]">
+              <Button size="sm" onClick={save} disabled={saving || !dirty} className="h-9 rounded-full bg-[#F47B45] px-4 font-bold text-[#2A1A14] hover:-translate-y-px hover:bg-[#FF8A58]">
                 {saving ? <Loader2 className="animate-spin" /> : <Check />}
                 {saving ? "Re-rendering…" : "Save & re-render"}
               </Button>
@@ -395,7 +406,17 @@ export default function Preview() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button asChild size="sm" className="bg-[#402B25] text-white hover:bg-[#2E1E19]">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="hidden size-9 rounded-full text-[#715A4E] md:inline-flex"
+            onClick={() => setHelpOpen(true)}
+            title="Keyboard shortcuts (?)"
+            aria-label="Keyboard shortcuts"
+          >
+            <Keyboard />
+          </Button>
+          <Button asChild size="sm" className="h-9 rounded-full bg-[#402B25] px-4 text-white hover:-translate-y-px hover:bg-[#2E1E19]">
             <Link to={`/app/present/${jobId}`}>
               <Play className="fill-current" /> Present
             </Link>
@@ -623,7 +644,7 @@ export default function Preview() {
                                 key={k}
                                 className={cn(
                                   "rounded-md px-2 py-1 text-[12.5px]",
-                                  "ABCD"[k] === letter ? "bg-[#E2F8F1] font-medium text-[#0B7A5E]" : "bg-[#FFFAF5] text-[#664F44]"
+                                  "ABCD"[k] === letter ? "bg-[#E6F2E8] font-medium text-[#3F6B47]" : "bg-[#FFFAF5] text-[#664F44]"
                                 )}
                               >
                                 {String(o)}
@@ -665,11 +686,11 @@ export default function Preview() {
                   <div className="mt-1 overflow-hidden rounded-xl border border-[#E8D8C9]">
                     <div className="flex items-center justify-between bg-[#FFFAF5] px-3 py-1.5">
                       <span className="text-[12px] font-semibold">{aiResult.label}</span>
-                      {aiResult.applied ? <span className="text-[11px] font-semibold text-[#0B7A5E]">Applied</span> : null}
+                      {aiResult.applied ? <span className="text-[11px] font-semibold text-[#3F6B47]">Applied</span> : null}
                     </div>
                     {[
                       ["Before", aiResult.before, "bg-[#FFF1F1] text-[#7A2E2E]"],
-                      ["After", aiResult.after, "bg-[#E8FAF4] text-[#0B5F4A]"],
+                      ["After", aiResult.after, "bg-[#E6F2E8] text-[#2F5D37]"],
                     ].map(([l, v, cls]) => (
                       <div key={l} className={cn("border-t px-3 py-2", cls)}>
                         <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">{l}</p>
@@ -698,6 +719,7 @@ export default function Preview() {
       </div>
 
       <TutorLauncher deckId={jobId} onJumpToSlide={setSelected} />
+      <ShortcutsOverlay open={helpOpen} onOpenChange={setHelpOpen} groups={PREVIEW_SHORTCUTS} />
 
       {figSrc ? (
         <ImageEditor

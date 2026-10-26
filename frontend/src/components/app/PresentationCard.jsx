@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export function statusDot(status = "ready") {
-  if (/fail|error/i.test(status)) return { color: "#EF4444", label: "Failed" };
+  if (/fail|error/i.test(status)) return { color: "#C0392B", label: "Failed" };
   if (/draft|await|run|process|generat/i.test(status)) return { color: "#FFC93C", label: "In progress" };
   return { color: "#6B9B72", label: "Ready" };
 }
@@ -44,7 +44,7 @@ export function DeckMenu({ deck, onDelete, className, triggerClassName }) {
         <button
           aria-label={`Actions for ${deckTitle(deck)}`}
           className={cn(
-            "grid size-8 place-items-center rounded-lg bg-white/90 text-[#402B25] shadow-sm backdrop-blur transition hover:bg-white",
+            "grid size-8 place-items-center rounded-lg bg-white/90 text-[#402B25] shadow-sm ring-1 ring-black/5 transition hover:bg-white",
             triggerClassName
           )}
         >
@@ -75,7 +75,7 @@ export function DeckMenu({ deck, onDelete, className, triggerClassName }) {
 }
 
 /** A deck tile: real thumbnail, hover lift, ⋯ menu, centre Present button. */
-export default function PresentationCard({ deck, index = 0, onDelete, className }) {
+export default function PresentationCard({ deck, onDelete, className }) {
   const id = deckId(deck);
   const slides = deckSlides(deck);
   const when = relativeTime(deckUpdated(deck));
@@ -83,8 +83,7 @@ export default function PresentationCard({ deck, index = 0, onDelete, className 
 
   return (
     <article
-      className={cn("lv-surface lv-lift lv-in group relative overflow-hidden", className)}
-      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+      className={cn("lv-surface lv-lift group relative h-full overflow-hidden", className)}
     >
       <div className="relative">
         <Link to={`/app/preview/${id}`} aria-label={`Open ${deckTitle(deck)}`} className="block">
@@ -98,7 +97,7 @@ export default function PresentationCard({ deck, index = 0, onDelete, className 
             Present <Play className="size-3.5 fill-current" />
           </Link>
         </div>
-        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[#402B25]/80 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[#402B25]/90 px-2 py-0.5 text-[11px] font-semibold text-white">
           {slides} slide{slides === 1 ? "" : "s"}
         </span>
         <div className="absolute right-2 top-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 data-[state=open]:opacity-100">

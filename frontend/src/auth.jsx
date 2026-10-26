@@ -12,6 +12,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { LogOut, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -169,7 +170,8 @@ export function UserProfile() {
   const [msg, setMsg] = useState("");
   if (DEMO || !user) return <p className="text-sm text-muted-foreground">Account management needs a signed-in user.</p>;
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const field = "w-full rounded-md border bg-background px-3 py-2 text-sm";
+  const field =
+    "h-11 w-full rounded-xl border border-[#E0CDBB] bg-white px-3.5 text-sm text-[#402B25] outline-none transition placeholder:text-[#765F53] focus:border-[#E3A98B] focus:ring-[3px] focus:ring-[#F47B45]/20";
   return (
     <form
       className="flex max-w-md flex-col gap-3"
@@ -177,9 +179,11 @@ export function UserProfile() {
         e.preventDefault();
         try {
           setUser(await api.saveProfile(f));
-          setMsg("Saved");
+          setMsg("");
+          toast.success("Profile saved");
         } catch (x) {
           setMsg(x.message);
+          toast.error(x.message || "Couldn’t save your profile");
         }
       }}
     >
@@ -194,18 +198,18 @@ export function UserProfile() {
         ))}
       </select>
       <div className="flex items-center gap-3">
-        <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Save</button>
-        <button type="button" className="text-sm text-muted-foreground underline" onClick={signOut}>Sign out</button>
-        {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
+        <button className="h-11 rounded-full bg-[#F47B45] px-6 text-sm font-bold text-[#2A1A14] transition duration-150 hover:-translate-y-px hover:bg-[#FF8A58]">Save</button>
+        <button type="button" className="min-h-10 px-2 text-sm font-semibold text-[#715A4E] underline" onClick={signOut}>Sign out</button>
+        {msg && <span role="alert" className="text-sm text-[#A53125]">{msg}</span>}
       </div>
-      <hr className="my-2" />
+      <hr className="my-2 border-[#E8D8C9]" />
       <p className="text-sm font-medium text-destructive">Danger zone</p>
       <p className="text-xs text-muted-foreground">
         Deleting your account permanently removes your profile, sessions and every saved deck. This cannot be undone.
       </p>
       <button
         type="button"
-        className="self-start rounded-md border border-destructive px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+        className="min-h-10 self-start rounded-full border border-destructive px-4 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10"
         onClick={async () => {
           if (!window.confirm("Permanently delete your account and all your decks?")) return;
           try {

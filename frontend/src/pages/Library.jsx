@@ -20,6 +20,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { PageContainer } from "@/components/app/Page";
+import { Stagger, StaggerItem } from "@/components/app/motion";
+import { NoResults } from "@/components/app/states";
 import LibraryToolbar from "@/components/app/LibraryToolbar";
 
 const KIND_META = {
@@ -56,16 +58,16 @@ export default function Library() {
     <AppLayout title="Library">
       <PageContainer>
         {/* header */}
-        <div className="relative overflow-hidden rounded-2xl border p-6 sm:p-8">
+        <div className="relative overflow-hidden rounded-3xl border border-[#F4C3A8] bg-[#FDEEE3] p-6 sm:p-8">
           <div className="lv-aurora" />
           <div className="relative">
-            <p className="inline-flex items-center gap-1.5 rounded-full border bg-background/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+            <p className="inline-flex items-center gap-1.5 rounded-full border border-[#F4C3A8] bg-white px-3 py-1 text-xs font-semibold text-[#8F3A18]">
               <Sparkles className="size-3" /> {TEMPLATES.length} ready-made lessons
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+            <h2 className="mt-3 font-[Bricolage_Grotesque] text-[28px] font-bold leading-8 tracking-tight text-[#402B25]">
               Pick a lesson, hit generate
             </h2>
-            <p className="mt-1 max-w-lg text-sm text-muted-foreground">
+            <p className="mt-1.5 max-w-lg text-sm leading-6 text-[#5A453B]">
               Each one is real, complete source material. Open it, tweak a line if
               you want, and you have a deck in a minute. They also show what the
               engine does with each kind of content.
@@ -84,21 +86,20 @@ export default function Library() {
         />
 
         {/* grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((t, i) => {
+        <Stagger key={`${kind}-${q}`} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((t) => {
             const M = KIND_META[t.kind] ?? KIND_META.concept;
             return (
+              <StaggerItem key={t.id}>
               <Card
-                key={t.id}
-                className="lv-card lv-in group flex flex-col overflow-hidden"
-                style={{ animationDelay: `${i * 45}ms` }}
+                className="lv-card lv-lift group flex h-full flex-col overflow-hidden"
               >
                 <CardContent className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-center justify-between">
-                    <span className={cn("flex size-9 items-center justify-center rounded-lg bg-primary/10", M.ring)}>
+                    <span className={cn("flex size-10 items-center justify-center rounded-xl bg-[#FCE5D6]", M.ring)}>
                       <M.icon className="size-5" />
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#715A4E]">
                       <Clock className="size-3" /> ~{t.minutes} min
                     </span>
                   </div>
@@ -106,7 +107,7 @@ export default function Library() {
                     <h3 className="font-medium leading-snug">{t.title}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{t.blurb}</p>
                   </div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#715A4E]">
                     {TEMPLATE_KINDS[t.kind].label} · {TEMPLATE_KINDS[t.kind].hint}
                   </p>
                   <div className="mt-auto flex gap-2 pt-1">
@@ -122,26 +123,19 @@ export default function Library() {
                     </Button>
                   </div>
                   {preview?.id === t.id ? (
-                    <pre className="mt-1 max-h-56 overflow-auto rounded-lg border bg-muted/40 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                    <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border bg-[#FFFAF5] p-3 text-[11.5px] leading-relaxed text-[#5A453B]">
                       {t.text}
                     </pre>
                   ) : null}
                 </CardContent>
               </Card>
+              </StaggerItem>
             );
           })}
-        </div>
+        </Stagger>
 
         {filtered.length === 0 ? (
-          <Card>
-            <CardContent className="p-10 text-center text-sm text-muted-foreground">
-              No lessons match that. Clear the filters, or{" "}
-              <button className="underline" onClick={() => navigate("/app")}>
-                start from your own content
-              </button>
-              .
-            </CardContent>
-          </Card>
+          <NoResults query={q} onClear={() => { setQ(""); setKind("all"); }} />
         ) : null}
 
         <Card className="lv-card">

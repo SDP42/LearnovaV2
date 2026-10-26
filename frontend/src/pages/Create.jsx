@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
 import FileDropzone from "@/components/app/FileDropzone";
 import GenerationPipeline from "@/components/app/GenerationPipeline";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +14,9 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import DesignPicker, { AUTO_DESIGN, DesignChips, designOptions } from "@/components/app/DesignPicker";
+import { PageHeader } from "@/components/app/Page";
+import { readPref } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 800;
@@ -40,20 +42,18 @@ export default function Create() {
   const [markdown, setMarkdown] = useState("");
   const [sections, setSections] = useState(0);
 
-  const [density, setDensity] = useState(
-    () => localStorage.getItem("learnova-default-density") || "medium"
-  );
-  const [quizFreq, setQuizFreq] = useState(
-    () => localStorage.getItem("learnova-default-quizfreq") || "4"
-  );
+  const [density, setDensity] = useState(() => readPref("learnova-default-density", "medium") || "medium");
+  const [quizFreq, setQuizFreq] = useState(() => readPref("learnova-default-quizfreq", "4") || "4");
   const [quizStyle, setQuizStyle] = useState("inline"); // "inline" | "slide"
   const [quizAfter, setQuizAfter] = useState(""); // e.g. "3, 7, 11"
   const [ocr, setOcr] = useState(true);
   const [wantPptx, setWantPptx] = useState(true);
   const [wantHtml, setWantHtml] = useState(true);
   const [enrich, setEnrich] = useState(true);
-  const [themes, setThemes] = useState([]);
+  const [themes, setThemes] = useState([]); // legacy curated presets, only used when the palette API is missing
   const [themeId, setThemeId] = useState("auto");
+  const [design, setDesign] = useState(AUTO_DESIGN);
+  const [paletteApi, setPaletteApi] = useState(true);
 
   const [phase, setPhase] = useState("input"); // input | review | generating | done
   const [error, setError] = useState("");
@@ -63,6 +63,7 @@ export default function Create() {
   useEffect(() => () => clearInterval(poll.current), []);
   useEffect(() => {
     api.listThemes().then((r) => setThemes(r.themes || [])).catch(() => {});
+    api.listPalettes().then(() => setPaletteApi(true)).catch(() => setPaletteApi(false));
   }, []);
 
   const loadMarkdown = useCallback(async (id) => {
@@ -81,7 +82,7 @@ export default function Create() {
       if (Date.now() - startedAt > MAX_MS) {
         clearInterval(poll.current);
         setBusy(false);
-        setError("This is taking longer than expected — check Projects in a minute.");
+        setError("This is taking longer than expected — check My Decks in a minute.");
         return;
       }
       try {
@@ -160,6 +161,7 @@ export default function Create() {
         build_html: wantHtml,
         text_density: density,
         markdown,
+        ...designOptions(design), // only present when a palette / template was picked explicitly
       });
       watch(job.id, (s) => {
         if (s.status === "done") {
@@ -174,245 +176,259 @@ export default function Create() {
     }
   }
 
+  const step = phase === "input" ? 1 : phase === "review" ? 2 : 3;
+  const STEPS = ["Content", "Review", "Generate"];
+  const card = "lv-surface lv-r-hero p-5 sm:p-6";
+
   return (
     <AppLayout title="Create">
       <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Create a learning experience</h2>
-          <p className="text-sm text-muted-foreground">
-            Upload a document or paste a syllabus. Review the structure, then generate.
-          </p>
-        </div>
+        <PageHeader
+          title="Create a deck"
+          subtitle="Upload a document or paste a syllabus. Review the structure, then generate."
+        />
+
+        <ol className="flex items-center gap-2" aria-label="Progress">
+          {STEPS.map((l, i) => {
+            const n = i + 1;
+            const done = step > n;
+            const on = step === n;
+            return (
+              <li key={l} className="flex items-center gap-2" aria-current={on ? "step" : undefined}>
+                <span
+                  className={cn(
+                    "grid size-7 place-items-center rounded-full text-[12px] font-bold tabular-nums transition-colors",
+                    on ? "bg-[#F47B45] text-[#2A1A14]" : done ? "bg-[#6B9B72] text-[#1F3A25]" : "bg-[#F3E6DA] text-[#715A4E]"
+                  )}
+                >
+                  {done ? <Check className="size-3.5" strokeWidth={3.5} /> : n}
+                </span>
+                <span className={cn("text-[13px] font-semibold", on ? "text-[#402B25]" : "text-[#715A4E]")}>{l}</span>
+                {n < STEPS.length ? <span aria-hidden className="mx-1 h-px w-6 bg-[#DCC6B4] sm:w-10" /> : null}
+              </li>
+            );
+          })}
+        </ol>
 
         {error ? (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="rounded-xl bg-[#FBE9E7]">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
 
         {phase === "input" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">1 · Provide your content</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs value={tab} onValueChange={setTab}>
-                <TabsList className="mb-4">
-                  <TabsTrigger value="upload">Upload file</TabsTrigger>
-                  <TabsTrigger value="paste">Paste syllabus</TabsTrigger>
-                </TabsList>
-                <TabsContent value="upload">
-                  <FileDropzone file={file} onFile={onUploadFile} onClear={() => setFile(null)} disabled={busy} />
-                  {busy && file ? (
-                    <p className="mt-3 text-xs text-muted-foreground">Converting {file.name}…</p>
-                  ) : null}
-                </TabsContent>
-                <TabsContent value="paste" className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="topic">Topic (optional)</Label>
-                    <Input
-                      id="topic"
-                      placeholder="Natural Language Processing"
-                      value={topic}
-                      onChange={(e) => setTopic(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="syllabus">Content</Label>
-                    <Textarea
-                      id="syllabus"
-                      rows={8}
-                      placeholder={"## Chapter 1: Introduction\n- Key idea one\n- Key idea two"}
-                      value={typed}
-                      onChange={(e) => setTyped(e.target.value)}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <Button onClick={onUseTyped} disabled={busy || !typed.trim()} className="self-start">
-                    Continue <ArrowRight />
-                  </Button>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+          <section className={card}>
+            <h2 className="t-h2 mb-4">Provide your content</h2>
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList className="mb-4 h-11 rounded-full bg-[#F3E6DA] p-1">
+                <TabsTrigger value="upload" className="h-9 rounded-full px-4 data-[state=active]:text-[#8F3A18]">Upload file</TabsTrigger>
+                <TabsTrigger value="paste" className="h-9 rounded-full px-4 data-[state=active]:text-[#8F3A18]">Paste syllabus</TabsTrigger>
+              </TabsList>
+              <TabsContent value="upload">
+                <FileDropzone file={file} onFile={onUploadFile} onClear={() => setFile(null)} disabled={busy} />
+                {busy && file ? (
+                  <p className="mt-3 flex items-center gap-2 text-[13px] text-[#715A4E]" role="status">
+                    <span className="size-3.5 animate-spin rounded-full border-2 border-[#E3A98B] border-t-[#C2502A]" /> Converting {file.name}…
+                  </p>
+                ) : null}
+              </TabsContent>
+              <TabsContent value="paste" className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="topic">Topic (optional)</Label>
+                  <Input
+                    id="topic"
+                    placeholder="Natural Language Processing"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    className="h-11 rounded-xl bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="syllabus">Content</Label>
+                  <Textarea
+                    id="syllabus"
+                    rows={8}
+                    placeholder={"## Chapter 1: Introduction\n- Key idea one\n- Key idea two"}
+                    value={typed}
+                    onChange={(e) => setTyped(e.target.value)}
+                    className="rounded-xl bg-white font-mono text-xs"
+                  />
+                </div>
+                <Button onClick={onUseTyped} disabled={busy || !typed.trim()} className="h-11 self-start rounded-full px-6 bg-[#F47B45] font-bold text-[#2A1A14] hover:-translate-y-0.5 hover:bg-[#FF8A58]">
+                  Continue <ArrowRight />
+                </Button>
+              </TabsContent>
+            </Tabs>
+          </section>
         )}
 
         {phase === "review" && (
           <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">2 · Review the structure</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                <p className="text-xs text-muted-foreground">
-                  This markdown is what the pipeline reasons over — edits here change the deck.{" "}
-                  {sections} section{sections === 1 ? "" : "s"} detected.
-                </p>
-                <Textarea
-                  rows={12}
-                  value={markdown}
-                  onChange={(e) => setMarkdown(e.target.value)}
-                  spellCheck={false}
-                  className="font-mono text-xs"
-                />
-              </CardContent>
-            </Card>
+            <section className={card}>
+              <h2 className="t-h2 mb-1">Review the structure</h2>
+              <p className="mb-3 text-[13px] text-[#715A4E]">
+                This markdown is what the pipeline reasons over — edits here change the deck. {sections} section
+                {sections === 1 ? "" : "s"} detected.
+              </p>
+              <Textarea
+                rows={12}
+                value={markdown}
+                onChange={(e) => setMarkdown(e.target.value)}
+                spellCheck={false}
+                aria-label="Deck markdown"
+                className="rounded-xl bg-white font-mono text-xs"
+              />
+            </section>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">3 · Options</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-5">
-                <div className="flex flex-col gap-2">
-                  <Label>Text density</Label>
-                  <RadioGroup value={density} onValueChange={setDensity} className="grid gap-2 sm:grid-cols-2">
-                    {DENSITIES.map((d) => (
-                      <label
-                        key={d.id}
-                        htmlFor={`d-${d.id}`}
-                        className={cn(
-                          "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors",
-                          density === d.id ? "border-primary bg-primary/5" : "hover:bg-muted/40"
-                        )}
-                      >
-                        <span className="flex items-center gap-2 font-medium">
-                          <RadioGroupItem id={`d-${d.id}`} value={d.id} />
-                          {d.label}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{d.desc}</span>
-                      </label>
-                    ))}
-                  </RadioGroup>
-                </div>
+            <section className={cn(card, "flex flex-col gap-5")}>
+              <h2 className="t-h2">Options</h2>
+              <div className="flex flex-col gap-2">
+                <Label>Text density</Label>
+                <RadioGroup value={density} onValueChange={setDensity} className="grid gap-2 sm:grid-cols-2">
+                  {DENSITIES.map((d) => (
+                    <label
+                      key={d.id}
+                      htmlFor={`d-${d.id}`}
+                      className={cn(
+                        "flex min-h-[64px] cursor-pointer flex-col gap-1 rounded-xl border bg-white p-3 text-sm transition duration-150 hover:-translate-y-px hover:border-[#E3A98B]",
+                        density === d.id ? "border-[#C2502A] bg-[#FDEEE3] ring-2 ring-[#C2502A]/20" : "border-[#E8D8C9]"
+                      )}
+                    >
+                      <span className="flex items-center gap-2 font-semibold">
+                        <RadioGroupItem id={`d-${d.id}`} value={d.id} />
+                        {d.label}
+                      </span>
+                      <span className="text-xs text-[#715A4E]">{d.desc}</span>
+                    </label>
+                  ))}
+                </RadioGroup>
+              </div>
 
-                <p className="text-xs text-muted-foreground">
-                  Learnova reads your content and decides automatically what to
-                  keep as text, summarise, or turn into a flowchart, timeline,
-                  comparison, chart, or diagram — per slide.
-                </p>
+              <p className="text-[13px] leading-5 text-[#715A4E]">
+                Learnova reads your content and decides automatically what to keep as text, summarise, or turn into a
+                flowchart, timeline, comparison, chart, or diagram — per slide.
+              </p>
 
-                <div className="flex flex-wrap items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="qf" className="text-sm">Quiz every</Label>
-                    <Select value={quizFreq} onValueChange={setQuizFreq} disabled={!!quizAfter.trim()}>
-                      <SelectTrigger id="qf" className="w-20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["2", "3", "4", "5", "6"].map((n) => (
-                          <SelectItem key={n} value={n}>{n}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span className="text-sm text-muted-foreground">slides</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="qstyle" className="text-sm">Checkpoint</Label>
-                    <Select value={quizStyle} onValueChange={setQuizStyle}>
-                      <SelectTrigger id="qstyle" className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="inline">Inline band</SelectItem>
-                        <SelectItem value="slide">Full slide</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch id="ocr" checked={ocr} onCheckedChange={setOcr} />
-                    <Label htmlFor="ocr" className="text-sm">Vision OCR for images</Label>
-                  </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="qf" className="text-sm">Quiz every</Label>
+                  <Select value={quizFreq} onValueChange={setQuizFreq} disabled={!!quizAfter.trim()}>
+                    <SelectTrigger id="qf" className="h-10 w-20 rounded-xl bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["2", "3", "4", "5", "6"].map((n) => (
+                        <SelectItem key={n} value={n}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-[#715A4E]">slides</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="qafter" className="text-sm whitespace-nowrap">
-                    …or after slides
-                  </Label>
-                  <Input
-                    id="qafter"
-                    value={quizAfter}
-                    onChange={(e) => setQuizAfter(e.target.value)}
-                    placeholder="e.g. 3, 7, 11"
-                    className="max-w-[180px]"
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    a full checkpoint slide goes in after each
-                  </span>
+                  <Label htmlFor="qstyle" className="text-sm">Checkpoint</Label>
+                  <Select value={quizStyle} onValueChange={setQuizStyle}>
+                    <SelectTrigger id="qstyle" className="h-10 w-36 rounded-xl bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inline">Inline band</SelectItem>
+                      <SelectItem value="slide">Full slide</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                {themes.length ? (
-                  <div className="rounded-lg border bg-muted/30 p-3">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Theme
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {themes.map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => setThemeId(t.id)}
-                          title={t.name}
-                          className={cn(
-                            "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
-                            themeId === t.id
-                              ? "border-primary bg-primary/10"
-                              : "hover:bg-muted/60"
-                          )}
-                        >
-                          {t.primary ? (
-                            <span className="flex gap-0.5">
-                              <span className="size-3 rounded-full" style={{ background: t.primary }} />
-                              <span className="size-3 rounded-full" style={{ background: t.secondary }} />
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">✦</span>
-                          )}
-                          {t.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Outputs
-                  </p>
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                    <label className="flex items-center gap-2 text-sm">
-                      <Switch checked={wantHtml} onCheckedChange={setWantHtml} />
-                      Interactive web deck
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <Switch checked={wantPptx} onCheckedChange={setWantPptx} />
-                      Animated PowerPoint
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <Switch checked={enrich} onCheckedChange={setEnrich} />
-                      Examples & analogies
-                    </label>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="ocr" checked={ocr} onCheckedChange={setOcr} />
+                  <Label htmlFor="ocr" className="text-sm">Vision OCR for images</Label>
                 </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Label htmlFor="qafter" className="whitespace-nowrap text-sm">…or after slides</Label>
+                <Input
+                  id="qafter"
+                  value={quizAfter}
+                  onChange={(e) => setQuizAfter(e.target.value)}
+                  placeholder="e.g. 3, 7, 11"
+                  className="h-10 max-w-[180px] rounded-xl bg-white"
+                />
+                <span className="text-xs text-[#715A4E]">a full checkpoint slide goes in after each</span>
+              </div>
 
-                <Button onClick={onGenerate} disabled={busy} className="self-start">
-                  <Sparkles /> Generate deck
-                </Button>
-              </CardContent>
-            </Card>
+              <div className="rounded-2xl border border-[#E8D8C9] bg-[#FFFAF5] p-4">
+                <p className="mb-2 text-[12px] font-bold uppercase tracking-[0.12em] text-[#715A4E]">Look</p>
+                {paletteApi ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DesignPicker design={design} onChange={setDesign} />
+                    <DesignChips design={design} onChange={setDesign} />
+                  </div>
+                ) : themes.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {themes.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setThemeId(t.id)}
+                        title={t.name}
+                        className={cn(
+                          "flex min-h-10 items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs font-semibold transition duration-150 hover:-translate-y-px hover:border-[#E3A98B]",
+                          themeId === t.id ? "border-[#C2502A] bg-[#FDEEE3] text-[#8F3A18]" : "border-[#E8D8C9] text-[#4F3A31]"
+                        )}
+                      >
+                        {t.primary ? (
+                          <span className="flex gap-0.5">
+                            <span className="size-3 rounded-full" style={{ background: t.primary }} />
+                            <span className="size-3 rounded-full" style={{ background: t.secondary }} />
+                          </span>
+                        ) : (
+                          <Sparkles className="size-3.5 text-[#B44A22]" />
+                        )}
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-[#715A4E]">Auto — Learnova picks the colours from your topic.</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-[#E8D8C9] bg-[#FFFAF5] p-4">
+                <p className="mb-3 text-[12px] font-bold uppercase tracking-[0.12em] text-[#715A4E]">Outputs</p>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <label className="flex min-h-10 items-center gap-2 text-sm">
+                    <Switch checked={wantHtml} onCheckedChange={setWantHtml} />
+                    Interactive web deck
+                  </label>
+                  <label className="flex min-h-10 items-center gap-2 text-sm">
+                    <Switch checked={wantPptx} onCheckedChange={setWantPptx} />
+                    Animated PowerPoint
+                  </label>
+                  <label className="flex min-h-10 items-center gap-2 text-sm">
+                    <Switch checked={enrich} onCheckedChange={setEnrich} />
+                    Examples &amp; analogies
+                  </label>
+                </div>
+              </div>
+
+              <Button
+                onClick={onGenerate}
+                disabled={busy}
+                className="h-11 self-start rounded-full bg-[#F47B45] px-6 text-[14px] font-bold text-[#2A1A14] shadow-[0_10px_22px_-10px_rgb(244_123_69/0.8)] hover:-translate-y-0.5 hover:bg-[#FF8A58]"
+              >
+                <Sparkles /> Generate deck
+              </Button>
+            </section>
           </>
         )}
 
         {(phase === "generating" || phase === "done") && (
-          <Card>
-            <CardContent className="p-6">
-              <GenerationPipeline
-                stage={job?.stage}
-                progress={job?.progress}
-                status={phase === "done" ? "done" : job?.stage_status || "running"}
-              />
-              {phase === "done" ? (
-                <p className="mt-4 text-sm text-muted-foreground">Opening your presentation…</p>
-              ) : null}
-            </CardContent>
-          </Card>
+          <section>
+            <GenerationPipeline
+              stage={job?.stage}
+              progress={job?.progress}
+              status={phase === "done" ? "done" : job?.stage_status || "running"}
+            />
+            {phase === "done" ? (
+              <p className="mt-4 text-sm text-[#715A4E]" role="status">Opening your presentation…</p>
+            ) : null}
+          </section>
         )}
       </div>
     </AppLayout>

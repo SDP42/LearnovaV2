@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import * as api from "@/api";
 import AppLayout from "@/components/app/AppLayout";
 import GenerationPipeline from "@/components/app/GenerationPipeline";
+import { readPref } from "@/lib/storage";
 import { toast } from "sonner";
 
 const POLL_MS = 800;
@@ -12,7 +13,7 @@ const MAX_MS = 25 * 60 * 1000; // matches the backend generation watchdog
 export function defaultGenerateOptions(extra = {}) {
   return {
     theme_id: "auto",
-    quiz_frequency: Number(localStorage.getItem("learnova-default-quizfreq") || 4),
+    quiz_frequency: Number(readPref("learnova-default-quizfreq", 4)) || 4,
     quiz_style: "inline",
     quiz_positions: null,
     enable_vision_ocr: true,
@@ -20,7 +21,7 @@ export function defaultGenerateOptions(extra = {}) {
     enable_enhancement: true,
     build_pptx: true,
     build_html: true,
-    text_density: localStorage.getItem("learnova-default-density") || "medium",
+    text_density: readPref("learnova-default-density", "medium") || "medium",
     ...extra,
   };
 }

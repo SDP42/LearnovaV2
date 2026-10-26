@@ -7,6 +7,7 @@ import * as api from "@/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { defaultGenerateOptions } from "@/pages/Generate";
+import DesignPicker, { AUTO_DESIGN, DesignChips, designOptions } from "@/components/app/DesignPicker";
 
 export const TEMPLATE_CHIPS = [
   { id: "lecture", label: "Lecture", text: "A 45-minute lecture introducing the topic to first-year students: why it matters, the core concepts, one worked example and a short recap.\n\nTopic: " },
@@ -44,9 +45,9 @@ function Opt({ label, value, onChange, items }) {
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         aria-label={label}
-        className="h-8 w-auto gap-1.5 rounded-full border-[#E8D8C9] bg-[#FFFAF5] px-3 text-[13px] font-medium text-[#4F3A31] shadow-none"
+        className="h-10 w-auto gap-1.5 rounded-full border-[#E8D8C9] bg-[#FFFAF5] px-3 text-[13px] font-medium text-[#4F3A31] shadow-none transition duration-150 hover:-translate-y-px hover:border-[#E3A98B] hover:bg-white sm:h-9"
       >
-        <span className="text-[#8A7468]">{label}:</span>
+        <span className="text-[#765F53]">{label}:</span>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -71,6 +72,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
   const [audience, setAudience] = useState("University");
   const [length, setLength] = useState("balanced");
   const [tone, setTone] = useState("Friendly");
+  const [design, setDesign] = useState(AUTO_DESIGN); // palette + template; Auto sends nothing extra
   const [hints, setHints] = useState([]);
   const [improving, setImproving] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -132,6 +134,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
     const options = defaultGenerateOptions({
       slide_detail: len?.detail || "balanced",
       audience: `${audience}, ${tone.toLowerCase()} tone, ${len?.label ? len.label + " detail" : ""}`.trim(),
+      ...designOptions(design),
     });
     try {
       if (file) {
@@ -179,7 +182,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
           rows={2}
           placeholder="Describe what you’re teaching, paste a syllabus, or drop a PDF, PPTX or DOCX here…"
           aria-label="What are we teaching?"
-          className="lv-bare block w-full resize-none bg-transparent text-[16px] leading-[26px] text-[#402B25] outline-none placeholder:text-[#8A7468]"
+          className="lv-bare block w-full resize-none bg-transparent text-[16px] leading-[26px] text-[#402B25] outline-none placeholder:text-[#765F53]"
         />
 
         <AnimatePresence initial={false}>
@@ -191,9 +194,9 @@ export default function Composer({ value, onChange, textareaRef, className }) {
               className="overflow-hidden"
             >
               <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border bg-[#FFFAF5] py-1.5 pl-2.5 pr-1.5 text-[13px]">
-                <FileText className="size-4 shrink-0 text-[#C2502A]" />
+                <FileText className="size-4 shrink-0 text-[#B44A22]" />
                 <span className="truncate font-medium">{file.name}</span>
-                <span className="text-[#8A7468]">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                <span className="text-[#765F53]">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
                 <button onClick={() => setFile(null)} aria-label="Remove file" className="grid size-5 place-items-center rounded hover:bg-white">
                   <X className="size-3.5" />
                 </button>
@@ -205,7 +208,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
         <AnimatePresence initial={false}>
           {hints.length ? (
             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-[12px] font-medium text-[#8A7468]">Try adding:</span>
+              <span className="text-[12px] font-medium text-[#765F53]">Try adding:</span>
               {hints.map((h) => (
                 <button
                   key={h}
@@ -213,7 +216,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
                     onChange(`${value.trim()}\n${h}`);
                     setHints((x) => x.filter((y) => y !== h));
                   }}
-                  className="rounded-full bg-[#FFF6DB] px-2.5 py-1 text-left text-[12px] font-medium text-[#8A5A00] transition hover:bg-[#FFEDB8]"
+                  className="rounded-full bg-[#FFF6DB] px-3 py-1.5 text-left text-[12px] font-medium text-[#8A5A00] transition hover:bg-[#FFEDB8]"
                 >
                   + {h}
                 </button>
@@ -221,6 +224,8 @@ export default function Composer({ value, onChange, textareaRef, className }) {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        <DesignChips design={design} onChange={setDesign} className="mt-3" />
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <input
@@ -236,19 +241,20 @@ export default function Composer({ value, onChange, textareaRef, className }) {
           <button
             onClick={() => fileInput.current?.click()}
             aria-label="Attach a file"
-            className="grid size-8 place-items-center rounded-full border border-[#E8D8C9] bg-[#FFFAF5] text-[#4F3A31] transition hover:bg-white"
+            className="grid size-10 place-items-center rounded-full border border-[#E8D8C9] bg-[#FFFAF5] text-[#4F3A31] transition duration-150 hover:-translate-y-px hover:border-[#E3A98B] hover:bg-white sm:size-9"
           >
             <Paperclip className="size-4" />
           </button>
           <Opt label="Audience" value={audience} onChange={setAudience} items={AUDIENCES} />
           <Opt label="Detail" value={length} onChange={setLength} items={LENGTHS} />
           <Opt label="Tone" value={tone} onChange={setTone} items={TONES} />
+          <DesignPicker design={design} onChange={setDesign} />
 
           <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
             <button
               onClick={improve}
               disabled={improving}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-[#E8D8C9] bg-white px-3.5 text-[13px] font-semibold text-[#8F3A18] transition hover:bg-[#FDEEE3] disabled:opacity-60 sm:flex-none"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-[#E8D8C9] bg-white px-3.5 text-[13px] font-semibold text-[#8F3A18] transition duration-150 hover:-translate-y-px hover:border-[#E3A98B] hover:bg-[#FDEEE3] disabled:opacity-60 sm:h-10 sm:flex-none"
             >
               {improving ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
               Improve my prompt <span aria-hidden>✨</span>
@@ -256,7 +262,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
             <button
               onClick={generate}
               disabled={!canGo}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#402B25] px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-[#2E1E19] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#9AA9C6] sm:flex-none"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#F47B45] px-6 text-[14px] font-bold text-[#2A1A14] shadow-[0_10px_22px_-10px_rgb(244_123_69/0.8)] transition duration-150 hover:-translate-y-0.5 hover:bg-[#FF8A58] active:translate-y-0 active:scale-[0.98] disabled:translate-y-0 disabled:cursor-not-allowed disabled:bg-[#E8D8C9] disabled:text-[#715A4E] disabled:shadow-none sm:h-10 sm:flex-none"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
               Generate

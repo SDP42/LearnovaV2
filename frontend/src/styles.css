@@ -70,7 +70,9 @@ body {
   overflow-x: hidden;
 }
 
-a {
+/* Anchors inside the signed-in app are reset in index.css (base layer) instead, so
+   Tailwind colour utilities on <Link>/<a> are able to win. */
+a:not([data-learnova-app] a) {
   color: inherit;
   text-decoration: none;
 }

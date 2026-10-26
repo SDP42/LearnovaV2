@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { PageContainer, PageHeader } from "@/components/app/Page";
 import { EmptyState, ErrorNote } from "@/components/app/states";
+import { Stagger, StaggerItem } from "@/components/app/motion";
 import { cn } from "@/lib/utils";
 
 const PAGE = 60;
@@ -183,6 +184,7 @@ export default function Gallery() {
             <Button
               variant={readyOnly ? "default" : "outline"}
               size="sm"
+              aria-pressed={readyOnly}
               onClick={() => setReadyOnly((v) => !v)}
             >
               <Sparkles /> {readyOnly ? "Showing ready decks" : "Ready decks only"}
@@ -196,27 +198,28 @@ export default function Gallery() {
           {/* subject rail */}
           <aside className="lg:w-52 lg:shrink-0">
             <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#765F53]" />
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search topics…"
-                className="pl-8"
+                aria-label="Search topics"
+                className="rounded-full pl-9"
               />
             </div>
             <div className="flex gap-1.5 overflow-x-auto pb-2 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
               <button
                 onClick={() => setSubject(null)}
                 className={cn(
-                  "shrink-0 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
-                  !subject ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted/60"
+                  "min-h-10 shrink-0 rounded-xl px-3 py-1.5 text-left text-sm transition-colors",
+                  !subject ? "bg-[#FCE5D6] font-semibold text-[#8F3A18]" : "text-[#5A453B] hover:bg-[#F3E6DA]"
                 )}
               >
                 All subjects
               </button>
               {Object.entries(subjectsByCategory).map(([cat, subs]) => (
                 <div key={cat} className="lg:mt-2">
-                  <p className="hidden px-2.5 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60 lg:block">
+                  <p className="hidden px-3 pb-1 pt-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[#765F53] lg:block">
                     {cat}
                   </p>
                   {subs.map((s) => (
@@ -224,14 +227,14 @@ export default function Gallery() {
                       key={s.subject}
                       onClick={() => setSubject(s.subject)}
                       className={cn(
-                        "flex shrink-0 items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors lg:w-full",
+                        "flex min-h-10 shrink-0 items-center justify-between gap-2 rounded-xl px-3 py-1.5 text-left text-sm transition-colors lg:w-full",
                         subject === s.subject
-                          ? "bg-primary/10 font-medium text-primary"
-                          : "text-muted-foreground hover:bg-muted/60"
+                          ? "bg-[#FCE5D6] font-semibold text-[#8F3A18]"
+                          : "text-[#5A453B] hover:bg-[#F3E6DA]"
                       )}
                     >
                       <span className="truncate">{s.subject}</span>
-                      <span className="text-xs tabular-nums opacity-60">{s.count}</span>
+                      <span className="text-xs tabular-nums text-[#765F53]">{s.count}</span>
                     </button>
                   ))}
                 </div>
@@ -244,7 +247,7 @@ export default function Gallery() {
             {entries === null || entries === undefined ? (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 9 }).map((_, i) => (
-                  <div key={i} className="h-32 animate-pulse rounded-xl bg-muted/50" />
+                  <div key={i} className="lv-skel h-36 rounded-2xl" />
                 ))}
               </div>
             ) : entries.length === 0 ? (
@@ -255,19 +258,19 @@ export default function Gallery() {
               />
             ) : (
               <>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <Stagger key={`${subject}-${q}-${readyOnly}`} stagger={0.03} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {entries.map((e) => (
+                    <StaggerItem key={e.slug}>
                     <Card
-                      key={e.slug}
-                      className="lv-card group flex flex-col"
+                      className="lv-card lv-lift group flex h-full flex-col"
                     >
                       <CardContent className="flex flex-1 flex-col gap-2 p-4">
                         <div className="flex items-center gap-2">
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          <span className="rounded-full bg-[#F3E6DA] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#715A4E]">
                             {e.subject}
                           </span>
                           {e.has_deck ? (
-                            <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F2E8] px-2 py-0.5 text-[10.5px] font-semibold text-[#2F5D37]">
                               <Sparkles className="size-3" /> Ready
                             </span>
                           ) : null}
@@ -311,8 +314,9 @@ export default function Gallery() {
                         </div>
                       </CardContent>
                     </Card>
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
 
                 {canLoadMore ? (
                   <div className="mt-5 flex justify-center">
@@ -341,13 +345,13 @@ export default function Gallery() {
             {previewDeck === null ? (
               <div className="space-y-2">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-9 animate-pulse rounded bg-muted/50" />
+                  <div key={i} className="lv-skel h-10 rounded-lg" />
                 ))}
               </div>
             ) : (
               <ol className="space-y-1.5">
                 {(previewDeck.slides || []).map((s, i) => (
-                  <li key={i} className="flex gap-3 rounded-lg border bg-muted/20 px-3 py-2 text-sm">
+                  <li key={i} className="flex gap-3 rounded-xl border bg-[#FFFAF5] px-3 py-2 text-sm">
                     <span className="tabular-nums text-muted-foreground">{i + 1}</span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">

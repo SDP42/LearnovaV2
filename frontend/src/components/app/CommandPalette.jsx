@@ -78,14 +78,14 @@ export default function CommandPalette({ open, onOpenChange, onNew }) {
         >
           <Dialog.Title className="sr-only">Command palette</Dialog.Title>
           <div className="flex items-center gap-2.5 border-b px-4">
-            <Search className="size-4 text-[#8A7468]" />
+            <Search className="size-4 text-[#765F53]" />
             <input
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={onKey}
               placeholder="Search decks and pages, or run a command…"
-              className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#8A7468]"
+              className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#765F53]"
             />
             <kbd className="rounded border bg-[#FFFAF5] px-1.5 text-[11px] text-[#7C6659]">esc</kbd>
           </div>
@@ -105,7 +105,7 @@ export default function CommandPalette({ open, onOpenChange, onNew }) {
                   >
                     <it.icon className="size-4 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                    <span className="text-[11px] text-[#8A7468]">{it.hint}</span>
+                    <span className="text-[11px] text-[#765F53]">{it.hint}</span>
                     {i === active ? <CornerDownLeft className="size-3.5" /> : null}
                   </button>
                 </li>

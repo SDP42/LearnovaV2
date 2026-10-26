@@ -11,6 +11,7 @@ import DeckThumb from "@/components/app/DeckThumb";
 import LibraryToolbar from "@/components/app/LibraryToolbar";
 import { EmptyState, ErrorNote, LoadingGrid, NoResults } from "@/components/app/states";
 import { DecksIllustration } from "@/components/app/Illustrations";
+import { Stagger, StaggerItem } from "@/components/app/motion";
 
 const CHIPS = [
   { id: "all", label: "All" },
@@ -79,7 +80,7 @@ export default function Presentations() {
           title="My Decks"
           subtitle={decks ? `${decks.length} deck${decks.length === 1 ? "" : "s"} in your library.` : "Everything you’ve made, in one place."}
           actions={
-            <Button asChild className="bg-[#402B25] text-white hover:bg-[#2E1E19]">
+            <Button asChild className="h-10 rounded-full bg-[#F47B45] px-5 font-bold text-[#2A1A14] hover:-translate-y-0.5 hover:bg-[#FF8A58]">
               <Link to="/app" state={{ focus: Date.now() }}>
                 <Plus /> New deck
               </Link>
@@ -117,16 +118,18 @@ export default function Presentations() {
         ) : shown.length === 0 ? (
           <NoResults query={q} onClear={clear} />
         ) : view === "grid" ? (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {shown.map((d, i) => (
-              <PresentationCard key={deckId(d)} deck={d} index={i} onDelete={onDelete} />
+          <Stagger className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4" key={`${chip}-${sort}-${q}`}>
+            {shown.map((d) => (
+              <StaggerItem key={deckId(d)}>
+                <PresentationCard deck={d} onDelete={onDelete} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         ) : (
           <div className="lv-surface overflow-hidden">
             <table className="w-full text-[14px]">
               <thead>
-                <tr className="border-b bg-[#F8FBFF] text-left text-[12px] text-muted-foreground">
+                <tr className="border-b bg-[#FBF3EC] text-left text-[12px] text-muted-foreground">
                   <th className="px-4 py-2 font-medium">Deck</th>
                   <th className="hidden px-3 py-2 font-medium sm:table-cell">Slides</th>
                   <th className="hidden px-3 py-2 font-medium md:table-cell">Edited</th>

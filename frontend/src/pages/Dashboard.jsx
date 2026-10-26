@@ -9,7 +9,8 @@ import PresentationCard, { confirmDelete } from "@/components/app/PresentationCa
 import { ErrorNote, LoadingGrid } from "@/components/app/states";
 import { deckId, deckTitle, useDecks } from "@/lib/useDecks";
 import { deckSlides, deckUpdated, greeting, relativeTime } from "@/lib/format";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Gauge, Layers, Presentation } from "lucide-react";
+import { CountUp, Stagger, StaggerItem } from "@/components/app/motion";
 
 export default function Dashboard() {
   const { user } = useUser();
@@ -48,7 +49,7 @@ export default function Dashboard() {
         <section className="flex flex-col gap-5 pt-2">
           <h1 className="t-h1">
             {greeting()}, {first}.
-            <br className="sm:hidden" /> <span className="text-[#C2502A]">What are we teaching today?</span>
+            <br className="sm:hidden" /> <span className="text-[#B44A22]">What are we teaching today?</span>
           </h1>
           <Composer value={text} onChange={setText} textareaRef={taRef} />
           <div className="flex flex-wrap items-center gap-2">
@@ -60,7 +61,7 @@ export default function Dashboard() {
                   setText(c.text);
                   taRef.current?.focus();
                 }}
-                className="rounded-full border border-[#E8D8C9] bg-white px-3.5 py-1.5 text-[13px] font-medium text-[#4F3A31] transition hover:-translate-y-px hover:border-[#E3A98B] hover:text-[#8F3A18]"
+                className="lv-chip min-h-10 px-4 font-medium hover:text-[#8F3A18] sm:min-h-9"
               >
                 {c.label}
               </button>
@@ -68,18 +69,25 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <div className="lv-surface flex flex-wrap items-center gap-x-8 gap-y-2 px-4 py-2.5 text-[13px]">
+        <Stagger className="grid grid-cols-3 gap-2.5 sm:gap-4" aria-label="Your numbers">
           {[
-            [decks === null ? "–" : stats.week, "slides this week"],
-            [decks === null ? "–" : list.length, list.length === 1 ? "deck" : "decks"],
-            [stats.avg != null ? `${stats.avg}` : "–", "avg engagement"],
-          ].map(([n, l]) => (
-            <span key={l} className="inline-flex items-baseline gap-1.5">
-              <b className="font-[Bricolage_Grotesque] text-[17px] tabular-nums text-[#402B25]">{n}</b>
-              <span className="text-muted-foreground">{l}</span>
-            </span>
+            [Layers, decks === null ? "–" : stats.week, "slides this week"],
+            [Presentation, decks === null ? "–" : list.length, list.length === 1 ? "deck" : "decks"],
+            [Gauge, stats.avg != null ? stats.avg : "–", "avg engagement"],
+          ].map(([Icon, n, l]) => (
+            <StaggerItem key={l}>
+              <div className="lv-surface lv-lift flex h-full flex-col gap-1.5 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-4">
+                <span className="hidden size-10 shrink-0 place-items-center rounded-xl bg-[#FCE5D6] text-[#8F3A18] sm:grid">
+                  <Icon className="size-5" />
+                </span>
+                <span className="min-w-0">
+                  <CountUp value={n} className="block font-[Bricolage_Grotesque] text-[26px] font-bold leading-8 tabular-nums text-[#402B25]" />
+                  <span className="block truncate text-[12.5px] text-[#715A4E]">{l}</span>
+                </span>
+              </div>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
 
         <ErrorNote error={error} />
 
@@ -97,43 +105,45 @@ export default function Dashboard() {
           <>
             <section className="flex flex-col gap-3">
               <h2 className="t-h2">Continue where you left off</h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {list.slice(0, 2).map((d, i) => (
-                  <Link
-                    key={deckId(d)}
-                    to={`/app/preview/${deckId(d)}`}
-                    style={{ animationDelay: `${i * 40}ms` }}
-                    className="lv-surface lv-lift lv-in flex items-center gap-4 p-3"
-                  >
-                    <span className="w-36 shrink-0 overflow-hidden rounded-lg border">
-                      <DeckThumb id={deckId(d)} title={deckTitle(d)} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="t-card block truncate">{deckTitle(d)}</span>
-                      <span className="t-meta mt-0.5 block">
-                        Edited {relativeTime(deckUpdated(d)) || "recently"} · {deckSlides(d)} slides
+              <Stagger className="grid gap-3 sm:grid-cols-2">
+                {list.slice(0, 2).map((d) => (
+                  <StaggerItem key={deckId(d)}>
+                    <Link
+                      to={`/app/preview/${deckId(d)}`}
+                      className="lv-surface lv-lift flex items-center gap-4 p-3"
+                    >
+                      <span className="w-28 shrink-0 overflow-hidden rounded-lg border sm:w-36">
+                        <DeckThumb id={deckId(d)} title={deckTitle(d)} />
                       </span>
-                      <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-[#C2502A]">
-                        Resume <ArrowRight className="size-3.5" />
+                      <span className="min-w-0 flex-1">
+                        <span className="t-card block truncate">{deckTitle(d)}</span>
+                        <span className="t-meta mt-0.5 block">
+                          Edited {relativeTime(deckUpdated(d)) || "recently"} · {deckSlides(d)} slides
+                        </span>
+                        <span className="mt-2 inline-flex min-h-6 items-center gap-1 text-[13px] font-semibold text-[#B44A22]">
+                          Resume <ArrowRight className="size-3.5" />
+                        </span>
                       </span>
-                    </span>
-                  </Link>
+                    </Link>
+                  </StaggerItem>
                 ))}
-              </div>
+              </Stagger>
             </section>
 
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h2 className="t-h2">Your decks</h2>
-                <Link to="/app/presentations" className="text-[13px] font-semibold text-[#C2502A] hover:underline">
+                <Link to="/app/presentations" className="inline-flex min-h-10 items-center text-[13px] font-semibold text-[#B44A22] hover:underline">
                   See all
                 </Link>
               </div>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-                {list.slice(0, 8).map((d, i) => (
-                  <PresentationCard key={deckId(d)} deck={d} index={i} onDelete={(x) => confirmDelete(x, removeWithUndo)} />
+              <Stagger className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {list.slice(0, 8).map((d) => (
+                  <StaggerItem key={deckId(d)}>
+                    <PresentationCard deck={d} onDelete={(x) => confirmDelete(x, removeWithUndo)} />
+                  </StaggerItem>
                 ))}
-              </div>
+              </Stagger>
             </section>
           </>
         )}

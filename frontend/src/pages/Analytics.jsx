@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageContainer, PageHeader } from "@/components/app/Page";
 import { EmptyState, ErrorNote } from "@/components/app/states";
+import { Stagger, StaggerItem } from "@/components/app/motion";
 import {
   ChartContainer,
   ChartTooltip,
@@ -138,18 +139,26 @@ export default function Analytics() {
           />
         ) : (
         <>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {decks === null ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[104px]" />)
-          ) : (
-            <>
-              <StatCard label="Avg engagement" value={`${avg}`} icon={Gauge} hint="/ 100" />
-              <StatCard label="Decks" value={decks.length} icon={Presentation} />
-              <StatCard label="Slides" value={totalSlides} icon={Target} />
-              <StatCard label="Quiz questions" value={totalQuizzes} icon={PieChart} />
-            </>
-          )}
-        </div>
+        {decks === null ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="lv-skel h-[112px] rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          <Stagger className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {[
+              ["Avg engagement", avg, Gauge, "/ 100"],
+              ["Decks", decks.length, Presentation],
+              ["Slides", totalSlides, Target],
+              ["Quiz questions", totalQuizzes, PieChart],
+            ].map(([label, value, icon, hint]) => (
+              <StaggerItem key={label}>
+                <StatCard label={label} value={value} icon={icon} hint={hint} />
+              </StaggerItem>
+            ))}
+          </Stagger>
+        )}
 
         <Card>
           <CardHeader>
@@ -157,7 +166,7 @@ export default function Analytics() {
           </CardHeader>
           <CardContent>
             {decks === null ? (
-              <Skeleton className="aspect-video w-full" />
+              <div className="lv-skel h-[260px] w-full" />
             ) : engagementSeries.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">No decks yet.</p>
             ) : (
@@ -190,12 +199,16 @@ export default function Analytics() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Deck composition</CardTitle>
+            <div className="flex items-center gap-4 text-xs font-medium text-[#5A453B]" aria-hidden>
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[#F47B45]" /> Slides</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[#402B25]" /> Quiz questions</span>
+            </div>
           </CardHeader>
           <CardContent>
             {decks === null ? (
-              <Skeleton className="aspect-video w-full" />
+              <div className="lv-skel h-[260px] w-full" />
             ) : sizeSeries.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">No decks yet.</p>
             ) : (
@@ -203,7 +216,7 @@ export default function Analytics() {
                 className="h-[260px] w-full"
                 config={{
                   slides: { label: "Slides", color: "var(--chart-1)" },
-                  quizzes: { label: "Quiz questions", color: "var(--chart-3)" },
+                  quizzes: { label: "Quiz questions", color: "var(--chart-2)" },
                 }}
               >
                 <BarChart data={sizeSeries} margin={{ left: -18, right: 8, top: 8 }}>
@@ -232,7 +245,7 @@ export default function Analytics() {
                       <p className="truncate font-medium">
                         {best.title ?? best.source_name ?? "Untitled"}
                       </p>
-                      <p className="mt-1 flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
+                      <p className="mt-1 flex items-center gap-1 text-sm font-semibold text-[#3F6B47]">
                         <ArrowUpRight className="size-4" />
                         {best.overall_score ?? 0} / 100 PSF
                       </p>
@@ -259,7 +272,7 @@ export default function Analytics() {
                       <p className="truncate font-medium">
                         {weakest.title ?? weakest.source_name ?? "Untitled"}
                       </p>
-                      <p className="mt-1 flex items-center gap-1 text-sm text-rose-600 dark:text-rose-400">
+                      <p className="mt-1 flex items-center gap-1 text-sm font-semibold text-[#A53125]">
                         <ArrowDownRight className="size-4" />
                         {weakest.overall_score ?? 0} / 100 PSF
                       </p>
@@ -280,14 +293,14 @@ export default function Analytics() {
             {insights.length > 0 ? (
               <Card className="lv-card">
                 <CardHeader className="flex flex-row items-center gap-2">
-                  <Sparkles className="size-4 text-primary" />
+                  <Sparkles className="size-4 text-[#B44A22]" />
                   <CardTitle className="text-base">Insights</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="flex flex-col gap-3 text-sm">
                     {insights.map(([h, b]) => (
                       <li key={h} className="flex gap-3">
-                        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#F47B45]" />
                         <span>
                           <span className="font-medium text-foreground">{h}</span>{" "}
                           <span className="text-muted-foreground">— {b}</span>
@@ -305,7 +318,7 @@ export default function Analytics() {
 
         <Card className="lv-card">
           <CardHeader className="flex flex-row items-center gap-2">
-            <Layers className="size-4 text-primary" />
+            <Layers className="size-4 text-[#B44A22]" />
             <CardTitle className="text-base">How to read the engagement score</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">

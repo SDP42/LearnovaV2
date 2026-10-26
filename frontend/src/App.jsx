@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Toaster } from "sonner";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth";
 import * as api from "./api";
@@ -133,6 +134,7 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       </ErrorBoundary>
+      <Toaster position="top-right" offset={68} richColors closeButton className="lv-toaster" toastOptions={{ style: { fontFamily: "inherit" } }} />
     </AuthBridge>
   );
 }
