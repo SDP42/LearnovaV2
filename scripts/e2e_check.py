@@ -140,7 +140,12 @@ def sc_pdf(h):
     check("pdf: generated", j and j["status"] == "done", f"{dt:.1f}s")
     if j and j["status"] == "done":
         slides = verify_deck("pdf", jid, h)
-        pages = 29
+        try:
+            import fitz
+
+            pages = len(fitz.open(os.environ["E2E_PDF"]))
+        except Exception:
+            pages = 29
         check("pdf: slide count sane", len(slides) <= pages * 2.5, f"{len(slides)} slides")
 
 
