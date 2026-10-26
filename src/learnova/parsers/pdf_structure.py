@@ -96,6 +96,12 @@ def _tables(page, lines: List[_Line]) -> Tuple[List[Dict], List[_Line]]:
     return tabs, keep
 
 
+def _continues(prev: str, text: str) -> bool:
+    """A line that starts lower-case right after text with no closing punctuation continues that sentence (across blocks and pages)."""
+    prev = (prev or "").rstrip()
+    return bool(prev) and not prev.endswith((".", "!", "?", ":", ";")) and text[:1].islower()
+
+
 def pdf_to_markdown(path: str) -> Optional[Dict]:
     try:
         import fitz
@@ -220,12 +226,12 @@ def pdf_to_markdown(path: str) -> Optional[Dict]:
             if para:
                 flush()
             lst.append(li.group(1))
-        elif lst and last is not None and l.x0 > last.x0 - 1 and l.block == last.block and not _NUM_HEAD.match(text):
+        elif lst and last is not None and not _NUM_HEAD.match(text) and ((l.x0 > last.x0 - 1 and l.block == last.block) or _continues(lst[-1], text)):
             lst[-1] += " " + text           # wrapped list item
         else:
             if lst:
                 flush()
-            if last is not None and (l.block != last.block or l.y0 - last.y1 > 0.8 * l.size) and para:
+            if last is not None and (l.block != last.block or l.y0 - last.y1 > 0.8 * l.size) and para and not _continues(para[-1], text):
                 flush()
             para.append(text)
         last = l

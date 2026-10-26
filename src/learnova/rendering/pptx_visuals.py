@@ -991,6 +991,10 @@ def _prose(c: _Canvas, data) -> bool:
         tag = _REL_TAG.get(rel, "")
         return (tag.upper() + "   " if tag else "") + text
 
+    def _pw(i):
+        """Width used to estimate a paragraph: the bold lead face (Poppins) runs wider than the estimate, so it gets extra margin."""
+        return lw * 0.88 if i == 0 else lw - (0.3 if body[i - 1][1] in {"example", "elaboration"} else 0)
+
     def make(b):
         ps = [(lead, b * 1.38, True, 0)] + [(tagged(t, r), b, False, 0) for t, r in body]
         return ps
@@ -998,12 +1002,12 @@ def _prose(c: _Canvas, data) -> bool:
     b = 24.0
     while b > 11.0:
         ps = make(b)
-        total = sum(L.paras_height([p], lw - (0.3 if i and body[i - 1][1] in {"example", "elaboration"} else 0)) for i, p in enumerate(ps)) + gap * (len(ps) + 0.5)
+        total = sum(L.paras_height([p], _pw(i)) for i, p in enumerate(ps)) + gap * (len(ps) + 0.5)
         if total <= c.h * 0.96 and L.longest_word_fits([p[0] for p in ps], lw, b, False):
             break
         b -= 0.5
     ps = make(b)
-    heights = [L.paras_height([p], lw - (0.3 if i and body[i - 1][1] in {"example", "elaboration"} else 0)) for i, p in enumerate(ps)]
+    heights = [L.paras_height([p], _pw(i)) for i, p in enumerate(ps)]
     total = sum(heights) + gap * (len(ps) + 0.5)
     y = c.y + max(0.0, (c.h - total) / 2)
     with c.group():

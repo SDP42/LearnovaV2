@@ -513,6 +513,67 @@ def det_chart(title: str, sents: List[str]) -> Det:
     return None
 
 
+_UNITS = {"seconds", "second", "secs", "sec", "minutes", "minute", "mins", "hours", "hour", "days", "day", "weeks", "week", "months", "month",
+          "years", "year", "ms", "milliseconds", "kg", "km", "m", "cm", "mm", "mb", "gb", "kb", "tb", "gw", "mw", "kw", "kwh", "hz", "mhz", "ghz",
+          "users", "people", "students", "patients", "countries", "cities", "points", "degrees", "tons", "tonnes", "miles", "litres", "liters"}
+_LABEL_STOP = {"a", "an", "the", "and", "or", "but", "to", "from", "that", "which", "while", "in", "on", "at", "for", "with", "by", "than", "as",
+               "is", "are", "was", "were", "be", "of", "about", "around", "roughly", "approximately", "nearly", "almost", "over", "under", "reached",
+               "grew", "fell", "rose", "added", "reduced", "increased", "decreased", "pass", "passes", "total", "totalling", "totaling", "only", "just", "up", "down"}
+
+
+def _words_after(text: str, limit: int = 4) -> List[str]:
+    out: List[str] = []
+    for tok in re.findall(r"[\w'’+#./-]+|[,;:.()]", text):
+        if tok in ",;:.()" or tok.lower() in _LABEL_STOP:
+            break
+        out.append(tok)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _words_before(text: str, limit: int = 4) -> List[str]:
+    toks = re.findall(r"[\w'’+#./-]+|[,;:.()]", text)
+    while toks and toks[-1].lower() in _LABEL_STOP:          # "from about" / "to"
+        toks.pop()
+    out: List[str] = []
+    for tok in reversed(toks):
+        if tok in ",;:.()" or re.search(r"\d", tok) or tok.lower() in _UNITS:     # another figure ends the phrase
+            break
+        out.append(tok)
+        if len(out) >= limit:
+            break
+    out.reverse()
+    while out and out[0].lower() in _LABEL_STOP:
+        out.pop(0)
+    return out
+
+
+def _local_stats(sentence: str) -> List[Tuple[str, str]]:
+    """(value, label) per figure, where the label is the phrase *next to* the figure ("37" -> "backend checks"), not the sentence opening."""
+    s = _REF_NUM.sub(lambda m: " " * len(m.group(0)), sentence)
+    found: List[Tuple[str, str]] = []
+    for m in _NUM_RE.finditer(s):
+        tok = m.group(0).strip().rstrip(",. ")
+        if not re.search(r"\d", tok) or (re.fullmatch(r"\d{4}", tok) and _YEAR_RE.fullmatch(tok)):
+            continue
+        after_txt = s[m.end():]
+        value = tok
+        unit = re.match(r"\s*([A-Za-z]+)", after_txt)
+        if unit and unit.group(1).lower() in _UNITS:
+            value = f"{tok} {unit.group(1).lower()}"
+            after_txt = after_txt[unit.end():]
+        after = _words_after(after_txt)
+        before = _words_before(s[:m.start()])
+        words = after if after else before
+        label = _cap(" ".join(words)) if words else (found[-1][1] if found else short_label(s, 6))   # "from 12 to 2": same subject
+        found.append((value, label))
+    # "from X to Y" with one shared label reads as before / after
+    if len(found) == 2 and found[0][1] == found[1][1] and re.search(r"\bfrom\b.+\bto\b", s, re.I):
+        found = [(found[0][0], found[0][1] + " (before)"), (found[1][0], found[1][1] + " (after)")]
+    return found
+
+
 def det_stats(title: str, sents: List[str]) -> Det:
     if sum(1 for s in sents if re.search(r"[A-Za-z0-9)]\s*=\s*[A-Za-z0-9(]", s)) >= 1:
         return None  # equations are not statistics
@@ -522,15 +583,8 @@ def det_stats(title: str, sents: List[str]) -> Det:
         return None
     tiles = []
     for s in sents:
-        nums = _numbers(s)
-        for k, n in enumerate(nums[:2]):
-            ctx = s
-            for m_ in nums:  # a label should not contain any figure
-                ctx = ctx.replace(m_, " ", 1)
-            ctx = _strip_end(ctx)
-            ctx = re.sub(r"\b(?:to|from|by|of|at|reached|grew|fell|rose|added|is|was|are|were|has|have|had|over|than)\b\s*$", "", ctx.strip(), flags=re.I)
-            label = short_label(re.sub(r"\s{2,}", " ", ctx), 6)
-            tiles.append({"value": n.strip(), "label": label, "detail": _strip_end(s) if k == 0 else ""})
+        for k, (value, label) in enumerate(_local_stats(s)[:2]):
+            tiles.append({"value": value, "label": label, "detail": _strip_end(s) if k == 0 else ""})
     # de-duplicate by value
     seen, uniq = set(), []
     for t in tiles:
@@ -542,7 +596,7 @@ def det_stats(title: str, sents: List[str]) -> Det:
         return None
     n_words = sum(len(s.split()) for s in sents)
     with_num = sum(1 for s in sents if _numbers(s))
-    if with_num / max(1, len(sents)) < 0.5 and n_words >= 30:
+    if with_num / max(1, len(sents)) < (0.6 if n_words >= 45 else 0.5) and n_words >= 30:
         return None  # a number in passing is not a statistic slide
     if len(uniq) >= 3 or (len(uniq) >= 2 and n_words < 60) or (len(uniq) >= 1 and n_words < 30):
         conf = 0.8 if len(uniq) >= 3 else 0.74
