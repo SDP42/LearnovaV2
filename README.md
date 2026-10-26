@@ -14,10 +14,10 @@ to a keyword heuristic. Keys improve the writing; they are not a dependency.
 
 ```bash
 pip install -r requirements.txt
-./scripts/dev.sh            # API :8000 + web app :5173 (creates .env on first run)
+./scripts/dev.sh            # API :8000 + web app :5190 (creates .env on first run)
 ```
 
-Open <http://localhost:5173> → **Continue with mobile** → enter any number. In dev mode
+Open <http://127.0.0.1:5190> → **Continue with mobile** → enter any number. In dev mode
 (`OTP_DEV_MODE=1`, the default) the code is shown on the screen and printed in the API log, so no SMS
 account is needed. Then **Create** → paste a syllabus (try `demo/sample_syllabus.md`) → Generate →
 **Preview**, **Present** (presenter console), **Before vs after**, and download the **.pptx**.
@@ -226,7 +226,7 @@ uvicorn apps.api.main:app --reload --port 8000
 cd frontend && npm install && npm run dev
 ```
 
-Then open <http://localhost:5173>. Vite proxies `/api` to port 8000, so there is no CORS setup.
+Then open <http://127.0.0.1:5190>. Vite proxies `/api` to port 8000, so there is no CORS setup.
 
 ---
 
