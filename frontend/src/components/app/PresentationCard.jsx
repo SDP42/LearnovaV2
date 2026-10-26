@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 export function statusDot(status = "ready") {
   if (/fail|error/i.test(status)) return { color: "#EF4444", label: "Failed" };
   if (/draft|await|run|process|generat/i.test(status)) return { color: "#FFC93C", label: "In progress" };
-  return { color: "#12C99B", label: "Ready" };
+  return { color: "#6B9B72", label: "Ready" };
 }
 
 export async function downloadDeck(deck, artifact) {
@@ -44,7 +44,7 @@ export function DeckMenu({ deck, onDelete, className, triggerClassName }) {
         <button
           aria-label={`Actions for ${deckTitle(deck)}`}
           className={cn(
-            "grid size-8 place-items-center rounded-lg bg-white/90 text-[#0B1F44] shadow-sm backdrop-blur transition hover:bg-white",
+            "grid size-8 place-items-center rounded-lg bg-white/90 text-[#402B25] shadow-sm backdrop-blur transition hover:bg-white",
             triggerClassName
           )}
         >
@@ -90,15 +90,15 @@ export default function PresentationCard({ deck, index = 0, onDelete, className 
         <Link to={`/app/preview/${id}`} aria-label={`Open ${deckTitle(deck)}`} className="block">
           <DeckThumb id={id} title={deckTitle(deck)} className="border-b" />
         </Link>
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#0B1F44]/0 opacity-0 transition-all duration-180 group-hover:bg-[#0B1F44]/25 group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#402B25]/0 opacity-0 transition-all duration-180 group-hover:bg-[#402B25]/25 group-hover:opacity-100 group-focus-within:opacity-100">
           <Link
             to={`/app/present/${id}`}
-            className="pointer-events-auto inline-flex h-9 translate-y-1 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-[#0B1F44] shadow-lg transition-transform duration-180 hover:scale-105 group-hover:translate-y-0"
+            className="pointer-events-auto inline-flex h-9 translate-y-1 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-[#402B25] shadow-lg transition-transform duration-180 hover:scale-105 group-hover:translate-y-0"
           >
             Present <Play className="size-3.5 fill-current" />
           </Link>
         </div>
-        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[#0B1F44]/80 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[#402B25]/80 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
           {slides} slide{slides === 1 ? "" : "s"}
         </span>
         <div className="absolute right-2 top-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 data-[state=open]:opacity-100">
@@ -108,7 +108,7 @@ export default function PresentationCard({ deck, index = 0, onDelete, className 
       <div className="px-3.5 pb-3 pt-2.5">
         <div className="flex items-center gap-2">
           <p
-            className="t-card min-w-0 flex-1 truncate text-[#0B1F44]"
+            className="t-card min-w-0 flex-1 truncate text-[#402B25]"
             title={deckTitle(deck)}
           >
             {deckTitle(deck)}

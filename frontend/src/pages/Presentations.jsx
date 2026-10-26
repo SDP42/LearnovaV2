@@ -79,7 +79,7 @@ export default function Presentations() {
           title="My Decks"
           subtitle={decks ? `${decks.length} deck${decks.length === 1 ? "" : "s"} in your library.` : "Everything you’ve made, in one place."}
           actions={
-            <Button asChild className="bg-[#0B1F44] text-white hover:bg-[#13306a]">
+            <Button asChild className="bg-[#402B25] text-white hover:bg-[#2E1E19]">
               <Link to="/app" state={{ focus: Date.now() }}>
                 <Plus /> New deck
               </Link>
@@ -139,7 +139,7 @@ export default function Presentations() {
                   const id = deckId(d);
                   const st = statusDot(d.status);
                   return (
-                    <tr key={id} className="border-b transition-colors last:border-0 hover:bg-[#F4F9FF]">
+                    <tr key={id} className="border-b transition-colors last:border-0 hover:bg-[#FFFAF5]">
                       <td className="px-4 py-2.5">
                         <Link to={`/app/preview/${id}`} className="flex items-center gap-3">
                           <span className="w-24 shrink-0 overflow-hidden rounded-md border">

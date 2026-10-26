@@ -1,5 +1,5 @@
 /** Inline SVG empty-state illustrations in the Learnova palette. */
-const B = "#2563EB", N = "#0B1F44", M = "#12C99B", Y = "#FFC93C", T = "#E6EEFD";
+const B = "#C2502A", N = "#402B25", M = "#6B9B72", Y = "#FFC93C", T = "#FCE5D6";
 
 export function DecksIllustration({ className = "w-56" }) {
   return (
@@ -10,8 +10,8 @@ export function DecksIllustration({ className = "w-56" }) {
       <rect x="64" y="30" width="124" height="86" rx="10" fill="#fff" stroke={N} strokeWidth="2.5" transform="rotate(4 126 73)" />
       <g transform="rotate(4 126 73)">
         <rect x="76" y="44" width="52" height="8" rx="4" fill={B} />
-        <rect x="76" y="60" width="76" height="5" rx="2.5" fill="#C7D6F0" />
-        <rect x="76" y="71" width="62" height="5" rx="2.5" fill="#C7D6F0" />
+        <rect x="76" y="60" width="76" height="5" rx="2.5" fill="#DCC6B4" />
+        <rect x="76" y="71" width="62" height="5" rx="2.5" fill="#DCC6B4" />
         <rect x="76" y="86" width="30" height="20" rx="4" fill={M} />
         <rect x="112" y="86" width="30" height="20" rx="4" fill={Y} />
         <rect x="148" y="86" width="26" height="20" rx="4" fill={B} opacity=".25" />
@@ -48,7 +48,7 @@ export function QuizIllustration({ className = "w-48" }) {
         <g key={i} transform={`translate(0 ${i * 22})`}>
           <circle cx="72" cy="66" r="7" fill={i === 1 ? M : "#fff"} stroke={N} strokeWidth="2.5" />
           {i === 1 && <path d="M68.5 66l2.5 2.5 4.5-5" stroke={N} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-          <rect x="88" y="63" width={60 - i * 8} height="6" rx="3" fill="#C7D6F0" />
+          <rect x="88" y="63" width={60 - i * 8} height="6" rx="3" fill="#DCC6B4" />
         </g>
       ))}
       <circle cx="176" cy="30" r="14" fill={Y} stroke={N} strokeWidth="2.5" />

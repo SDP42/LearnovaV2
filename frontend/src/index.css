@@ -17,44 +17,46 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.65rem;
+  --radius: 0.85rem;
 
-  --background: oklch(0.985 0.008 250);
-  --foreground: oklch(0.27 0.06 262);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.03 264);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.03 264);
+  /* Warm editorial palette shared with the landing page:
+     orange for actions, dark brown for structure, warm white ground. */
+  --background: #FFFAF5;
+  --foreground: #402B25;
+  --card: #FFFFFF;
+  --card-foreground: #402B25;
+  --popover: #FFFFFF;
+  --popover-foreground: #402B25;
 
-  --primary: oklch(0.55 0.22 262);          /* indigo 600-ish */
-  --primary-foreground: oklch(0.99 0.005 250);
-  --secondary: oklch(0.968 0.007 264);
-  --secondary-foreground: oklch(0.28 0.03 264);
-  --muted: oklch(0.968 0.007 264);
-  --muted-foreground: oklch(0.55 0.02 264);
-  --accent: oklch(0.95 0.03 250);
-  --accent-foreground: oklch(0.35 0.1 262);
-  --destructive: oklch(0.58 0.24 27);
-  --destructive-foreground: oklch(0.98 0.01 27);
+  --primary: #F47B45;                       /* brand orange; buttons carry dark-brown text (7:1) */
+  --primary-foreground: #2A1A14;
+  --secondary: #F3E6DA;
+  --secondary-foreground: #402B25;
+  --muted: #F7EFE8;
+  --muted-foreground: #715A4E;              /* 6.4:1 on the warm white ground */
+  --accent: #FCE5D6;
+  --accent-foreground: #8F3A18;
+  --destructive: #C0392B;
+  --destructive-foreground: #FFFAF5;
 
-  --border: oklch(0.92 0.006 264);
-  --input: oklch(0.92 0.006 264);
-  --ring: oklch(0.55 0.22 262);
+  --border: #E8D8C9;
+  --input: #E8D8C9;
+  --ring: #D95D39;
 
-  --chart-1: oklch(0.55 0.22 262);
-  --chart-2: oklch(0.65 0.12 190);
-  --chart-3: oklch(0.7 0.15 162);
-  --chart-4: oklch(0.75 0.16 85);
-  --chart-5: oklch(0.65 0.2 15);
+  --chart-1: #F47B45;
+  --chart-2: #402B25;
+  --chart-3: #B44A22;
+  --chart-4: #E3A66B;
+  --chart-5: #7A9E7E;
 
-  --sidebar: oklch(0.985 0.002 264);
-  --sidebar-foreground: oklch(0.21 0.03 264);
-  --sidebar-primary: oklch(0.55 0.22 262);
-  --sidebar-primary-foreground: oklch(0.99 0.005 250);
-  --sidebar-accent: oklch(0.95 0.03 250);
-  --sidebar-accent-foreground: oklch(0.35 0.1 262);
-  --sidebar-border: oklch(0.92 0.006 264);
-  --sidebar-ring: oklch(0.55 0.22 262);
+  --sidebar: #402B25;
+  --sidebar-foreground: #FFFAF5;
+  --sidebar-primary: #F47B45;
+  --sidebar-primary-foreground: #2A1A14;
+  --sidebar-accent: #5A3F36;
+  --sidebar-accent-foreground: #FFFAF5;
+  --sidebar-border: rgba(255, 250, 245, 0.14);
+  --sidebar-ring: #F47B45;
 }
 
 .dark {
@@ -139,7 +141,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  --font-sans: "Manrope", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
 }
 
@@ -470,7 +472,7 @@
 }
 
 /* Display type: Bricolage Grotesque for headings across the app shell. */
-[data-learnova-app] h1,[data-learnova-app] h2,[data-learnova-app] h3{font-family:"Bricolage Grotesque","Plus Jakarta Sans",system-ui,sans-serif;letter-spacing:-0.025em}
+[data-learnova-app] h1,[data-learnova-app] h2,[data-learnova-app] h3{font-family:"Bricolage Grotesque","Manrope",system-ui,sans-serif;letter-spacing:-0.025em}
 
 /* ═════════════════════════════════════════════════════════════════════════
    Learnova app shell v3 — palette, type scale, spacing, motion.
@@ -480,33 +482,33 @@
    ═════════════════════════════════════════════════════════════════════════ */
 :root:has([data-lv-shell]),
 [data-lv-shell] {
-  --background: #F4F9FF;
-  --foreground: #0B1F44;
+  --background: #FFFAF5;
+  --foreground: #402B25;
   --card: #ffffff;
-  --card-foreground: #0B1F44;
+  --card-foreground: #402B25;
   --popover: #ffffff;
-  --popover-foreground: #0B1F44;
-  --primary: #2563EB;
+  --popover-foreground: #402B25;
+  --primary: #C2502A;
   --primary-foreground: #ffffff;
-  --secondary: #EAF1FC;
-  --secondary-foreground: #0B1F44;
-  --muted: #EAF1FC;
-  --muted-foreground: #5A6B8C;
-  --accent: #E6EEFD;
-  --accent-foreground: #1D4ED8;
-  --border: #DEE7F5;
-  --input: #D3DFF1;
-  --ring: #2563EB;
+  --secondary: #F3E6DA;
+  --secondary-foreground: #402B25;
+  --muted: #F3E6DA;
+  --muted-foreground: #715A4E;
+  --accent: #FCE5D6;
+  --accent-foreground: #8F3A18;
+  --border: #E8D8C9;
+  --input: #E0CDBB;
+  --ring: #C2502A;
   --sidebar: #ffffff;
-  --sidebar-foreground: #0B1F44;
-  --sidebar-border: #DEE7F5;
-  --sidebar-accent: #E6EEFD;
-  --sidebar-accent-foreground: #1D4ED8;
-  --lv-ink: #0B1F44;
-  --lv-mint: #12C99B;
+  --sidebar-foreground: #402B25;
+  --sidebar-border: #E8D8C9;
+  --sidebar-accent: #FCE5D6;
+  --sidebar-accent-foreground: #8F3A18;
+  --lv-ink: #402B25;
+  --lv-mint: #6B9B72;
   --lv-yellow: #FFC93C;
-  --lv-canvas: #E8F0FB;
-  --lv-shadow: 0 12px 32px -10px rgb(11 31 68 / 0.12);
+  --lv-canvas: #F3E6DA;
+  --lv-shadow: 0 12px 32px -10px rgb(64 43 37 / 0.12);
   --lv-gutter: 16px;
   --lv-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -527,8 +529,8 @@
 }
 
 @layer components {
-  [data-learnova-app] .t-h1 { font-family: "Bricolage Grotesque","Plus Jakarta Sans",system-ui,sans-serif; font-size: var(--t-h1); line-height: var(--t-h1-lh); letter-spacing: -0.02em; font-weight: 700; color: var(--lv-ink, var(--color-foreground)); }
-  [data-learnova-app] .t-h2 { font-family: "Bricolage Grotesque","Plus Jakarta Sans",system-ui,sans-serif; font-size: var(--t-h2); line-height: var(--t-h2-lh); letter-spacing: -0.015em; font-weight: 600; }
+  [data-learnova-app] .t-h1 { font-family: "Bricolage Grotesque","Manrope",system-ui,sans-serif; font-size: var(--t-h1); line-height: var(--t-h1-lh); letter-spacing: -0.02em; font-weight: 700; color: var(--lv-ink, var(--color-foreground)); }
+  [data-learnova-app] .t-h2 { font-family: "Bricolage Grotesque","Manrope",system-ui,sans-serif; font-size: var(--t-h2); line-height: var(--t-h2-lh); letter-spacing: -0.015em; font-weight: 600; }
   [data-learnova-app] .t-card { font-size: var(--t-card); line-height: var(--t-card-lh); font-weight: 600; }
   [data-learnova-app] .t-body { font-size: var(--t-body); line-height: var(--t-body-lh); }
   [data-learnova-app] .t-meta { font-size: var(--t-meta); line-height: var(--t-meta-lh); color: var(--color-muted-foreground); }
@@ -540,17 +542,17 @@
 
   /* hover lift: -3px + navy 12% shadow, 180ms */
   [data-learnova-app] .lv-lift { transition: transform 180ms var(--lv-ease), box-shadow 180ms var(--lv-ease), border-color 180ms ease; }
-  [data-learnova-app] .lv-lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -10px rgb(11 31 68 / 0.12); border-color: #C7D6F0; }
+  [data-learnova-app] .lv-lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -10px rgb(64 43 37 / 0.12); border-color: #DCC6B4; }
 
   [data-learnova-app] .lv-surface { background: #fff; border: 1px solid var(--color-border); border-radius: var(--r-card); }
-  [data-learnova-app] .lv-skel { position: relative; overflow: hidden; background: #E3ECF9; border-radius: 8px; }
+  [data-learnova-app] .lv-skel { position: relative; overflow: hidden; background: #EFE1D4; border-radius: 8px; }
   [data-learnova-app] .lv-skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.7) 45%, transparent 70%); background-size: 200% 100%; animation: lv-skel 1.4s linear infinite; }
   @keyframes lv-skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
-  [data-learnova-app] .lv-pill-active { background: #E6EEFD; color: #1D4ED8; position: relative; }
-  [data-learnova-app] .lv-pill-active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: #2563EB; }
+  [data-learnova-app] .lv-pill-active { background: #FCE5D6; color: #8F3A18; position: relative; }
+  [data-learnova-app] .lv-pill-active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: #C2502A; }
 
-  [data-learnova-app] .lv-glow-blue { box-shadow: 0 0 0 4px rgb(37 99 235 / 0.14), 0 0 24px rgb(37 99 235 / 0.35); }
+  [data-learnova-app] .lv-glow-blue { box-shadow: 0 0 0 4px rgb(194 80 42 / 0.14), 0 0 24px rgb(194 80 42 / 0.35); }
   [data-learnova-app] .lv-no-scrollbar { scrollbar-width: none; }
   [data-learnova-app] .lv-no-scrollbar::-webkit-scrollbar { display: none; }
   @keyframes lv-burst { from { transform: translate(0,0) scale(1) rotate(0); opacity: 1; } to { transform: translate(var(--bx), var(--by)) scale(0.6) rotate(var(--br)); opacity: 0; } }
@@ -568,7 +570,7 @@
 /* calmer card surface for legacy .lv-card users inside the new shell */
 @layer components {
   [data-lv-shell] .lv-card { background: #fff; backdrop-filter: none; border: 1px solid var(--color-border); border-radius: var(--r-card); box-shadow: none; }
-  [data-lv-shell] .lv-card:hover { border-color: #C7D6F0; box-shadow: 0 10px 24px -12px rgb(11 31 68 / 0.12); }
+  [data-lv-shell] .lv-card:hover { border-color: #DCC6B4; box-shadow: 0 10px 24px -12px rgb(64 43 37 / 0.12); }
   [data-lv-shell] .lv-wash { background: #fff; }
 }
 

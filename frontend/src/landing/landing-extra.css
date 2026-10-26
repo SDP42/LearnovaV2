@@ -1,0 +1,243 @@
+/* Runtime pieces the design board could only describe: loader, scroll-driven
+   states, and the fit-to-width scaling. Loaded after landing.css. */
+
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+
+/* The page is composed at 1440 design px; 1 design px = --u, so every section
+   keeps its proportions at any width. (CSS zoom would be simpler but breaks
+   ScrollTrigger's pin offsets.) */
+.l-page {
+  /* 1 design px: limited by width AND by the height left under the navbar,
+     so a wide, short screen isn't shrunk twice (once here, once by the fit) */
+  --u: min(calc(min(100vw, 1920px) / 1440), calc((100vh - 100px) / 840));
+  background: #fff; overflow-x: clip;
+}
+/* sections run full-bleed; their content sits in a centred 1440-unit stage */
+.l-L.l-L { width: 100%; margin: 0; }
+.l-w { display: inline-block; will-change: transform, filter, opacity; }
+
+/* nav: the active section's link, driven by ScrollTrigger */
+.l-nav { position: fixed !important; }
+.l-nav a.l-lk { transition: color .3s; white-space: nowrap; }
+.l-nav .l-btn { white-space: nowrap; }
+.l-nav a.l-lk:hover { color: var(--bm); }
+
+/* chapter 1 beats light up as the pin scrubs */
+.l-beat { transition: border-color .4s, opacity .4s; opacity: .45; }
+.l-beat.l-on { opacity: 1; }
+
+/* scroll-scrubbed versions replace the board's looping CSS animations */
+.l-strip.js { animation: none; }
+.l-draw.js { animation: none; }
+
+/* ── loader ── */
+.l-loader { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+.l-veil { position: absolute; inset: 0; background: #FFFAF5; }
+.l-ldots { position: absolute; left: 50%; top: 50%; }
+.l-ldots i {
+  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: #402B25;
+}
+.l-ldots i:nth-child(2) { background: #D95D39; }
+.l-ldots i:nth-child(3) { background: #F47B45; }
+.l-lockup {
+  position: absolute; left: 50%; top: 50%; display: flex; align-items: center; gap: 8px;
+  transform-origin: 0 0; color: #402B25;
+}
+.l-lockup svg { width: 30px; height: 30px; }
+.l-lockup span {
+  font: 600 22px 'Bricolage Grotesque', sans-serif; letter-spacing: -.04em;
+  clip-path: inset(0 100% 0 0);
+}
+.l-loading .l-nav .l-brand { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .l-L *, .l-L *::before, .l-L *::after { animation: none !important; }
+}
+
+/* stage wrapper added in JS: the section's content at design size, centred;
+   pinned chapters are also scaled to fit the window */
+.l-fit { position: absolute; left: 50%; width: calc(1440 * var(--u)); transform-origin: 50% 0; }
+
+/* Chapter 01, sized up: shorter composition (less fit-scaling on wide,
+   short windows) and larger type so it reads at a glance. */
+.l-L .l-ch1 { height: calc(860 * var(--u)); }
+.l-L .l-ch1-l { left: calc(110 * var(--u)); top: calc(96 * var(--u)); width: calc(560 * var(--u)); gap: calc(24 * var(--u)); }
+.l-L .l-ch1 .l-h2 { font-size: calc(64 * var(--u)); }
+.l-L .l-ch1 .l-chap { font-size: calc(14 * var(--u)); }
+.l-L .l-beat { padding-left: calc(22 * var(--u)); border-left-width: calc(4 * var(--u)); }
+.l-L .l-beat h4 { font-size: calc(26 * var(--u)); }
+.l-L .l-beat p { font-size: calc(17 * var(--u)); line-height: 1.5; }
+.l-L .l-ch1-r { left: calc(720 * var(--u)); top: calc(90 * var(--u)); width: calc(640 * var(--u)); height: calc(700 * var(--u)); }
+.l-L .l-paper { width: calc(380 * var(--u)); height: calc(500 * var(--u)); padding: calc(30 * var(--u)); }
+.l-L .l-paper i { height: calc(9 * var(--u)); margin: calc(12 * var(--u)) 0; }
+.l-L .l-chip { font-size: calc(15 * var(--u)); padding: calc(10 * var(--u)) calc(15 * var(--u)); }
+.l-L .l-out { width: calc(480 * var(--u)); height: calc(270 * var(--u)); bottom: 0; }
+
+/* Larger type everywhere: the board's sizes were tuned for a canvas preview,
+   and read small on a real screen. */
+.l-L .l-h2 { font-size: calc(58 * var(--u)); }
+.l-L .l-chap { font-size: calc(14 * var(--u)); }
+.l-L .l-chap i { width: calc(34 * var(--u)); height: calc(34 * var(--u)); }
+.l-L .l-lead { font-size: calc(19 * var(--u)); }
+
+/* Chapter 02, sized up and shortened so it barely needs fit-scaling */
+.l-L .l-facts { height: calc(800 * var(--u)); }
+.l-L .l-facts-in { gap: calc(28 * var(--u)); justify-content: flex-start; padding-top: calc(70 * var(--u)); }
+.l-L .l-cards { width: calc(1160 * var(--u)); gap: calc(16 * var(--u)); }
+.l-L .l-tk { height: calc(200 * var(--u)); padding: calc(24 * var(--u)) calc(28 * var(--u)); }
+.l-L .l-tk span { font-size: calc(15 * var(--u)); }
+.l-L .l-tk b { font-size: calc(72 * var(--u)); }
+.l-L .l-tk small { font-size: calc(14 * var(--u)); }
+.l-L .l-fmts { width: calc(1120 * var(--u)); font-size: calc(24 * var(--u)); margin-top: calc(12 * var(--u)); }
+.l-L .l-fmts svg { width: calc(24 * var(--u)) !important; height: calc(24 * var(--u)) !important; }
+.l-L .l-band { width: calc(560 * var(--u)); }
+/* the fanned deck sits under the format row, never over its text */
+.l-L .l-deck { z-index: 1; bottom: calc(-110 * var(--u)); }
+
+/* ── 03 · horizontal pipeline ── */
+.l-L .l-flow { height: calc(760 * var(--u)); }
+.l-L .l-flow-head { top: calc(60 * var(--u)); }
+.l-fl {
+  position: absolute; left: calc(48 * var(--u)); right: calc(48 * var(--u)); top: calc(360 * var(--u));
+  display: grid; grid-template-columns: repeat(8, 1fr); column-gap: calc(34 * var(--u)); align-items: center;
+}
+.l-fcol { position: relative; z-index: 2; display: flex; flex-direction: column; gap: calc(18 * var(--u)); }
+.l-L .l-fl .l-node {
+  position: relative; left: auto; top: auto; width: auto; padding: calc(14 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(16 * var(--u));
+}
+.l-L .l-fl .l-node h4 { font-size: calc(17 * var(--u)); margin: calc(5 * var(--u)) 0; }
+.l-L .l-fl .l-node p { font-size: calc(12.5 * var(--u)); }
+.l-L .l-fl .l-node .l-k { font-size: calc(10 * var(--u)); }
+.l-fledges { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; z-index: 1; pointer-events: none; }
+.l-fledges .e { fill: none; stroke: #402B25; stroke-width: 2; stroke-linecap: round; }
+.l-fledges .loop { fill: none; stroke: #D95D39; stroke-width: 2; stroke-dasharray: 5 6; }
+.l-fledges text { font: 700 12px Manrope, sans-serif; fill: #B44A22; }
+
+/* ── 05 · workflow: open step lays out sideways (window | text) ── */
+.l-L .l-acc { height: calc(820 * var(--u)); }
+.l-L .l-acc .l-num { font-size: calc(260 * var(--u)); }
+.l-L .l-acc .l-panel-in { bottom: calc(70 * var(--u)); gap: calc(26 * var(--u)); }
+.l-L .l-acc .l-step {
+  width: calc(880 * var(--u)); display: grid; grid-template-columns: calc(560 * var(--u)) 1fr;
+  column-gap: calc(28 * var(--u)); align-items: end;
+}
+.l-L .l-acc .l-mw { grid-row: 1 / span 3; margin-bottom: 0; width: calc(560 * var(--u)); height: calc(318 * var(--u)); }
+.l-L .l-acc .l-mw .l-sc { transform: scale(.9333); transform-origin: 0 0; width: calc(600 * var(--u)); height: calc(312 * var(--u)); }
+.l-L .l-acc .l-step h3 { font-size: calc(26 * var(--u)); }
+.l-L .l-acc .l-step p { font-size: calc(15 * var(--u)); }
+
+/* 05 · workflow, scroll-scrubbed: GSAP owns flex-grow and the step fade, so
+   the CSS transitions (which would lag behind the scroll) are switched off.
+   Collapsed strips are narrower so the open step gets more of the screen. */
+.l-L .l-track.js .l-panel { transition: none !important; flex: 0 0 calc(110 * var(--u)); overflow: hidden; }
+.l-L .l-track.js .l-panel .l-step,
+.l-L .l-track.js .l-panel.is-active .l-step { transition: none !important; filter: none; transform: none; opacity: 1; }
+.l-L .l-acc { height: calc(760 * var(--u)); }
+.l-L .l-acc .l-loop-head { top: calc(36 * var(--u)); }
+.l-L .l-acc .l-panel-in { left: calc(22 * var(--u)); bottom: calc(46 * var(--u)); }
+.l-L .l-acc .l-num { font-size: calc(240 * var(--u)); }
+.l-L .l-acc .l-step { width: calc(1000 * var(--u)); grid-template-columns: calc(620 * var(--u)) 1fr; }
+.l-L .l-acc .l-mw { width: calc(620 * var(--u)); height: calc(352 * var(--u)); }
+.l-L .l-acc .l-mw .l-sc { transform: scale(1.0333); width: calc(600 * var(--u)); height: calc(312 * var(--u)); }
+
+/* CTA: solid card (no gradient, no frosted blur) above the full-bleed scene */
+.l-L .l-ccard {
+  z-index: 5;
+  background: #FFFAF5;
+  border: 1px solid #E8D8C9;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 30px 70px rgba(42, 26, 20, .35);
+}
+/* the colour wave stays; lift + glow are dropped because the 3D tilt
+   magnified them into large blocks near the bottom of the screen */
+.l-L .l-wall div { animation-name: tileglow; box-shadow: none !important; }
+@keyframes tileglow { 0%, 100% { background: rgba(255,250,245,.08); } 45% { background: rgba(244,123,69,.45); } }
+
+/* brand tokens on the page root too: the navbar now lives outside .l-L */
+.l-page {
+  --o: #F47B45; --od: #D95D39; --ot: #B44A22; --b: #402B25; --bm: #715A4E;
+  --w: #FFFAF5; --be: #F3E6DA; --bd: #E8D8C9; --line: #F1E6DC;
+  font-family: Manrope, sans-serif; color: var(--b);
+}
+
+/* Scrolling (unpinned) sections fill the screen's width; only the pinned
+   chapters are limited by the window height. */
+.l-L .l-hero, .l-L .l-cta { --u: calc(min(100vw, 1920px) / 1440); }
+
+/* ── navbar hover ── */
+.l-nav a.l-lk { position: relative; transition: color .25s; }
+.l-nav a.l-lk::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: calc(-6 * var(--u)); height: 2px;
+  border-radius: 2px; background: var(--o); transform: scaleX(0); transform-origin: left;
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1);
+}
+.l-nav a.l-lk:hover, .l-nav a.l-lk.l-on { color: var(--od); }
+.l-nav a.l-lk:hover::after, .l-nav a.l-lk.l-on::after { transform: scaleX(1); }
+.l-nav .l-btn { transition: background .25s, color .25s, transform .25s; }
+.l-nav .l-btn:hover { background: var(--o); color: #2a1a14; transform: translateY(-1px); }
+.l-nav .l-brand { transition: opacity .2s; }
+.l-nav .l-brand:hover { opacity: .8; }
+
+/* ── footer ── */
+.l-flogo { display: inline-flex; align-items: center; gap: calc(10 * var(--u)); color: #2a1a14; text-decoration: none; }
+.l-flogo span { font: 700 calc(30 * var(--u)) 'Bricolage Grotesque', sans-serif; letter-spacing: -.04em; }
+/* copyright row above the wordmark, so the wordmark sits on the page's
+   bottom edge */
+.l-L .l-foot { display: flex; flex-direction: column; padding-bottom: 0; }
+.l-L .l-fbot { order: 3; margin-top: calc(36 * var(--u)); }
+.l-L .l-word {
+  order: 4;
+  /* `font:` above reset line-height to normal and clipped the letters;
+     restate it after, and size the box to the glyphs */
+  line-height: .8;
+  height: calc(250 * var(--u));
+  align-items: flex-end;
+  margin-top: calc(10 * var(--u));
+}
+
+/* ═══ Pinned chapters, recomposed wide and short (≈1440 × 640 design units)
+   and sized by screen WIDTH like the hero, so on widescreens they fill the
+   width; fitPinned() only trims what still exceeds the window height. ═══ */
+.l-L .l-ch1, .l-L .l-facts, .l-L .l-flow, .l-L .l-lib, .l-L .l-acc { --u: calc(min(100vw, 1920px) / 1440); }
+
+/* 01 · what we do */
+.l-L .l-ch1 { height: calc(640 * var(--u)); }
+.l-L .l-ch1-l { top: calc(30 * var(--u)); gap: calc(18 * var(--u)); width: calc(600 * var(--u)); }
+.l-L .l-ch1 .l-h2 { font-size: calc(54 * var(--u)); }
+.l-L .l-beat h4 { font-size: calc(22 * var(--u)); margin-bottom: calc(4 * var(--u)); }
+.l-L .l-beat p { font-size: calc(15 * var(--u)); }
+.l-L .l-ch1-r { top: calc(20 * var(--u)); left: calc(760 * var(--u)); width: calc(620 * var(--u)); height: calc(600 * var(--u)); }
+.l-L .l-paper { width: calc(330 * var(--u)); height: calc(430 * var(--u)); }
+.l-L .l-out { width: calc(440 * var(--u)); height: calc(248 * var(--u)); }
+
+/* 02 · features */
+.l-L .l-facts { height: calc(640 * var(--u)); }
+.l-L .l-facts-in { padding-top: calc(24 * var(--u)); gap: calc(22 * var(--u)); }
+.l-L .l-facts .l-h2 { font-size: calc(50 * var(--u)); }
+.l-L .l-tk { height: calc(172 * var(--u)); }
+.l-L .l-tk b { font-size: calc(64 * var(--u)); }
+.l-L .l-deck { transform: translateX(-50%) scale(.8); transform-origin: 50% 100%; bottom: calc(-150 * var(--u)); }
+
+/* 03 · how it works */
+.l-L .l-flow { height: calc(620 * var(--u)); }
+.l-L .l-flow-head { top: calc(20 * var(--u)); gap: calc(10 * var(--u)); }
+.l-L .l-flow .l-h2 { font-size: calc(50 * var(--u)); }
+.l-L .l-fl { top: calc(270 * var(--u)); }
+
+/* 04 · layouts */
+.l-L .l-lib { height: calc(560 * var(--u)); }
+.l-L .l-lib .l-fit > div:first-child { top: calc(40 * var(--u)) !important; }
+.l-L .l-strip { top: calc(240 * var(--u)); }
+
+/* 05 · workflow */
+.l-L .l-acc { height: calc(660 * var(--u)); }
+.l-L .l-acc .l-loop-head { top: calc(16 * var(--u)); gap: calc(10 * var(--u)); }
+.l-L .l-acc .l-h2 { font-size: calc(50 * var(--u)); }
+.l-L .l-acc .l-panel-in { bottom: calc(30 * var(--u)); }
+/* 03: room above the row for the repair loop, below for the refine loop */
+.l-L .l-flow { height: calc(680 * var(--u)); }
+.l-L .l-fl { top: calc(320 * var(--u)); }

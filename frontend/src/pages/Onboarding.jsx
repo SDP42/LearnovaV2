@@ -9,7 +9,7 @@ import { Blobs } from "@/components/fx/Haikei";
 import "./auth.css";
 
 const ROLES = [["educator", "Educator"], ["student", "Student"], ["trainer", "Trainer"], ["researcher", "Researcher"], ["other", "Other"]];
-const COLORS = ["#5B8CFF", "#37d0ff", "#FFC93C", "#4ade80", "#fbbf24"];
+const COLORS = ["#F47B45", "#E3A66B", "#FFC93C", "#4ade80", "#fbbf24"];
 
 export default function Onboarding() {
   const { user, setUser } = useAuth();

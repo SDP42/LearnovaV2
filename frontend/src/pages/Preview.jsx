@@ -295,21 +295,21 @@ export default function Preview() {
     <button
       disabled={aiDisabled}
       onClick={() => runAi(label, instruction, audience)}
-      className="flex items-center justify-between gap-2 rounded-lg border border-[#DEE7F5] bg-white px-3 py-2 text-left text-[13px] font-medium text-[#0B1F44] transition hover:border-[#9DBBF5] hover:bg-[#F4F9FF] disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex items-center justify-between gap-2 rounded-lg border border-[#E8D8C9] bg-white px-3 py-2 text-left text-[13px] font-medium text-[#402B25] transition hover:border-[#E3A98B] hover:bg-[#FFFAF5] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {label}
-      {aiBusy === label ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5 text-[#2563EB]" />}
+      {aiBusy === label ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5 text-[#C2502A]" />}
     </button>
   );
 
   const chip = saving
-    ? { text: "Saving…", cls: "bg-[#EEF4FF] text-[#1D4ED8]", icon: <Loader2 className="size-3 animate-spin" /> }
+    ? { text: "Saving…", cls: "bg-[#FDEEE3] text-[#8F3A18]", icon: <Loader2 className="size-3 animate-spin" /> }
     : dirty
     ? { text: "Unsaved changes", cls: "bg-[#FFF3D6] text-[#8A5A00]", icon: <span className="size-1.5 rounded-full bg-[#FFC93C]" /> }
     : { text: `Saved${meta.version > 1 ? ` · v${meta.version}` : ""}`, cls: "bg-[#E2F8F1] text-[#0B7A5E]", icon: <Check className="size-3" /> };
 
   return (
-    <div data-learnova-app data-lv-shell className="flex h-svh flex-col bg-[#F4F9FF] text-[#0B1F44]">
+    <div data-learnova-app data-lv-shell className="flex h-svh flex-col bg-[#FFFAF5] text-[#402B25]">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-white px-3">
         <Button asChild variant="ghost" size="icon" className="size-8 shrink-0" title="Back to My Decks">
           <Link to="/app/presentations" aria-label="Back to My Decks">
@@ -332,7 +332,7 @@ export default function Preview() {
         <div className="flex shrink-0 items-center gap-1.5">
           {editing ? (
             <>
-              <Button size="sm" onClick={save} disabled={saving || !dirty} className="bg-[#2563EB] hover:bg-[#1D4ED8]">
+              <Button size="sm" onClick={save} disabled={saving || !dirty} className="bg-[#C2502A] hover:bg-[#8F3A18]">
                 {saving ? <Loader2 className="animate-spin" /> : <Check />}
                 {saving ? "Re-rendering…" : "Save & re-render"}
               </Button>
@@ -394,7 +394,7 @@ export default function Preview() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button asChild size="sm" className="bg-[#0B1F44] text-white hover:bg-[#13306a]">
+          <Button asChild size="sm" className="bg-[#402B25] text-white hover:bg-[#2E1E19]">
             <Link to={`/app/present/${jobId}`}>
               <Play className="fill-current" /> Present
             </Link>
@@ -422,24 +422,24 @@ export default function Preview() {
                       className={cn(
                         "group flex w-full gap-2.5 rounded-[10px] border p-2 text-left transition",
                         i === selected
-                          ? "border-[#2563EB] bg-[#EEF4FF] shadow-[0_0_0_3px_rgb(37_99_235/0.12)]"
-                          : "border-transparent hover:border-[#DEE7F5] hover:bg-[#F4F9FF]"
+                          ? "border-[#C2502A] bg-[#FDEEE3] shadow-[0_0_0_3px_rgb(194_80_42/0.12)]"
+                          : "border-transparent hover:border-[#E8D8C9] hover:bg-[#FFFAF5]"
                       )}
                     >
                       <span
                         className={cn(
                           "grid size-7 shrink-0 place-items-center rounded-md text-[12px] font-bold tabular-nums",
-                          i === selected ? "bg-[#2563EB] text-white" : "bg-[#EAF1FC] text-[#5A6B8C]"
+                          i === selected ? "bg-[#C2502A] text-white" : "bg-[#F3E6DA] text-[#715A4E]"
                         )}
                       >
                         {i + 1}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="line-clamp-2 text-[12.5px] font-semibold leading-4 text-[#0B1F44]">
+                        <span className="line-clamp-2 text-[12.5px] font-semibold leading-4 text-[#402B25]">
                           {draft?.[i]?.title || s.title}
                         </span>
                         {s.family || s.variant ? (
-                          <span className="mt-1 inline-block max-w-full truncate rounded bg-[#E3ECF9] px-1.5 py-px text-[10px] font-medium text-[#4A5C80]">
+                          <span className="mt-1 inline-block max-w-full truncate rounded bg-[#EFE1D4] px-1.5 py-px text-[10px] font-medium text-[#664F44]">
                             {(s.variant || s.family || "").toString().replace(/_/g, " ").toLowerCase()}
                           </span>
                         ) : null}
@@ -451,9 +451,9 @@ export default function Preview() {
         </aside>
 
         {/* Canvas */}
-        <div className="flex min-h-[300px] min-w-0 items-center justify-center bg-[#E8F0FB] p-4 sm:p-6 lg:min-h-0">
+        <div className="flex min-h-[300px] min-w-0 items-center justify-center bg-[#F3E6DA] p-4 sm:p-6 lg:min-h-0">
           {htmlUrl ? (
-            <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-[0_18px_50px_-18px_rgb(11_31_68/0.35),0_2px_6px_rgb(11_31_68/0.08)]">
+            <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-[0_18px_50px_-18px_rgb(64_43_37/0.35),0_2px_6px_rgb(64_43_37/0.08)]">
               <iframe
                 ref={iframeRef}
                 title="Presentation preview"
@@ -476,17 +476,17 @@ export default function Preview() {
         {/* Inspector */}
         <aside className="min-h-0 border-t bg-white lg:overflow-y-auto lg:border-l lg:border-t-0" aria-label="Inspector">
           <Tabs value={tab} onValueChange={setTab} className="flex flex-col">
-            <TabsList className="m-3 grid h-9 grid-cols-4 rounded-lg bg-[#EAF1FC] p-0.5">
+            <TabsList className="m-3 grid h-9 grid-cols-4 rounded-lg bg-[#F3E6DA] p-0.5">
               {[
                 ["design", "Design"],
                 ["content", "Content"],
                 ["quiz", "Quiz"],
                 ["ai", "AI"],
               ].map(([v, l]) => (
-                <TabsTrigger key={v} value={v} className="relative rounded-md px-2 text-[13px] data-[state=active]:text-[#1D4ED8]">
+                <TabsTrigger key={v} value={v} className="relative rounded-md px-2 text-[13px] data-[state=active]:text-[#8F3A18]">
                   {l}
                   {v === "ai" && aiNeedsSetup ? <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#FFC93C]" title="Needs setup" /> : null}
-                  {v === "ai" && aiOn ? <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#12C99B]" /> : null}
+                  {v === "ai" && aiOn ? <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#6B9B72]" /> : null}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -592,7 +592,7 @@ export default function Preview() {
                     <Separator />
                     <div className="flex flex-col gap-1">
                       <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Speaker notes</span>
-                      <pre className="whitespace-pre-wrap rounded-md bg-[#F4F9FF] p-2 text-xs leading-relaxed">
+                      <pre className="whitespace-pre-wrap rounded-md bg-[#FFFAF5] p-2 text-xs leading-relaxed">
                         {cur.speaker_notes || cur.takeaway || "—"}
                       </pre>
                     </div>
@@ -614,7 +614,7 @@ export default function Preview() {
                     {deckQuizzes.map((q, i) => {
                       const letter = String(q.correct ?? "").trim().toUpperCase().slice(0, 1);
                       return (
-                        <div key={i} className="rounded-lg border border-[#DEE7F5] p-3">
+                        <div key={i} className="rounded-lg border border-[#E8D8C9] p-3">
                           <p className="text-[13px] font-semibold leading-5">{i + 1}. {q.question}</p>
                           <ul className="mt-2 space-y-1">
                             {(q.options || []).slice(0, 4).map((o, k) => (
@@ -622,7 +622,7 @@ export default function Preview() {
                                 key={k}
                                 className={cn(
                                   "rounded-md px-2 py-1 text-[12.5px]",
-                                  "ABCD"[k] === letter ? "bg-[#E2F8F1] font-medium text-[#0B7A5E]" : "bg-[#F4F9FF] text-[#4A5C80]"
+                                  "ABCD"[k] === letter ? "bg-[#E2F8F1] font-medium text-[#0B7A5E]" : "bg-[#FFFAF5] text-[#664F44]"
                                 )}
                               >
                                 {String(o)}
@@ -661,8 +661,8 @@ export default function Preview() {
                 </div>
 
                 {aiResult ? (
-                  <div className="mt-1 overflow-hidden rounded-xl border border-[#DEE7F5]">
-                    <div className="flex items-center justify-between bg-[#F4F9FF] px-3 py-1.5">
+                  <div className="mt-1 overflow-hidden rounded-xl border border-[#E8D8C9]">
+                    <div className="flex items-center justify-between bg-[#FFFAF5] px-3 py-1.5">
                       <span className="text-[12px] font-semibold">{aiResult.label}</span>
                       {aiResult.applied ? <span className="text-[11px] font-semibold text-[#0B7A5E]">Applied</span> : null}
                     </div>
@@ -680,7 +680,7 @@ export default function Preview() {
                     ))}
                     <div className="flex gap-2 border-t bg-white p-2">
                       {!aiResult.applied ? (
-                        <Button size="sm" onClick={acceptAi} className="flex-1 bg-[#12C99B] text-[#04382C] hover:bg-[#0FB88C]">
+                        <Button size="sm" onClick={acceptAi} className="flex-1 bg-[#6B9B72] text-[#04382C] hover:bg-[#0FB88C]">
                           <Check /> Accept
                         </Button>
                       ) : null}

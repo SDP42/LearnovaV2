@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth";
 import * as api from "./api";
-import Cursor from "./components/Cursor.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
 import Onboarding from "./pages/Onboarding.jsx";
@@ -85,7 +84,6 @@ function Welcome() {
 export default function App() {
   return (
     <AuthBridge>
-      <Cursor />
       <ErrorBoundary>
       <Routes>
         <Route path="/" element={<Landing />} />

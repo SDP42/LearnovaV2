@@ -3,9 +3,9 @@ import * as api from "@/api";
 import { cn } from "@/lib/utils";
 
 const TONES = [
-  ["#2563EB", "#0B1F44"],
-  ["#12C99B", "#0B3D3A"],
-  ["#0B1F44", "#2563EB"],
+  ["#C2502A", "#402B25"],
+  ["#6B9B72", "#0B3D3A"],
+  ["#402B25", "#C2502A"],
   ["#FFC93C", "#B45309"],
 ];
 
@@ -41,7 +41,7 @@ export default function DeckThumb({ id, title = "Untitled deck", className, roun
   const [c1, c2] = toneFor(title);
 
   return (
-    <div className={cn("relative aspect-video w-full overflow-hidden bg-[#E3ECF9]", rounded, className)}>
+    <div className={cn("relative aspect-video w-full overflow-hidden bg-[#EFE1D4]", rounded, className)}>
       {mine && state.url ? (
         <img
           src={state.url}
@@ -62,7 +62,7 @@ export default function DeckThumb({ id, title = "Untitled deck", className, roun
           </div>
           <p
             className="line-clamp-3 text-[clamp(11px,1.6vw,17px)] font-semibold leading-tight"
-            style={{ fontFamily: '"Bricolage Grotesque", system-ui, sans-serif', color: c1 === "#FFC93C" ? "#0B1F44" : "#fff" }}
+            style={{ fontFamily: '"Bricolage Grotesque", system-ui, sans-serif', color: c1 === "#FFC93C" ? "#402B25" : "#fff" }}
           >
             {title}
           </p>

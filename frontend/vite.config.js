@@ -15,7 +15,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          three: ["three", "@react-three/fiber", "@react-three/drei"],
+          gsap: ["gsap", "lenis"],
           charts: ["recharts"],
           vendor: ["react", "react-dom", "react-router-dom"],
         },
@@ -23,7 +23,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 5190,
     // Proxy keeps the browser on one origin in dev, so CORS never bites.
     // VITE_API_TARGET overrides the API origin (e.g. when :8000 is taken).
     proxy: {

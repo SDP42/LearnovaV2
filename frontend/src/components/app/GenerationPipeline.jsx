@@ -42,7 +42,7 @@ const BURST = Array.from({ length: 28 }, (_, i) => {
     x: Math.cos(a) * r,
     y: Math.sin(a) * r - 20,
     rot: (i * 53) % 360,
-    c: ["#2563EB", "#12C99B", "#FFC93C", "#0B1F44"][i % 4],
+    c: ["#C2502A", "#6B9B72", "#FFC93C", "#402B25"][i % 4],
     w: 6 + (i % 3) * 3,
   };
 });
@@ -50,8 +50,8 @@ const BURST = Array.from({ length: 28 }, (_, i) => {
 function MiniSlide({ i, newest }) {
   const v = i % 4;
   return (
-    <div className="relative flex h-full w-full flex-col gap-1.5 overflow-hidden rounded-lg border border-[#DEE7F5] bg-white p-2.5 shadow-sm">
-      <div className="h-1.5 w-2/3 rounded-full bg-[#2563EB]" />
+    <div className="relative flex h-full w-full flex-col gap-1.5 overflow-hidden rounded-lg border border-[#E8D8C9] bg-white p-2.5 shadow-sm">
+      <div className="h-1.5 w-2/3 rounded-full bg-[#C2502A]" />
       {v === 0 && (
         <>
           <div className="h-1 w-full rounded-full bg-[#DCE6F5]" />
@@ -61,21 +61,21 @@ function MiniSlide({ i, newest }) {
       )}
       {v === 1 && (
         <div className="mt-0.5 flex flex-1 gap-1.5">
-          <div className="flex-1 rounded bg-[#12C99B]/30" />
+          <div className="flex-1 rounded bg-[#6B9B72]/30" />
           <div className="flex-1 rounded bg-[#FFC93C]/40" />
-          <div className="flex-1 rounded bg-[#2563EB]/20" />
+          <div className="flex-1 rounded bg-[#C2502A]/20" />
         </div>
       )}
       {v === 2 && (
         <div className="mt-0.5 flex flex-1 items-end gap-1">
           {[40, 70, 55, 90].map((h, k) => (
-            <div key={k} className="flex-1 rounded-t bg-[#2563EB]/70" style={{ height: `${h}%`, opacity: 0.4 + k * 0.15 }} />
+            <div key={k} className="flex-1 rounded-t bg-[#C2502A]/70" style={{ height: `${h}%`, opacity: 0.4 + k * 0.15 }} />
           ))}
         </div>
       )}
       {v === 3 && (
         <>
-          <div className="mt-0.5 flex-1 rounded bg-[#E6EEFD]" />
+          <div className="mt-0.5 flex-1 rounded bg-[#FCE5D6]" />
           <div className="h-1 w-1/2 rounded-full bg-[#DCE6F5]" />
         </>
       )}
@@ -90,13 +90,13 @@ function Ring({ pct, done }) {
   return (
     <div className="relative size-[108px] shrink-0">
       <svg viewBox="0 0 108 108" className="size-full -rotate-90">
-        <circle cx="54" cy="54" r={R} fill="none" stroke="#E3ECF9" strokeWidth="9" />
+        <circle cx="54" cy="54" r={R} fill="none" stroke="#EFE1D4" strokeWidth="9" />
         <motion.circle
           cx="54"
           cy="54"
           r={R}
           fill="none"
-          stroke={done ? "#12C99B" : "#2563EB"}
+          stroke={done ? "#6B9B72" : "#C2502A"}
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={C}
@@ -106,9 +106,9 @@ function Ring({ pct, done }) {
       </svg>
       <div className="absolute inset-0 grid place-items-center">
         {done ? (
-          <Check className="size-9 text-[#12C99B]" strokeWidth={3} />
+          <Check className="size-9 text-[#6B9B72]" strokeWidth={3} />
         ) : (
-          <span className="font-[Bricolage_Grotesque] text-2xl font-bold tabular-nums text-[#0B1F44]">{pct}%</span>
+          <span className="font-[Bricolage_Grotesque] text-2xl font-bold tabular-nums text-[#402B25]">{pct}%</span>
         )}
       </div>
     </div>
@@ -167,9 +167,9 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
           Something got in the way while building your deck. Your content is safe — give it another go, or edit it and
           try again.
         </p>
-        {error ? <p className="rounded-lg bg-[#F4F9FF] px-3 py-2 text-xs text-[#5A6B8C]">{error}</p> : null}
+        {error ? <p className="rounded-lg bg-[#FFFAF5] px-3 py-2 text-xs text-[#715A4E]">{error}</p> : null}
         {onRetry ? (
-          <Button onClick={onRetry} className="bg-[#0B1F44] hover:bg-[#13306a]">
+          <Button onClick={onRetry} className="bg-[#402B25] hover:bg-[#2E1E19]">
             <RotateCcw /> Try again
           </Button>
         ) : null}
@@ -186,7 +186,7 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
           <div className="min-w-0">
             <p className="t-card">{done ? "Your deck is ready" : "Building your deck"}</p>
             {title ? <p className="t-meta mt-0.5 line-clamp-2">{title}</p> : null}
-            <p className="t-meta mt-1 text-[#2563EB]">{done ? "All done" : eta}</p>
+            <p className="t-meta mt-1 text-[#C2502A]">{done ? "All done" : eta}</p>
           </div>
         </div>
         <ol className="flex flex-col gap-1.5">
@@ -198,15 +198,15 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                 key={p.key}
                 className={cn(
                   "flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 transition-colors",
-                  st === "active" && "border-[#BFD3FA] bg-[#EEF4FF]"
+                  st === "active" && "border-[#BFD3FA] bg-[#FDEEE3]"
                 )}
               >
                 <span
                   className={cn(
                     "relative grid size-11 shrink-0 place-items-center rounded-xl transition-all",
                     st === "todo" && "bg-[#EEF3FB] text-[#9AA9C6]",
-                    st === "active" && "lv-glow-blue bg-[#2563EB] text-white",
-                    st === "done" && "bg-[#12C99B]/15 text-[#0E9F7B]"
+                    st === "active" && "lv-glow-blue bg-[#C2502A] text-white",
+                    st === "done" && "bg-[#6B9B72]/15 text-[#0E9F7B]"
                   )}
                 >
                   <AnimatePresence mode="wait" initial={false}>
@@ -216,7 +216,7 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                         initial={reduce ? false : { scale: 0, rotate: -40 }}
                         animate={{ scale: 1, rotate: 0 }}
                         transition={{ type: "spring", stiffness: 520, damping: 14 }}
-                        className="grid size-7 place-items-center rounded-full bg-[#12C99B] text-white"
+                        className="grid size-7 place-items-center rounded-full bg-[#6B9B72] text-white"
                       >
                         <Check className="size-4" strokeWidth={3.5} />
                       </motion.span>
@@ -228,10 +228,10 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                   </AnimatePresence>
                 </span>
                 <span className="min-w-0">
-                  <span className={cn("block text-[15px] font-semibold leading-5", st === "todo" ? "text-[#8190AD]" : "text-[#0B1F44]")}>
+                  <span className={cn("block text-[15px] font-semibold leading-5", st === "todo" ? "text-[#8A7468]" : "text-[#402B25]")}>
                     {p.label}
                   </span>
-                  <span className="block truncate text-[12px] leading-4 text-[#6A7A9B]">{p.sub}</span>
+                  <span className="block truncate text-[12px] leading-4 text-[#7C6659]">{p.sub}</span>
                 </span>
               </li>
             );
@@ -240,7 +240,7 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
       </div>
 
       {/* assembling canvas */}
-      <div className="lv-r-hero relative flex min-h-[380px] flex-col overflow-hidden border bg-[#E8F0FB] p-5">
+      <div className="lv-r-hero relative flex min-h-[380px] flex-col overflow-hidden border bg-[#F3E6DA] p-5">
         <div className="mb-3 flex items-center justify-between">
           <p className="t-card">{done ? "Deck assembled" : "Deck assembling"}</p>
           <span className="t-meta tabular-nums">{visible} / {SLIDES} slides sketched</span>
@@ -289,7 +289,7 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                   ))}
                 </div>
               )}
-              <Button size="lg" onClick={onOpen} className="h-11 bg-[#0B1F44] px-6 text-[15px] hover:bg-[#13306a]">
+              <Button size="lg" onClick={onOpen} className="h-11 bg-[#402B25] px-6 text-[15px] hover:bg-[#2E1E19]">
                 Open deck
               </Button>
               <Button size="lg" variant="outline" onClick={onPresent} className="h-11 bg-white px-6 text-[15px]">
@@ -304,7 +304,7 @@ export default function GenerationPipeline({ stage, progress = 0, status = "runn
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.25 }}
-                className="text-center text-[13px] text-[#4A5C80]"
+                className="text-center text-[13px] text-[#664F44]"
               >
                 {TIPS[tip]}
               </motion.p>

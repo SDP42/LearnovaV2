@@ -40,7 +40,7 @@ function Avatar({ user, size = 32 }) {
   return (
     <span
       style={{ width: size, height: size }}
-      className="grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#2563EB] to-[#12C99B] text-xs font-bold text-white"
+      className="grid shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#C2502A] to-[#6B9B72] text-xs font-bold text-white"
     >
       {initial}
     </span>
@@ -100,10 +100,10 @@ export default function AppSidebar({ onNew }) {
       >
         <div className="flex h-12 items-center gap-2 px-4 max-[1099px]:justify-center max-[1099px]:px-0">
           <Link to="/app" className="flex items-center gap-2.5">
-            <span className="grid size-7 place-items-center rounded-lg bg-[#2563EB] text-white shadow-sm">
+            <span className="grid size-7 place-items-center rounded-lg bg-[#C2502A] text-white shadow-sm">
               <Sparkles className="size-4" />
             </span>
-            <span className="font-[Bricolage_Grotesque] text-[17px] font-bold tracking-tight text-[#0B1F44] max-[1099px]:hidden">
+            <span className="font-[Bricolage_Grotesque] text-[17px] font-bold tracking-tight text-[#402B25] max-[1099px]:hidden">
               Learnova
             </span>
           </Link>
@@ -113,7 +113,7 @@ export default function AppSidebar({ onNew }) {
           <RailTip label="New deck (N)">
             <button
               onClick={onNew}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#0B1F44] text-[14px] font-semibold text-white shadow-sm transition hover:bg-[#13306a] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#402B25] text-[14px] font-semibold text-white shadow-sm transition hover:bg-[#2E1E19] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C2502A]"
             >
               <Plus className="size-4" />
               <span className="max-[1099px]:hidden">New deck</span>
@@ -131,8 +131,8 @@ export default function AppSidebar({ onNew }) {
                   to={item.to}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative flex h-9 items-center gap-3 rounded-lg px-3 text-[14px] font-medium text-[#3C4D70] transition-colors hover:bg-[#F0F5FD] hover:text-[#0B1F44] max-[1099px]:justify-center max-[1099px]:px-0",
-                    active && "lv-pill-active font-semibold hover:bg-[#E6EEFD] hover:text-[#1D4ED8]"
+                    "relative flex h-9 items-center gap-3 rounded-lg px-3 text-[14px] font-medium text-[#5A453B] transition-colors hover:bg-[#F7EFE8] hover:text-[#402B25] max-[1099px]:justify-center max-[1099px]:px-0",
+                    active && "lv-pill-active font-semibold hover:bg-[#FCE5D6] hover:text-[#8F3A18]"
                   )}
                 >
                   <item.icon className="size-[18px] shrink-0" />
@@ -146,18 +146,18 @@ export default function AppSidebar({ onNew }) {
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3 max-[1099px]:hidden">
           {recent.length ? (
             <>
-              <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8190AD]">Recent</p>
+              <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8A7468]">Recent</p>
               <ul className="flex flex-col gap-0.5">
                 {recent.map((d) => (
                   <li key={deckId(d)}>
                     <Link
                       to={`/app/preview/${deckId(d)}`}
-                      className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#F0F5FD]"
+                      className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#F7EFE8]"
                     >
                       <span className="w-12 shrink-0 overflow-hidden rounded-md border">
                         <DeckThumb id={deckId(d)} title={deckTitle(d)} />
                       </span>
-                      <span className="line-clamp-2 text-[13px] font-medium leading-4 text-[#2A3B5F]">{deckTitle(d)}</span>
+                      <span className="line-clamp-2 text-[13px] font-medium leading-4 text-[#4F3A31]">{deckTitle(d)}</span>
                     </Link>
                   </li>
                 ))}
@@ -171,7 +171,7 @@ export default function AppSidebar({ onNew }) {
             <Link
               to="/app/settings"
               className={cn(
-                "relative flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[14px] font-medium text-[#3C4D70] transition-colors hover:bg-[#F0F5FD] max-[1099px]:justify-center max-[1099px]:px-0",
+                "relative flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[14px] font-medium text-[#5A453B] transition-colors hover:bg-[#F7EFE8] max-[1099px]:justify-center max-[1099px]:px-0",
                 pathname.startsWith("/app/settings") && "lv-pill-active font-semibold"
               )}
             >
@@ -180,13 +180,13 @@ export default function AppSidebar({ onNew }) {
             </Link>
           </RailTip>
           <AccountMenu>
-            <button className="mt-1 flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-[#F0F5FD] max-[1099px]:justify-center max-[1099px]:p-1">
+            <button className="mt-1 flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-[#F7EFE8] max-[1099px]:justify-center max-[1099px]:p-1">
               <Avatar user={user} />
               <span className="min-w-0 flex-1 max-[1099px]:hidden">
-                <span className="block truncate text-[13px] font-semibold text-[#0B1F44]">{user?.fullName || "Account"}</span>
-                <span className="block truncate text-[11px] text-[#8190AD]">{user?.phone || "Signed in"}</span>
+                <span className="block truncate text-[13px] font-semibold text-[#402B25]">{user?.fullName || "Account"}</span>
+                <span className="block truncate text-[11px] text-[#8A7468]">{user?.phone || "Signed in"}</span>
               </span>
-              <ChevronsUpDown className="size-4 text-[#8190AD] max-[1099px]:hidden" />
+              <ChevronsUpDown className="size-4 text-[#8A7468] max-[1099px]:hidden" />
             </button>
           </AccountMenu>
         </div>
@@ -210,15 +210,15 @@ export function MobileTabs({ onNew }) {
             key={t.to}
             to={t.to}
             className={cn(
-              "flex flex-col items-center gap-0.5 py-1 text-[11px] font-medium text-[#6A7A9B]",
-              t.match(pathname) && "text-[#2563EB]"
+              "flex flex-col items-center gap-0.5 py-1 text-[11px] font-medium text-[#7C6659]",
+              t.match(pathname) && "text-[#C2502A]"
             )}
           >
             <t.icon className="size-5" />
             {t.title.replace("My ", "")}
           </Link>
         ) : (
-          <button key={i} onClick={onNew} aria-label="New deck" className="mx-auto grid size-12 -translate-y-3 place-items-center rounded-full bg-[#0B1F44] text-white shadow-lg">
+          <button key={i} onClick={onNew} aria-label="New deck" className="mx-auto grid size-12 -translate-y-3 place-items-center rounded-full bg-[#402B25] text-white shadow-lg">
             <Plus className="size-6" />
           </button>
         )

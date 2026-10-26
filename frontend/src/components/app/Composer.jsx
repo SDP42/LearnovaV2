@@ -44,9 +44,9 @@ function Opt({ label, value, onChange, items }) {
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         aria-label={label}
-        className="h-8 w-auto gap-1.5 rounded-full border-[#DEE7F5] bg-[#F4F9FF] px-3 text-[13px] font-medium text-[#2A3B5F] shadow-none"
+        className="h-8 w-auto gap-1.5 rounded-full border-[#E8D8C9] bg-[#FFFAF5] px-3 text-[13px] font-medium text-[#4F3A31] shadow-none"
       >
-        <span className="text-[#8190AD]">{label}:</span>
+        <span className="text-[#8A7468]">{label}:</span>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -151,7 +151,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
   return (
     <div
       className={cn(
-        "lv-r-hero relative border bg-white shadow-[0_1px_0_rgb(11_31_68/0.04),0_16px_40px_-18px_rgb(37_99_235/0.28)] transition-shadow focus-within:border-[#9DBBF5] focus-within:shadow-[0_0_0_4px_rgb(37_99_235/0.10),0_16px_40px_-18px_rgb(37_99_235/0.35)]",
+        "lv-r-hero relative border bg-white shadow-[0_1px_0_rgb(64_43_37/0.04),0_16px_40px_-18px_rgb(194_80_42/0.28)] transition-shadow focus-within:border-[#E3A98B] focus-within:shadow-[0_0_0_4px_rgb(194_80_42/0.10),0_16px_40px_-18px_rgb(194_80_42/0.35)]",
         className
       )}
       onDragEnter={(e) => {
@@ -179,7 +179,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
           rows={2}
           placeholder="Describe what you’re teaching, paste a syllabus, or drop a PDF, PPTX or DOCX here…"
           aria-label="What are we teaching?"
-          className="lv-bare block w-full resize-none bg-transparent text-[16px] leading-[26px] text-[#0B1F44] outline-none placeholder:text-[#8190AD]"
+          className="lv-bare block w-full resize-none bg-transparent text-[16px] leading-[26px] text-[#402B25] outline-none placeholder:text-[#8A7468]"
         />
 
         <AnimatePresence initial={false}>
@@ -190,10 +190,10 @@ export default function Composer({ value, onChange, textareaRef, className }) {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border bg-[#F4F9FF] py-1.5 pl-2.5 pr-1.5 text-[13px]">
-                <FileText className="size-4 shrink-0 text-[#2563EB]" />
+              <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border bg-[#FFFAF5] py-1.5 pl-2.5 pr-1.5 text-[13px]">
+                <FileText className="size-4 shrink-0 text-[#C2502A]" />
                 <span className="truncate font-medium">{file.name}</span>
-                <span className="text-[#8190AD]">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                <span className="text-[#8A7468]">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
                 <button onClick={() => setFile(null)} aria-label="Remove file" className="grid size-5 place-items-center rounded hover:bg-white">
                   <X className="size-3.5" />
                 </button>
@@ -205,7 +205,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
         <AnimatePresence initial={false}>
           {hints.length ? (
             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-[12px] font-medium text-[#8190AD]">Try adding:</span>
+              <span className="text-[12px] font-medium text-[#8A7468]">Try adding:</span>
               {hints.map((h) => (
                 <button
                   key={h}
@@ -236,7 +236,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
           <button
             onClick={() => fileInput.current?.click()}
             aria-label="Attach a file"
-            className="grid size-8 place-items-center rounded-full border border-[#DEE7F5] bg-[#F4F9FF] text-[#2A3B5F] transition hover:bg-white"
+            className="grid size-8 place-items-center rounded-full border border-[#E8D8C9] bg-[#FFFAF5] text-[#4F3A31] transition hover:bg-white"
           >
             <Paperclip className="size-4" />
           </button>
@@ -248,7 +248,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
             <button
               onClick={improve}
               disabled={improving}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-[#DEE7F5] bg-white px-3.5 text-[13px] font-semibold text-[#1D4ED8] transition hover:bg-[#EEF4FF] disabled:opacity-60 sm:flex-none"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-[#E8D8C9] bg-white px-3.5 text-[13px] font-semibold text-[#8F3A18] transition hover:bg-[#FDEEE3] disabled:opacity-60 sm:flex-none"
             >
               {improving ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
               Improve my prompt <span aria-hidden>✨</span>
@@ -256,7 +256,7 @@ export default function Composer({ value, onChange, textareaRef, className }) {
             <button
               onClick={generate}
               disabled={!canGo}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#0B1F44] px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-[#13306a] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#9AA9C6] sm:flex-none"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-[#402B25] px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-[#2E1E19] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#9AA9C6] sm:flex-none"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
               Generate
@@ -272,12 +272,12 @@ export default function Composer({ value, onChange, textareaRef, className }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-10 grid place-items-center rounded-[inherit] border-2 border-dashed border-[#2563EB] bg-[#EEF4FF]/95"
+            className="absolute inset-0 z-10 grid place-items-center rounded-[inherit] border-2 border-dashed border-[#C2502A] bg-[#FDEEE3]/95"
           >
-            <div className="flex flex-col items-center gap-2 text-[#1D4ED8]">
+            <div className="flex flex-col items-center gap-2 text-[#8F3A18]">
               <UploadCloud className="size-9" />
               <p className="font-[Bricolage_Grotesque] text-lg font-bold">Drop to read it</p>
-              <p className="text-[12px] text-[#5A6B8C]">PDF, PPTX or DOCX</p>
+              <p className="text-[12px] text-[#715A4E]">PDF, PPTX or DOCX</p>
             </div>
           </motion.div>
         ) : null}

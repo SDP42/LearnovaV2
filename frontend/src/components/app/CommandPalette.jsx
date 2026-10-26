@@ -71,27 +71,27 @@ export default function CommandPalette({ open, onOpenChange, onNew }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-[#0B1F44]/30 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[#402B25]/30 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-[15vh] z-50 w-[calc(100vw-32px)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border bg-white shadow-[0_24px_60px_-12px_rgb(11_31_68/0.35)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+          className="fixed left-1/2 top-[15vh] z-50 w-[calc(100vw-32px)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border bg-white shadow-[0_24px_60px_-12px_rgb(64_43_37/0.35)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
         >
           <Dialog.Title className="sr-only">Command palette</Dialog.Title>
           <div className="flex items-center gap-2.5 border-b px-4">
-            <Search className="size-4 text-[#8190AD]" />
+            <Search className="size-4 text-[#8A7468]" />
             <input
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={onKey}
               placeholder="Search decks and pages, or run a command…"
-              className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#8190AD]"
+              className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[#8A7468]"
             />
-            <kbd className="rounded border bg-[#F4F9FF] px-1.5 text-[11px] text-[#6A7A9B]">esc</kbd>
+            <kbd className="rounded border bg-[#FFFAF5] px-1.5 text-[11px] text-[#7C6659]">esc</kbd>
           </div>
           <ul ref={listRef} className="max-h-[50vh] overflow-y-auto p-2" role="listbox">
             {items.length === 0 ? (
-              <li className="px-3 py-8 text-center text-[13px] text-[#6A7A9B]">No matches for “{q}”.</li>
+              <li className="px-3 py-8 text-center text-[13px] text-[#7C6659]">No matches for “{q}”.</li>
             ) : (
               items.map((it, i) => (
                 <li key={it.id} data-i={i} role="option" aria-selected={i === active}>
@@ -100,12 +100,12 @@ export default function CommandPalette({ open, onOpenChange, onNew }) {
                     onClick={() => choose(i)}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[14px]",
-                      i === active ? "bg-[#E6EEFD] text-[#1D4ED8]" : "text-[#0B1F44]"
+                      i === active ? "bg-[#FCE5D6] text-[#8F3A18]" : "text-[#402B25]"
                     )}
                   >
                     <it.icon className="size-4 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                    <span className="text-[11px] text-[#8190AD]">{it.hint}</span>
+                    <span className="text-[11px] text-[#8A7468]">{it.hint}</span>
                     {i === active ? <CornerDownLeft className="size-3.5" /> : null}
                   </button>
                 </li>

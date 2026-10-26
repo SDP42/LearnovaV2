@@ -48,7 +48,7 @@ export default function Dashboard() {
         <section className="flex flex-col gap-5 pt-2">
           <h1 className="t-h1">
             {greeting()}, {first}.
-            <br className="sm:hidden" /> <span className="text-[#2563EB]">What are we teaching today?</span>
+            <br className="sm:hidden" /> <span className="text-[#C2502A]">What are we teaching today?</span>
           </h1>
           <Composer value={text} onChange={setText} textareaRef={taRef} />
           <div className="flex flex-wrap items-center gap-2">
@@ -60,7 +60,7 @@ export default function Dashboard() {
                   setText(c.text);
                   taRef.current?.focus();
                 }}
-                className="rounded-full border border-[#DEE7F5] bg-white px-3.5 py-1.5 text-[13px] font-medium text-[#2A3B5F] transition hover:-translate-y-px hover:border-[#9DBBF5] hover:text-[#1D4ED8]"
+                className="rounded-full border border-[#E8D8C9] bg-white px-3.5 py-1.5 text-[13px] font-medium text-[#4F3A31] transition hover:-translate-y-px hover:border-[#E3A98B] hover:text-[#8F3A18]"
               >
                 {c.label}
               </button>
@@ -75,7 +75,7 @@ export default function Dashboard() {
             [stats.avg != null ? `${stats.avg}` : "–", "avg engagement"],
           ].map(([n, l]) => (
             <span key={l} className="inline-flex items-baseline gap-1.5">
-              <b className="font-[Bricolage_Grotesque] text-[17px] tabular-nums text-[#0B1F44]">{n}</b>
+              <b className="font-[Bricolage_Grotesque] text-[17px] tabular-nums text-[#402B25]">{n}</b>
               <span className="text-muted-foreground">{l}</span>
             </span>
           ))}
@@ -113,7 +113,7 @@ export default function Dashboard() {
                       <span className="t-meta mt-0.5 block">
                         Edited {relativeTime(deckUpdated(d)) || "recently"} · {deckSlides(d)} slides
                       </span>
-                      <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-[#2563EB]">
+                      <span className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-[#C2502A]">
                         Resume <ArrowRight className="size-3.5" />
                       </span>
                     </span>
@@ -125,7 +125,7 @@ export default function Dashboard() {
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h2 className="t-h2">Your decks</h2>
-                <Link to="/app/presentations" className="text-[13px] font-semibold text-[#2563EB] hover:underline">
+                <Link to="/app/presentations" className="text-[13px] font-semibold text-[#C2502A] hover:underline">
                   See all
                 </Link>
               </div>

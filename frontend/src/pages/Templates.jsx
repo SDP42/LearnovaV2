@@ -14,9 +14,9 @@ export default function Templates() {
       <PageContainer>
         <PageHeader title="Templates" subtitle="Start from a ready-made lesson or a community topic. One click fills the composer." />
         <Tabs value={tab} onValueChange={(v) => setParams(v === "lessons" ? {} : { tab: v }, { replace: true })}>
-          <TabsList className="h-10 rounded-full bg-[#E3ECF9] p-1">
-            <TabsTrigger value="lessons" className="rounded-full px-4 data-[state=active]:text-[#1D4ED8]">Lessons</TabsTrigger>
-            <TabsTrigger value="community" className="rounded-full px-4 data-[state=active]:text-[#1D4ED8]">Community gallery</TabsTrigger>
+          <TabsList className="h-10 rounded-full bg-[#EFE1D4] p-1">
+            <TabsTrigger value="lessons" className="rounded-full px-4 data-[state=active]:text-[#8F3A18]">Lessons</TabsTrigger>
+            <TabsTrigger value="community" className="rounded-full px-4 data-[state=active]:text-[#8F3A18]">Community gallery</TabsTrigger>
           </TabsList>
           <EmbeddedCtx.Provider value={true}>
             <TabsContent value="lessons" className="mt-5"><Library /></TabsContent>
