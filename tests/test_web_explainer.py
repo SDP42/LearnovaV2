@@ -51,3 +51,22 @@ def test_embedded_explainer_is_escaped_once_and_unescaped_by_the_overlay():
     assert "split('<\\\\/script>')" in html          # JS source: a literal backslash before the slash
     holder = html.split('type="text/plain"', 1)[1].split("</script>", 1)[0]
     assert "<\\/script>" in holder and "</script>" not in holder
+
+
+def test_title_slide_does_not_sit_in_the_flow_and_old_decks_are_repaired():
+    """An inline position:relative on the title slide pushed every later slide below the frame (only its header showed)."""
+    from learnova.rendering.web_deck_builder import repair_html
+
+    html = _deck().html_bytes
+    assert b'class="title-slide" style="position:relative;"' not in html
+    old = b'<section data-background-color="#1D4ED8" class="title-slide" style="position:relative;"><p>x</p>'
+    assert b"position:relative" not in repair_html(old) and repair_html(b"<p>no title</p>") == b"<p>no title</p>"
+
+
+def test_a_tiny_deck_is_padded_to_a_real_one():
+    from learnova.parsers.markdown_converter import from_typed_text
+    from learnova.pipeline.orchestrator import PipelineConfig, generate
+
+    md = "## The Machine Learning Workflow\n1. Frame the problem and the metric.\n2. Collect and label a dataset.\n3. Split into train, validation and test sets.\n\n## Common Pitfalls\n- Data leakage: test information leaks into training.\n- Class imbalance makes accuracy meaningless.\n"
+    res = generate(from_typed_text(md, "ml"), PipelineConfig(enable_enhancement=False, enable_vision_ocr=False, enable_quizzes=True, build_pptx=False, build_html=False))
+    assert len(res.final_deck) >= 5

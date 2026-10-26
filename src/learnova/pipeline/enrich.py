@@ -171,7 +171,7 @@ def _lead(entry: dict, max_words: int = 20) -> str:
     return first
 
 
-def summary_slide(entries: List[dict], minimum_slides: int = 3, max_items: int = 7) -> int:
+def summary_slide(entries: List[dict], minimum_slides: int = 3, max_items: int = 7, minimum_picks: int = 3) -> int:
     """A closing "Key takeaways" slide: one line per section, taken from the deck's own text (nothing invented)."""
     import copy
 
@@ -190,7 +190,7 @@ def summary_slide(entries: List[dict], minimum_slides: int = 3, max_items: int =
         title = re.sub(r"\s*\(\d+/\d+\)$", "", str(imp.get("title") or key)).strip()
         if lead and title:
             picks.append((title, lead))
-    if len(picks) < 3:
+    if len(picks) < minimum_picks:
         return 0
     if len(picks) > max_items:                       # even sample across the deck
         step = len(picks) / max_items
@@ -264,8 +264,9 @@ def enrich_deck(entries: List[dict]) -> Dict[str, int]:
     gl = build_glossary(entries)
     kt = attach_key_terms(entries, gl)
     pr = attach_prompts(entries)
-    gs = glossary_slides(entries, gl)
+    tiny = sum(1 for e in entries if str((e.get("improved") or {}).get("layout_type", "")).upper() != "QUIZ") < 5
+    gs = glossary_slides(entries, gl, minimum=3 if tiny else 4)
     act = activity_slide(entries, gl)
-    ss = summary_slide(entries)
-    ag = agenda_slide(entries)
+    ss = summary_slide(entries, minimum_slides=2 if tiny else 3, minimum_picks=2 if tiny else 3)
+    ag = agenda_slide(entries, minimum_sections=2 if tiny else 4)
     return {"glossary_terms": len(gl), "slides_with_terms": kt, "prompts": pr, "glossary_slides": gs, "summary_slides": ss, "agenda_slides": ag, "activity_slides": act}

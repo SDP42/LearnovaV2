@@ -376,7 +376,14 @@ def read_artifact(user_id: str, deck_id: str, artifact: str) -> Optional[bytes]:
     if not filename:
         return None
     path = _deck_dir(user_id, deck_id) / filename
-    return path.read_bytes() if path.is_file() else None
+    if not path.is_file():
+        return None
+    data = path.read_bytes()
+    if artifact == "html":
+        from learnova.rendering.web_deck_builder import repair_html
+
+        data = repair_html(data)                          # decks stored by older builds keep working
+    return data
 
 
 def delete_deck(user_id: str, deck_id: str) -> bool:

@@ -18,6 +18,14 @@ from learnova.rendering.theme_engine import (
 _VENDOR = Path(__file__).parent / "vendor"
 
 
+def repair_html(data: bytes) -> bytes:
+    """Decks built before the title slide stopped being position:relative pushed every later slide down by the title slide's height
+    (so a slide showed only its header, at the bottom of the frame). Fixing the stored markup on the way out repairs them without a rebuild."""
+    if b'class="title-slide" style="position:relative;">' not in data:
+        return data
+    return data.replace(b'class="title-slide" style="position:relative;">', b'class="title-slide">', 1)
+
+
 @functools.lru_cache(maxsize=8)
 def _vendor(name: str) -> str:
     """Read a bundled Reveal.js asset. Returns '' if it is missing, so the
@@ -347,7 +355,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     _hero_flex = "" if tpl.title_layout == "centered" else f'<div style="flex:0 0 {30 if tpl.title_layout == "left_band" else 34}%;">{_hero}</div>'
     _pad_left = "30%" if tpl.title_layout == "left_band" else "0"
     slides_html_list.append(f"""
-    <section data-background-color="{_t_bg}" class="title-slide" style="position:relative;">
+    <section data-background-color="{_t_bg}" class="title-slide">
         {_t_deco}
         <div style="position:relative;display:flex;align-items:center;gap:48px;min-height:620px;padding-left:{_pad_left};text-align:{_t_align};">
             <div style="flex:1 1 58%;min-width:0;">
