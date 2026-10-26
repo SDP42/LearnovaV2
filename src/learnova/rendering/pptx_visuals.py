@@ -141,11 +141,19 @@ class _Canvas:
         shp.shadow.inherit = False
         return shp
 
-    def card(self, x, y, w, h, fill=None, line=None, radius=0.07):
-        # radius is an absolute corner size so small and large cards share one visual radius
-        r = radius / max(0.3, min(w, h)) * 2.2
-        return self.shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h, fill or self.t.card_bg_rgb,
-                          line or _blend(self.t.primary_rgb, 0.72), radius=r)
+    def card(self, x, y, w, h, fill=None, line=None, radius=None):
+        # radius is an absolute corner size so small and large cards share one visual radius;
+        # unless a caller asks for its own, the deck template decides it (and whether cards have an outline)
+        from learnova.rendering.templates import get_template
+
+        tpl = get_template(getattr(self.t, "template_id", None))
+        r_abs = tpl.card_radius if radius is None else radius
+        r = r_abs / max(0.3, min(w, h)) * 2.2
+        if fill is None:
+            fill = self.t.card_bg_rgb if tpl.card_border else _blend(self.t.primary_rgb, 0.95)
+        if line is None and tpl.card_border:
+            line = _blend(self.t.primary_rgb, 0.72)
+        return self.shape(MSO_SHAPE.ROUNDED_RECTANGLE if r_abs > 0 else MSO_SHAPE.RECTANGLE, x, y, w, h, fill, line, radius=r)
 
     def accent_bar(self, x, y, h, w=0.09, color=None):
         return self.shape(MSO_SHAPE.RECTANGLE, x, y, w, h, color or self.t.accent_rgb)

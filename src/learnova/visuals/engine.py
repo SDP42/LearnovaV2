@@ -344,15 +344,17 @@ def det_compare(title: str, sents: List[str]) -> Det:
     if not subj:
         return None
     a, b = subj
-    pa = re.compile(rf"(?<![\w]){re.escape(a)}(?![\w])", re.I)
-    pb = re.compile(rf"(?<![\w]){re.escape(b)}(?![\w])", re.I)
+    pa = re.compile(rf"(?<![\w-]){re.escape(a)}(?![\w-])", re.I)     # not inside "bias-variance"
+    pb = re.compile(rf"(?<![\w-]){re.escape(b)}(?![\w-])", re.I)
     left: List[str] = []
     right: List[str] = []
 
     def clean(x: str, subj_re) -> str:
         x = _LEAD_CUE.sub("", x)
         x = re.sub(r"^(?:while|whereas|but|and|,|;)\s+", "", x.strip(" ,;"), flags=re.I)
-        x = subj_re.sub("", x, count=1).strip(" ,;")
+        if subj_re.match(x):                         # drop the subject only when it opens the clause ("Bias is…"), never mid-sentence
+            x = subj_re.sub("", x, count=1).strip(" ,;")
+            x = re.sub(r"^(?:is|are|was|were|means|refers to)\s+", "", x, flags=re.I)
         x = re.sub(r"[,;]?\s*(?:while|whereas|but|and)\s*$", "", x, flags=re.I).strip(" ,;")
         x = re.sub(r"^(?:learning|models?|databases?|systems?|methods?|approach(?:es)?)\b\s*", "", x, flags=re.I)
         return _cap(_strip_end(x))

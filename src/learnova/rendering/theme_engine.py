@@ -28,6 +28,8 @@ class ColorPalette:
     # Typography. Defaults keep every existing theme rendering as before.
     heading_font: str = "Bebas Neue"
     body_font: str = "Inter"
+    # Structure (header / title slide / card shape / footer) — see rendering/templates.py.
+    template_id: str = "classic"
 
 # ── 10 Curated Professional Color Palettes ────────────────────────────────────
 THEMES = {
@@ -447,9 +449,30 @@ def apply_font(theme: ColorPalette, font_id: str) -> ColorPalette:
     return replace(theme, heading_font=font["heading"], body_font=font["body"])
 
 
+def palette_to_theme(spec, font_id: str = DEFAULT_FONT_ID) -> ColorPalette:
+    """Turn a library ``PaletteSpec`` (rendering/palettes.py) into a ColorPalette the builders understand."""
+    font = FONT_CHOICES.get(font_id, FONT_CHOICES[DEFAULT_FONT_ID])
+    return ColorPalette(
+        id=spec.id, name=spec.name, description=f"{spec.category} palette, {spec.mode} surface.",
+        bg_hex=spec.bg,           bg_rgb=_hex_to_rgb(spec.bg),
+        primary_hex=spec.primary, primary_rgb=_hex_to_rgb(spec.primary),
+        accent_hex=spec.accent,   accent_rgb=_hex_to_rgb(spec.accent),
+        card_bg_hex=spec.card,    card_bg_rgb=_hex_to_rgb(spec.card),
+        text_hex=spec.text,       text_rgb=_hex_to_rgb(spec.text),
+        subtext_hex=spec.subtext, subtext_rgb=_hex_to_rgb(spec.subtext),
+        heading_font=font["heading"] if font_id != DEFAULT_FONT_ID else "Poppins",
+        body_font=font["body"],
+    )
+
+
 def get_theme(theme_id: str) -> ColorPalette:
-    """Retrieve theme color palette by ID, defaulting to the bright default."""
-    return THEMES.get(theme_id, THEMES["canva_bright"])
+    """Retrieve a colour theme by id: a curated preset, or any of the 240 library palettes."""
+    if theme_id in THEMES:
+        return THEMES[theme_id]
+    from learnova.rendering.palettes import palette_by_id
+
+    spec = palette_by_id(theme_id)
+    return palette_to_theme(spec) if spec else THEMES["canva_bright"]
 
 def auto_detect_theme(topic_title: str) -> ColorPalette:
     """Pick a *bright* palette from title keywords (dark themes stay opt-in)."""
@@ -465,11 +488,25 @@ def auto_detect_theme(topic_title: str) -> ColorPalette:
     for words, tid in rules:
         if any(re.search(r"\b" + re.escape(w), t) for w in words):  # word start: 'art' must not match 'quarterly'
             return THEMES[tid]
+    try:                                    # no keyword hit: a stable, topic-aware pick from the 240-palette library
+        from learnova.rendering.palettes import pick_for_topic
+
+        spec = pick_for_topic(topic_title, mode="light")
+        if spec:
+            return palette_to_theme(spec)
+    except Exception:
+        pass
     return THEMES["canva_bright"]
 
 
 def resolve_theme(topic_title: str, theme_id: str = "auto",
                   theme_spec: dict | None = None) -> ColorPalette:
+    """Colours (preset, library palette, auto or custom) plus the structural template from ``theme_spec["template_id"]``."""
+    return with_template(_resolve_colors(topic_title, theme_id, theme_spec), (theme_spec or {}).get("template_id"))
+
+
+def _resolve_colors(topic_title: str, theme_id: str = "auto",
+                    theme_spec: dict | None = None) -> ColorPalette:
     """
     Turn a theme selection into a ColorPalette.
 
@@ -491,3 +528,10 @@ def resolve_theme(topic_title: str, theme_id: str = "auto",
     if theme_spec and theme_spec.get("font_id"):
         theme = apply_font(theme, theme_spec["font_id"])
     return theme
+
+
+def with_template(theme: ColorPalette, template_id: str | None) -> ColorPalette:
+    from learnova.rendering.templates import TEMPLATES, DEFAULT_TEMPLATE_ID
+
+    tid = template_id if template_id in TEMPLATES else DEFAULT_TEMPLATE_ID
+    return replace(theme, template_id=tid)

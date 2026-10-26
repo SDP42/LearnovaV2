@@ -22,28 +22,7 @@ from learnova.rendering.theme_engine import (
     ColorPalette, THEMES, LAYOUT_STYLES,
 )
 
-def _lum(rgb) -> float:
-    ch = []
-    for v in (rgb[0], rgb[1], rgb[2]):
-        c = v / 255.0
-        ch.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
-    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
-
-
-def _contrast(a, b) -> float:
-    la, lb = sorted((_lum(a), _lum(b)), reverse=True)
-    return (la + 0.05) / (lb + 0.05)
-
-
-def _readable(bg, prefer=None) -> RGBColor:
-    """Text colour that stays legible on ``bg``: ``prefer`` if it has contrast ≥ 4, else white/ink."""
-    if prefer is not None and _contrast(prefer, bg) >= 4.0:
-        return prefer
-    return RGBColor(0xFF, 0xFF, 0xFF) if _contrast(RGBColor(255, 255, 255), bg) >= _contrast(RGBColor(0x11, 0x14, 0x22), bg) else RGBColor(0x11, 0x14, 0x22)
-
-
-def _tint(rgb, t: float) -> RGBColor:
-    return RGBColor(int(rgb[0] + (255 - rgb[0]) * t), int(rgb[1] + (255 - rgb[1]) * t), int(rgb[2] + (255 - rgb[2]) * t))
+from learnova.rendering.pptx_chrome import _lum, _contrast, _readable, _tint, add_header, add_footer, add_title_slide
 
 
 def SubElement(parent, tagname, **kwargs):
@@ -100,42 +79,12 @@ def _add_slide_transition(slide, name: str = "none"):
 
 
 def _add_header_bar(slide, title_text: str, theme: ColorPalette):
-    header_bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(13.33), Inches(1.1))
-    header_bar.fill.solid()
-    header_bar.fill.fore_color.rgb = theme.primary_rgb
-    header_bar.line.fill.background()
-    strip = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(1.1), Inches(13.33), Inches(0.07))
-    strip.fill.solid(); strip.fill.fore_color.rgb = theme.accent_rgb
-    strip.line.fill.background()
-
-    title_box = slide.shapes.add_textbox(Inches(L.MARGIN_X), Inches(0.1), Inches(L.SLIDE_W - 2 * L.MARGIN_X), Inches(0.9))
-    tf = title_box.text_frame
-    tf.word_wrap = True
-    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-    tf.margin_left = tf.margin_right = 0
-    tf.text = title_text
-    p = tf.paragraphs[0]
-    p.font.size = Pt(L.fit_font_size([title_text], L.SLIDE_W - 2 * L.MARGIN_X, 0.85, max_pt=30, min_pt=15, bold=True))
-    p.font.bold = True
-    # accent text only when it genuinely contrasts with the bar; otherwise the readable colour
-    p.font.color.rgb = _readable(theme.primary_rgb, prefer=theme.accent_rgb)
+    add_header(slide, title_text, theme)
 
 
 def _add_footer(slide, n: int, total: int, theme: ColorPalette):
     """Footer band: identical position on every slide, text edges on the 0.5in margins."""
-    w = 3.0
-    for text, x, align, bold in (("Learnova", L.MARGIN_X, PP_ALIGN.LEFT, True),
-                                 (f"{n} / {total}", L.SLIDE_W - L.MARGIN_X - w, PP_ALIGN.RIGHT, False)):
-        tb = slide.shapes.add_textbox(Inches(x), Inches(L.FOOTER_Y), Inches(w), Inches(L.FOOTER_H))
-        tf = tb.text_frame
-        tf.margin_left = tf.margin_right = 0
-        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        tf.text = text
-        para = tf.paragraphs[0]
-        para.alignment = align
-        para.font.size = Pt(10)
-        para.font.bold = bold
-        para.font.color.rgb = theme.subtext_rgb
+    add_footer(slide, n, total, theme)
 
 
 def _add_takeaway_bar(slide, rows, theme: ColorPalette):
@@ -384,41 +333,15 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(13.33), Inches(7.5)
 
-    # ── Title slide ───────────────────────────────────────────────────────────
-    title_slide = prs.slides.add_slide(prs.slide_layouts[6])
-    title_slide.background.fill.solid()
-    title_slide.background.fill.fore_color.rgb = theme.primary_rgb
-    _on_p = _readable(theme.primary_rgb)
-    for d, col, x, y in ((6.2, _tint(theme.accent_rgb, 0.1), 9.4, 3.9), (3.4, _tint(theme.primary_rgb, 0.25), 8.2, -1.4),
-                         (1.6, _tint(theme.accent_rgb, 0.5), 11.6, 0.6)):
-        o = title_slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(d), Inches(d))
-        o.fill.solid(); o.fill.fore_color.rgb = col
-        o.line.fill.background()
-    try:
+    # ── Title slide (template-driven) ─────────────────────────────────────────
+    def _hero(kind: str) -> bytes:
         from learnova.ai.image_gen import vector_illustration
-        from learnova.rendering.pptx_visuals import _Canvas
         from learnova.visuals.icons import pick_icons
 
         _seed_text = topic_title + " " + " ".join(str((d.get("improved") or {}).get("title", "")) for d in slides_data[:6])
-        _hero = vector_illustration(pick_icons(_seed_text, 5), theme.primary_hex, theme.accent_hex, topic_title, kind="panel", width=800)
-        _Canvas(title_slide, theme, L.content_band(has_takeaway=False)).picture(_hero, 8.85, 0.95, 3.95, 4.94)
-    except Exception:
-        pass
-    bar = title_slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.9), Inches(2.0), Inches(1.4), Inches(0.14))
-    bar.fill.solid(); bar.fill.fore_color.rgb = theme.accent_rgb
-    bar.line.fill.background()
-    tbox = title_slide.shapes.add_textbox(Inches(0.8), Inches(2.3), Inches(8.6), Inches(2.6))
-    tf1 = tbox.text_frame
-    tf1.word_wrap = True
-    tf1.vertical_anchor = MSO_ANCHOR.TOP
-    tf1.text = topic_title
-    tf1.paragraphs[0].font.size = Pt(54 if len(topic_title) < 28 else 40 if len(topic_title) < 55 else 32)
-    tf1.paragraphs[0].font.bold = True
-    tf1.paragraphs[0].font.color.rgb = _on_p
-    sub = title_slide.shapes.add_textbox(Inches(0.9), Inches(5.0), Inches(8), Inches(0.5)).text_frame
-    sub.text = f"{len(slides_data)} slides  •  made with Learnova"
-    sub.paragraphs[0].font.size = Pt(18)
-    sub.paragraphs[0].font.color.rgb = _readable(theme.primary_rgb, prefer=_tint(theme.primary_rgb, 0.7))
+        return vector_illustration(pick_icons(_seed_text, 5), theme.primary_hex, theme.accent_hex, topic_title, kind=kind, width=800)
+
+    title_slide = add_title_slide(prs, theme, topic_title, len(slides_data), _hero)
 
     # ── Content slides ────────────────────────────────────────────────────────
     prev_style = None

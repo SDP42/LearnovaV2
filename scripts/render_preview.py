@@ -3,6 +3,7 @@ Render a deck to images so layout can be inspected without opening PowerPoint.
 
     python scripts/render_preview.py demo/sample_syllabus.md [theme_id] [max_slides]
     python scripts/render_preview.py ~/Desktop/some.pdf
+    python scripts/render_preview.py demo/sample_ml.md auto 6 template=editorial   # structural template
 
 Writes demo/output/preview.pptx, preview.pdf, preview_sheet.png (contact sheet) and preview_NN.png (one per slide,
 first ``max_slides``). Needs LibreOffice (``soffice``) for the PDF step.
@@ -21,10 +22,12 @@ apply_runtime_env()
 from learnova.parsers.markdown_converter import from_typed_text  # noqa: E402
 from learnova.pipeline.orchestrator import PipelineConfig, generate, run_all  # noqa: E402
 
-src = pathlib.Path(sys.argv[1]).expanduser()
-theme = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].isdigit() else "auto"
-limit = int(sys.argv[-1]) if sys.argv[-1].isdigit() else 12
-cfg = PipelineConfig(theme_id=theme, enable_quizzes=True, quiz_frequency=3, enable_enhancement=False, enable_vision_ocr=False)
+src = pathlib.Path([a for a in sys.argv[1:] if "=" not in a][0]).expanduser()
+_opts = {a.split("=", 1)[0]: a.split("=", 1)[1] for a in sys.argv[1:] if "=" in a}
+_pos = [a for a in sys.argv[1:] if "=" not in a]
+theme = _pos[1] if len(_pos) > 1 and not _pos[1].isdigit() else "auto"
+limit = int(_pos[-1]) if _pos[-1].isdigit() else 12
+cfg = PipelineConfig(theme_id=theme, theme_spec=({"template_id": _opts["template"]} if "template" in _opts else None), enable_quizzes=True, quiz_frequency=3, enable_enhancement=False, enable_vision_ocr=False)
 res = run_all(str(src), config=cfg) if src.suffix.lower() in {".pdf", ".pptx"} else generate(from_typed_text(src.read_text(), src.stem), cfg)
 
 out = ROOT / "demo" / "output"

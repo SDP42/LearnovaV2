@@ -239,10 +239,12 @@ class ThemeSpec(BaseModel):
     background: Optional[str] = None
     font_id: Optional[str] = None
     name: Optional[str] = None
+    template_id: Optional[str] = None
 
 
 class GenerateRequest(BaseModel):
-    theme_id: str = "auto"
+    theme_id: str = "auto"                 # "auto", a curated preset, or any palette id from /api/palettes
+    template_id: Optional[str] = None      # structural template from /api/templates (header, title slide, cards, footer)
     theme_spec: Optional[ThemeSpec] = None
     quiz_frequency: int = 4
     quiz_positions: Optional[list[int]] = None
@@ -264,7 +266,10 @@ class GenerateRequest(BaseModel):
 
 
 def _config_from(request: GenerateRequest, textbook_mode: bool = False) -> PipelineConfig:
-    spec = request.theme_spec.model_dump(exclude_none=True) if request.theme_spec else None
+    spec = request.theme_spec.model_dump(exclude_none=True) if request.theme_spec else {}
+    if request.template_id:
+        spec = {**spec, "template_id": request.template_id}
+    spec = spec or None
     return PipelineConfig(
         theme_id=request.theme_id,
         theme_spec=spec or None,
@@ -312,9 +317,31 @@ def config_status() -> dict:
     }
 
 
+@app.get("/api/palettes")
+def palettes(q: str = "", category: str = "", mode: str = "", limit: int = 60, offset: int = 0) -> dict:
+    """The 240-palette library, searchable (name, category, mode) and paged. Every palette is contrast-checked."""
+    from learnova.rendering.palettes import CATEGORIES, search_palettes
+
+    limit = max(1, min(240, limit))
+    found = search_palettes(q=q, category=category, mode=mode)
+    return {"total": len(found), "offset": offset, "limit": limit, "categories": CATEGORIES,
+            "palettes": [p.to_dict() for p in found[max(0, offset): max(0, offset) + limit]]}
+
+
+@app.get("/api/templates")
+def templates() -> dict:
+    from learnova.rendering.templates import DEFAULT_TEMPLATE_ID, list_templates
+
+    return {"default": DEFAULT_TEMPLATE_ID, "templates": list_templates()}
+
+
 @app.get("/api/themes")
 def themes() -> dict:
+    from learnova.rendering.palettes import CATEGORIES, PALETTES
+    from learnova.rendering.templates import list_templates
+
     return {
+        "palette_total": len(PALETTES), "palette_categories": CATEGORIES, "templates": list_templates(),
         "themes": [{"id": "auto", "name": "Auto-Detect from Topic"}]
         + [
             {

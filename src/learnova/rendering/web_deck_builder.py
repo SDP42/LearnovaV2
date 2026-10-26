@@ -266,6 +266,41 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
     slides_html_list = []
 
+    from learnova.rendering.templates import get_template as _get_template
+
+    tpl = _get_template(getattr(theme, "template_id", None))
+    _upper = "uppercase" if tpl.title_case == "upper" or tpl.id in {"classic", "bold"} else "none"
+    _hd_font = f"font-family:'{theme.heading_font}',sans-serif;"
+
+    def _slide_header(title_html: str) -> str:
+        """Header treatment per template (mirrors pptx_chrome.add_header)."""
+        if tpl.header == "bar":
+            return (f'<div style="background:{theme.primary_hex};border-bottom:6px solid {theme.accent_hex};border-radius:{max(0, round(tpl.card_radius * 40))}px;'
+                    f'padding:12px 22px;margin-bottom:12px;"><h2 style="color:{_on_color(theme.primary_hex)};{_hd_font}font-size:2rem;margin:0;text-transform:{_upper};">{title_html}</h2></div>')
+        if tpl.header == "side":
+            return (f'<div style="border-left:12px solid {theme.primary_hex};padding:2px 0 2px 18px;margin-bottom:10px;">'
+                    f'<h2 style="color:{theme.primary_hex};{_hd_font}font-size:2rem;margin:0;text-transform:{_upper};">{title_html}</h2></div>')
+        if tpl.header == "ribbon":
+            return (f'<div style="margin-bottom:12px;"><h2 style="display:inline-block;background:{theme.primary_hex};color:{_on_color(theme.primary_hex)};'
+                    f'{_hd_font}font-size:1.7rem;margin:0;padding:8px 26px;border-radius:999px;text-transform:{_upper};">{title_html}</h2></div>')
+        if tpl.header == "plain":
+            return (f'<div style="border-bottom:1px solid {theme.subtext_hex}55;padding-bottom:8px;margin-bottom:8px;">'
+                    f'<h2 style="color:{theme.primary_hex};{_hd_font}font-size:2.1rem;margin:0;text-transform:{_upper};">{title_html}</h2></div>')
+        return (f'<div style="border-bottom:3px solid {theme.primary_hex};padding-bottom:8px;margin-bottom:6px;">'      # underline
+                f'<h2 style="color:{theme.primary_hex};{_hd_font}font-size:2rem;margin:0;text-transform:{_upper};">{title_html}</h2></div>')
+
+    _title_light = tpl.title_layout in {"centered", "left_band"}
+    _t_bg = theme.bg_hex if _title_light else theme.primary_hex
+    _t_ink = theme.primary_hex if _title_light else _on_color(theme.primary_hex)
+    _t_align = "center" if tpl.title_layout == "centered" else "left"
+    _t_deco = ""
+    if tpl.title_layout == "poster":
+        _t_deco = f'<div style="position:absolute;right:0;bottom:0;width:260px;height:110px;background:{theme.accent_hex};"></div>'
+    elif tpl.title_layout == "frame":
+        _t_deco = f'<div style="position:absolute;inset:18px;border:3px solid {theme.accent_hex};pointer-events:none;"></div>'
+    elif tpl.title_layout == "left_band":
+        _t_deco = f'<div style="position:absolute;left:0;top:0;bottom:0;width:26%;background:{theme.primary_hex};border-right:8px solid {theme.accent_hex};"></div>'
+
     # Title slide — same design language as the PowerPoint: solid brand field, hero illustration, accent rule.
     try:
         import base64 as _b64
@@ -280,18 +315,24 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     except Exception:
         _hero = ""
     _n_content = sum(1 for d in slides_data if str((d.get("improved") or {}).get("layout_type", "")).upper() != "QUIZ")
+    _h1_size = "5rem" if tpl.title_layout == "poster" else "3.9rem"
+    _h1_tt = "uppercase" if tpl.title_case == "upper" else "none"
+    _sub_ink = theme.subtext_hex if _title_light else _on_color(theme.primary_hex)
+    _hero_flex = "" if tpl.title_layout == "centered" else f'<div style="flex:0 0 {30 if tpl.title_layout == "left_band" else 34}%;">{_hero}</div>'
+    _pad_left = "30%" if tpl.title_layout == "left_band" else "0"
     slides_html_list.append(f"""
-    <section data-background-color="{theme.primary_hex}" class="title-slide">
-        <div style="display:flex;align-items:center;gap:48px;min-height:620px;">
+    <section data-background-color="{_t_bg}" class="title-slide" style="position:relative;">
+        {_t_deco}
+        <div style="position:relative;display:flex;align-items:center;gap:48px;min-height:620px;padding-left:{_pad_left};text-align:{_t_align};">
             <div style="flex:1 1 58%;min-width:0;">
-                <div style="width:96px;height:10px;border-radius:5px;background:{theme.accent_hex};margin-bottom:26px;"></div>
-                <h1 style="color:{_on_color(theme.primary_hex)};font-family:'{theme.heading_font}',sans-serif;font-size:3.9rem;line-height:1.05;margin:0 0 22px;text-transform:none;">
+                <div style="width:96px;height:10px;border-radius:5px;background:{theme.accent_hex};margin:0 {'auto' if _t_align == 'center' else '0'} 26px;"></div>
+                <h1 style="color:{_t_ink};{_hd_font}font-size:{_h1_size};line-height:1.05;margin:0 0 22px;text-transform:{_h1_tt};">
                     {html.escape(topic_title)}
                 </h1>
-                <h3 style="color:{_on_color(theme.primary_hex)};opacity:.78;font-size:1.35rem;font-weight:500;margin:0;">{_n_content} slides &nbsp;•&nbsp; made with Learnova</h3>
-                <p style="color:{_on_color(theme.primary_hex)};opacity:.6;font-size:.95rem;margin-top:44px;">Press <strong>Space</strong> or <strong>→</strong> to begin</p>
+                <h3 style="color:{_sub_ink};opacity:.78;font-size:1.35rem;font-weight:500;margin:0;">{_n_content} slides &nbsp;•&nbsp; made with Learnova</h3>
+                <p style="color:{_sub_ink};opacity:.6;font-size:.95rem;margin-top:44px;">Press <strong>Space</strong> or <strong>→</strong> to begin</p>
             </div>
-            <div style="flex:0 0 34%;">{_hero}</div>
+            {_hero_flex}
         </div>
     </section>
     """)
@@ -575,9 +616,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
         slides_html_list.append(f"""
         <section data-transition="{slide_transition}"{' data-force-build="1"' if force_build else ''} style="text-align:left;">
-            <div style="border-bottom:3px solid {theme.primary_hex}; padding-bottom:8px; margin-bottom:6px;">
-                <h2 style="color:{theme.primary_hex}; font-family:'{theme.heading_font}', sans-serif; font-size:2rem; margin:0; text-transform:uppercase;">{title_text}{step_badge}</h2>
-            </div>
+            {_slide_header(title_text + step_badge)}
             <div class="lv-body lv-anim">
             {body_inner}
             </div>
@@ -607,6 +646,9 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         }}
         /* Every slide fills the stage so a light slide isn't a small block
            floating in the middle of a big empty canvas. */
+        .reveal .lv-body [style*="border-radius"]:not([style*="border-radius:50%"]):not([style*="border-radius:999px"]):not([style*="border-radius:12px;padding:1px"]) {{
+            border-radius: {max(0, round(tpl.card_radius * 70))}px !important;
+        }}
         .reveal .slides > section {{
             min-height: 690px;
             box-sizing: border-box;
