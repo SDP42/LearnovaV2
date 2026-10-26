@@ -126,7 +126,7 @@ def _on_color(hex_color: str) -> str:
     return '#ffffff' if (0.299 * r + 0.587 * g + 0.114 * b) < 150 else '#111827'
 
 
-def _image_html(orig: dict, theme) -> str:
+def _image_html(orig: dict, theme, big: bool = False) -> str:
     """
     Render an extracted figure as an inline data-URI <img>. The image policy can
     only *hide* a figure it is confident is decoration (DROP); a redraw-as-
@@ -167,7 +167,8 @@ def _image_html(orig: dict, theme) -> str:
         return (
             f'<figure style="margin:6px auto 0;max-width:100%;text-align:center;">'
             f'<img src="data:image/{mime};base64,{b64}" '
-            f'style="max-width:100%;max-height:300px;border-radius:8px;'
+            f'onclick="lvZoom(this)" title="Click to enlarge" '
+            f'style="max-width:100%;max-height:{520 if big else 300}px;border-radius:10px;cursor:zoom-in;background:#fff;padding:{10 if big else 0}px;'
             f'border:1px solid {theme.primary_hex}33;" alt="figure{badge}"/>'
             f'{cap_html}</figure>'
         )
@@ -358,7 +359,8 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         takeaway_text = html.escape(_tk_raw)
 
         sp = deck_plan.by_index(idx - 1) if deck_plan is not None else None
-        image_block = _image_html(orig, theme)
+        _is_figure = bool(sp and getattr(sp, "family", "") == "FIGURE")
+        image_block = "" if _is_figure else _image_html(orig, theme)
         slide_transition = sp.transition if sp else "slide"
         frag_map = _fragment_index_for(idx - 1, sp.animation if sp else None)
 
@@ -524,6 +526,10 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                     f'border:2px solid {theme.primary_hex};border-radius:8px;">'
                     f'<div class="mermaid" style="font-size:0.8rem;">{escaped_mermaid}</div></div>'
                 )
+
+        # ── 4b. FIGURE — the slide is a picture: big, zoomable, never redrawn ─
+        elif _is_figure:
+            slide_body = f'<div style="margin-top:14px;">{_image_html(orig, theme, big=True)}</div>'
 
         # ── 5. EXPANDED VISUAL FAMILIES (from the Deck Director) ─────────────
         elif sp and getattr(sp, "family", None) and getattr(sp, "data", None) and _family_block(
@@ -913,6 +919,21 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                 else {{ window.__enableBuilds(); this.textContent = 'show all'; }}
             }});
         }})();
+
+        // Click a figure to see it full screen; click again (or Esc) to close.
+        function lvZoom(img) {{
+            var o = document.createElement('div');
+            o.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,14,10,.86);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+            var big = document.createElement('img');
+            big.src = img.src;
+            big.style.cssText = 'max-width:94vw;max-height:94vh;background:#fff;border-radius:10px;padding:10px;';
+            o.appendChild(big);
+            var close = function () {{ o.remove(); document.removeEventListener('keydown', onKey, true); }};
+            var onKey = function (e) {{ if (e.key === 'Escape') {{ e.stopPropagation(); close(); }} }};
+            o.addEventListener('click', close);
+            document.addEventListener('keydown', onKey, true);
+            document.body.appendChild(o);
+        }}
 
         // Checkpoint quiz: mark the picked option, reveal the explanation.
         // Locks after the first pick so the answer is not a click-through.

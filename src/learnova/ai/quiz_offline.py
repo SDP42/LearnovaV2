@@ -130,14 +130,25 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
 def _cloze(idx: int, title: str, bullets: List[str], pool_words: List[str]) -> Optional[Dict[str, Any]]:
     tw = {w.lower() for w in _WORD.findall(title)}
     for s in bullets:
-        cands = [w for w in _WORD.findall(s) if w.lower() not in _STOP and w.lower() not in tw]
-        if len(s.split()) >= 6 and cands:
-            key = max(cands, key=len)
-            blanked = re.sub(rf"\b{re.escape(key)}\b", "_____", s, count=1)
-            near = sorted({w for w in pool_words if w.lower() != key.lower() and abs(len(w) - len(key)) <= 3}, key=lambda w: (abs(len(w) - len(key)), w))
-            q = _make(f"{idx}:{title}:cloze", f"Fill in the blank: “{_clip(blanked, 26)}”", key, near, f"“{s.rstrip('.')}.”", "recall")
-            if q:
-                return q
+        text = s.strip()
+        if (len(text.split()) < 8 or text.endswith(":") or re.search(r"\b(?:following|below|above|e\.g\.|i\.e\.)\b", text, re.I)
+                or not re.search(r"[.!?]$", text)):
+            continue                                              # a lead-in, a list header or a fragment makes a bad question
+        words = _WORD.findall(text)
+        cands = [w for i, w in enumerate(words) if w.lower() not in _STOP and w.lower() not in tw and len(w) >= 5 and i > 0]
+        if not cands:
+            continue
+
+        def score(w: str) -> float:
+            i = words.index(w)
+            return len(w) + (3 if w[:1].isupper() and i > 0 else 0) + (3 if "-" in w or any(ch.isdigit() for ch in w) else 0) - (2 if w.lower().endswith(("ly", "ing")) else 0)
+
+        key = max(cands, key=score)
+        blanked = re.sub(rf"\b{re.escape(key)}\b", "_____", text, count=1)
+        near = sorted({w for w in pool_words if w.lower() != key.lower() and abs(len(w) - len(key)) <= 3}, key=lambda w: (abs(len(w) - len(key)), w))
+        q = _make(f"{idx}:{title}:cloze", f"Fill in the blank: “{_clip(blanked, 26)}”", key, near, f"“{text.rstrip('.')}.”", "recall")
+        if q:
+            return q
     return None
 
 

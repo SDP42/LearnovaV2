@@ -126,6 +126,48 @@ def _add_takeaway_bar(slide, rows, theme: ColorPalette):
         r2 = para.add_run(); r2.text = str(txt)
         r2.font.size = Pt(size); r2.font.color.rgb = ink; r2.font.bold = len(rows) == 1
 
+def _draw_figure_in_band(slide, theme: ColorPalette, band, image_bytes: bytes, caption: str = "") -> bool:
+    """A source figure fitted into the content band inside a soft frame, centred, with an optional one-line caption."""
+    try:
+        from PIL import Image
+
+        with Image.open(io.BytesIO(image_bytes)) as im:
+            iw, ih = im.size
+        cap_h = 0.45 if caption else 0.0
+        pad = 0.18
+        box_w, box_h = band.width, band.height - cap_h
+        scale = min((box_w - 2 * pad) / iw, (box_h - 2 * pad) / ih)
+        dw, dh = iw * scale, ih * scale
+        fx, fy, fw, fh = band.left + (box_w - dw) / 2 - pad, band.top + (box_h - dh) / 2 - pad, dw + 2 * pad, dh + 2 * pad
+        with vis_group(slide):
+            frame = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(fx), Inches(fy), Inches(fw), Inches(fh))
+            try:
+                frame.adjustments[0] = 0.03
+            except Exception:
+                pass
+            frame.fill.solid()
+            frame.fill.fore_color.rgb = RGBColor(255, 255, 255)
+            frame.line.color.rgb = _tint(theme.primary_rgb, 0.6)
+            frame.line.width = Pt(1)
+            frame.shadow.inherit = False
+            slide.shapes.add_picture(io.BytesIO(image_bytes), Inches(fx + pad), Inches(fy + pad), Inches(dw), Inches(dh))
+        if caption:
+            with vis_group(slide):
+                tb = slide.shapes.add_textbox(Inches(band.left), Inches(band.top + box_h + 0.05), Inches(band.width), Inches(cap_h - 0.05))
+                tf = tb.text_frame
+                tf.word_wrap = True
+                tf.margin_left = tf.margin_right = 0
+                p = tf.paragraphs[0]
+                p.text = caption
+                p.alignment = PP_ALIGN.CENTER
+                p.font.size = Pt(13)
+                p.font.italic = True
+                p.font.color.rgb = theme.subtext_rgb
+        return True
+    except Exception:
+        return False
+
+
 def _add_figure_slide(prs, theme: ColorPalette, title_text: str, image_bytes: bytes,
                       caption: str = "") -> bool:
     """
@@ -393,9 +435,13 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         _add_header_bar(slide, title_text, theme)
         _add_footer(slide, idx + 1, len(slides_data), theme)
 
-        # ── 0. CONTENT-ENGINE VISUAL — wins over the older layout guesses, as in the web deck
+        # ── 0a. FIGURE — the slide is a picture (diagram / table image from the source): large, framed, with its caption
         _family_drawn = False
-        if (_sp and getattr(_sp, "family", None) and getattr(_sp, "data", None)
+        if _sp is not None and getattr(_sp, "family", "") == "FIGURE" and (orig.get("image") or {}).get("bytes"):
+            _family_drawn = _draw_figure_in_band(slide, theme, band, orig["image"]["bytes"], str((_sp.data or {}).get("caption", "")))
+
+        # ── 0. CONTENT-ENGINE VISUAL — wins over the older layout guesses, as in the web deck
+        if (not _family_drawn and _sp and getattr(_sp, "family", None) and getattr(_sp, "data", None)
                 and getattr(_sp, "confidence", 0) >= 0.62 and layout_type != "QUIZ"
                 and not (layout_type == "TABLE" and imp.get("table_rows"))):
             from learnova.rendering.pptx_visuals import draw_family

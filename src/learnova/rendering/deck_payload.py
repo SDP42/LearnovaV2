@@ -45,7 +45,7 @@ def slides_payload(final_deck: List[dict]) -> List[Dict[str, Any]]:
             "visual_source": improved.get("visual_source", "router"),
             "continued": bool(improved.get("continued")),
             "has_image": bool(original.get("image")),
-            "source_text": original.get("text", ""),
+            "source_text": original.get("text", "") or original.get("figure_text", ""),
             "family": getattr(sp, "family", None) or improved.get("family"),
             "variant": getattr(sp, "variant", None),
             "treatment": getattr(sp, "treatment", None),

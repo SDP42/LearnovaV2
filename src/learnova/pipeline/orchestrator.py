@@ -304,6 +304,14 @@ def generate(
         # One section becomes one slide; the density stage decides how much
         # fits and paginates the rest. Without this, a 22-paragraph section
         # produced 22 near-empty slides sharing one title.
+        meta = markdown_doc.meta or {}
+        if meta.get("slide_pages"):
+            from learnova.pipeline.slide_chunks import chunks_from_pages, md_fingerprint
+
+            if meta.get("md_sha") == md_fingerprint(markdown_doc.markdown):        # unedited: use the structured pages
+                result.chunks = chunks_from_pages(meta["slide_pages"])
+                logger.info("slide deck: %d slides kept page by page", len(result.chunks))
+                return len(result.chunks)
         merged = merge_chunks_by_section(chunk_parsed_data(result.parsed_units))
 
         # A section that enumerates phases / methods / types where each item has
@@ -407,7 +415,7 @@ def generate(
             result.improved = preserve_chunks(result.chunks)
             paginate_tables(result.improved)
             _cap = {"compact": 170, "balanced": 130, "detailed": 95}.get(config.slide_detail, 130)
-            _pages = int((markdown_doc.meta or {}).get("pages") or 0)
+            _pages = int((markdown_doc.meta or {}).get("pages") or 0) if not (markdown_doc.meta or {}).get("slide_pages") else 0   # a slide deck keeps its own length
             # a report's length sets the deck's length: ~1 / 1.5 / 2.2 slides per source page for compact / balanced / detailed
             _target = round(_pages * {"compact": 1.0, "balanced": 1.5, "detailed": 2.2}.get(config.slide_detail, 1.5)) if _pages >= 4 else None
             plan_to_budget(result.improved, _cap, _target)

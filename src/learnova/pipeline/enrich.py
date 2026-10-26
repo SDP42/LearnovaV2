@@ -209,6 +209,8 @@ def agenda_slide(entries: List[dict], minimum_sections: int = 4, max_items: int 
     """An opening "Agenda" roadmap: the deck's own section titles, in order."""
     import copy
 
+    if any(re.match(r"^\s*(?:content|contents|agenda|outline|syllabus|topics|table of contents)\s*:?\s*$", str((e.get("improved") or {}).get("title", "")), re.I) for e in entries):
+        return 0               # the source already opens with its own contents slide
     titles: List[str] = []
     for e in entries:
         imp = e.get("improved") or {}

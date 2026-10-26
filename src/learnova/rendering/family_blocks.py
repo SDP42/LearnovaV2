@@ -726,6 +726,32 @@ def _prose(data: Dict[str, Any], theme) -> Optional[str]:
             f'<div style="font-size:.7rem;font-weight:800;letter-spacing:.1em;color:{theme.subtext_hex};">AT A GLANCE</div>{chips}</div></div>')
 
 
+def _outline(data: Dict[str, Any], theme) -> Optional[str]:
+    """Nested bullets as grouped cards, each card revealing on its own click; childless siblings as chips."""
+    groups = [g for g in (data.get("groups") or []) if g.get("heading")][:6]
+    if not groups:
+        return None
+    chips = [str(x) for x in (data.get("chips") or []) if str(x).strip()][:12]
+    n = len(groups)
+    cols = n if n <= 3 else 3 if n in (5, 6) else 2
+    cards = ""
+    for i, g in enumerate(groups):
+        items = "".join(
+            f'<li style="margin:0 0 5px;{"margin-left:14px;list-style:circle;color:" + theme.subtext_hex + ";" if str(it).startswith("– ") else ""}">{_esc(str(it)[2:] if str(it).startswith("– ") else str(it))}</li>'
+            for it in (g.get("items") or []))
+        cards += (f'<div data-el="el.{i + (1 if data.get("lead") else 0)}" data-build="{i + (1 if data.get("lead") else 0)}" style="background:{theme.card_bg_hex};border:1px solid {theme.primary_hex}2e;border-radius:16px;'
+                  f'padding:16px 18px;border-top:5px solid {theme.accent_hex};">'
+                  f'<div style="font-weight:800;color:{theme.primary_hex};font-size:1.12rem;margin-bottom:8px;">{_esc(str(g["heading"]))}</div>'
+                  f'<ul style="margin:0;padding-left:18px;font-size:.98rem;line-height:1.45;color:{theme.text_hex};">{items}</ul></div>')
+    lead = (f'<div data-el="el.0" data-build="0" style="display:flex;gap:14px;margin:6px 0 16px;"><div style="flex:none;width:6px;border-radius:3px;background:{theme.accent_hex};"></div>'
+            f'<div><div style="font-weight:700;font-size:1.35rem;line-height:1.3;color:{theme.primary_hex};">{_esc(str(data.get("lead", "")))}</div>'
+            + "".join(f'<div style="font-size:1rem;line-height:1.5;color:{theme.text_hex};margin-top:6px;">{_esc(str(m))}</div>' for m in (data.get("lead_more") or [])) + '</div></div>') if data.get("lead") else ""
+    k0 = n + (1 if data.get("lead") else 0)
+    chip_html = (f'<div data-el="el.{k0}" data-build="{k0}" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">' +
+                 "".join(f'<span style="background:{theme.primary_hex}14;border:1px solid {theme.primary_hex}44;color:{theme.primary_hex};border-radius:999px;padding:6px 14px;font-weight:700;font-size:.9rem;">{_esc(c)}</span>' for c in chips) + "</div>") if chips else ""
+    return f'<div style="margin-top:10px;">{lead}<div style="display:grid;grid-template-columns:repeat({cols},1fr);gap:14px;">{cards}</div>{chip_html}</div>'
+
+
 def _sections(data: Dict[str, Any], theme) -> Optional[str]:
     """Short sibling subsections side by side: each keeps its own heading, lead sentence and text — no boxes."""
     secs = (data.get("sections") or [])[:3]
@@ -1028,6 +1054,7 @@ _BUILDERS = {
     "COMPARE_TABLE": _compare_table,
     "MATRIX_GRID": _matrix_2x2,
     "MIND_MAP": _mind_map,
+    "OUTLINE": _outline,
     "CHART_CATEGORICAL": _bar_chart,
     "CHART_RANKING": _bar_chart,
     "CHART_TREND": _line_chart,

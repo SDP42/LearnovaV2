@@ -61,7 +61,7 @@ class MarkdownDocument:
             "source_type": self.source_type,
             "converter": self.converter,
             "asset_count": len(self.assets),
-            "meta": self.meta,
+            "meta": {k: v for k, v in self.meta.items() if k != "slide_pages"},
         }
 
 
@@ -781,6 +781,24 @@ def _convert_to_markdown_impl(
     if use_cache and cache_file.exists():
         cached_markdown = cache_file.read_text(encoding="utf-8")
         logger.info("markdown cache hit for %s", name)
+
+    # A slide deck exported to PDF is read page by page with its structure (bullet nesting, tables, figures) intact.
+    if ext == ".pdf" and not textbook_mode and is_slide_style_pdf(str(file_path)):
+        try:
+            from learnova.parsers.slide_pdf import pages_to_markdown, read_slide_pdf
+
+            deck = read_slide_pdf(str(file_path))
+            if deck and sum(1 for p in deck["pages"] if p["items"] or p["tables"] or p["figure"]) >= 3:
+                md = pages_to_markdown(deck["pages"])
+                if md.strip():
+                    logger.info("%s is a slide deck PDF — structured page-per-slide reader (%d pages)", name, len(deck["pages"]))
+                    return MarkdownDocument(
+                        markdown=md, source_name=name, source_type="pdf", converter="slide-pdf", assets=[],
+                        meta={"slide_pages": deck["pages"], "deck_title": deck["title"], "deck_subtitle": deck["subtitle"],
+                              "pages": len(deck["pages"]), "md_sha": __import__("learnova.pipeline.slide_chunks", fromlist=["x"]).md_fingerprint(md)},
+                    )
+        except Exception:
+            logger.warning("slide reader failed — using the general converter", exc_info=True)
 
     assets: List[dict] = []
     if extract_images:

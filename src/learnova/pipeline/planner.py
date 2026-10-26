@@ -54,10 +54,12 @@ def preserve_chunks(chunks: List[dict]) -> List[dict]:
     for c in chunks:
         text = (c.get("text") or "").strip()
         title = (c.get("title") or "").strip() or "Overview"
-        entries.append({
-            "original": c,
-            "improved": {"layout_type": "MINIMAL_TEXT", "title": title, "bullets": _prose_bullets(text), "takeaway": "", "verbatim": []},
-        })
+        outline = [o for o in (c.get("outline") or []) if str(o.get("text", "")).strip()]
+        bullets = [str(o["text"]).strip() for o in outline] if outline else _prose_bullets(text)
+        imp = {"layout_type": "MINIMAL_TEXT", "title": title, "bullets": bullets, "takeaway": "", "verbatim": []}
+        if outline:
+            imp["outline"] = [{"level": int(o.get("level", 0)), "text": str(o["text"]).strip()} for o in outline]
+        entries.append({"original": c, "improved": imp})
     return entries
 
 
@@ -123,7 +125,7 @@ def _words_of(e: dict) -> int:
 def _mergeable(e: dict) -> bool:
     imp = e.get("improved") or {}
     return bool(_section_of(e)) and not _is_table_entry(e) and not imp.get("is_overview") and not imp.get("part") \
-        and not imp.get("is_glossary") and not imp.get("merged")
+        and not imp.get("is_glossary") and not imp.get("merged") and not (e.get("original") or {}).get("slide_kind")
 
 
 def _pack_siblings(entries: List[dict], max_words: int) -> List[dict]:
@@ -174,6 +176,9 @@ def _drop_empty_headings(entries: List[dict]) -> List[dict]:
         body = _norm(" ".join(map(str, imp.get("bullets") or [])))
         if body and body == _norm(imp.get("title", "")) and not _is_table_entry(e):
             continue                    # a heading that only repeats itself ("# Sorting Algorithms") is the deck title, not a slide
+        if (e.get("original") or {}).get("slide_kind"):
+            out.append(e)                # a slide from a slide deck is a slide, however short
+            continue
         if (not _is_table_entry(e) and _words_of(e) < 8 and nxt is not None and _section_of(e)
                 and _section_of(nxt) == _section_of(e) and not imp.get("is_glossary")):
             continue
@@ -208,6 +213,9 @@ def plan_slides(entries: List[dict], max_words: int = MAX_WORDS) -> int:
             title = base if k == 0 else f"{base}: {label}"
             e["improved"] = {"layout_type": "MINIMAL_TEXT", "title": _unique(title, used), "bullets": g, "takeaway": "",
                              "verbatim": [], "part": [k + 1, len(groups)], "short": sum(_wc(x) for x in g) < SHORT_WORDS}
+            if imp.get("outline"):
+                gs = set(g)
+                e["improved"]["outline"] = [o for o in imp["outline"] if o["text"] in gs]
             out.append(e)
         if len(groups) >= 4 and len(entries) < 40:  # a map of the parts, placed before them (short decks only)
             ov = copy.deepcopy(entry)
@@ -222,7 +230,8 @@ def plan_slides(entries: List[dict], max_words: int = MAX_WORDS) -> int:
     for e in out:
         imp = e.get("improved") or {}
         bl = imp.get("bullets") or []
-        if not bl and "[TABLE DATA]" not in str((e.get("original") or {}).get("text") or "") and not imp.get("is_overview"):
+        if (not bl and "[TABLE DATA]" not in str((e.get("original") or {}).get("text") or "") and not imp.get("is_overview")
+                and not (e.get("original") or {}).get("image")):          # a figure-only slide (a diagram or table picture) is a slide
             continue
         final.append(e)
     delta = len(final) - len(entries)

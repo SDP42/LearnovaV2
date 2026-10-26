@@ -77,7 +77,7 @@ def _cap(s: str) -> str:
     return s[:1].upper() + s[1:] if s else s
 
 
-_DANGLE = {"favours", "favors", "gives", "makes", "causes", "leads", "shows", "has", "have", "can", "will", "may", "must", "should",
+_DANGLE = {"may", "might", "could", "would", "shall", "favours", "favors", "gives", "makes", "causes", "leads", "shows", "has", "have", "can", "will", "may", "must", "should",
            "does", "do", "uses", "needs", "requires", "helps", "allows", "lets", "means", "creates", "produces", "provides", "gets", "get"}
 _PARTICIPLE = re.compile(r"^(?:\w+ed|taken|made|done|given|seen|known|shown|built|used|held|kept|sent|written|found|heated|cooled|set|put|read|cut)$", re.I)
 
@@ -109,7 +109,7 @@ def heading_for(sentence: str) -> str:
     while words and words[0].lower() in _STOP:
         words.pop(0)
     out = words[:3]
-    while out and out[-1].lower() in _STOP:
+    while out and (out[-1].lower() in _STOP or out[-1].lower() in _DANGLE):
         out.pop()
     return _cap(" ".join(out)) or short_label(sentence, 3)
 
@@ -149,8 +149,12 @@ _YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
 _REF_NUM = re.compile(r"\b(?:[QH][1-4]|FY\s?\d{2,4})\b|\b(?:tables?|figures?|fig\.?|sections?|pages?|steps?|chapters?|appendix|eq\.?|equations?|slides?)\s*\d+(?:\.\d+)*|\[\d+(?:[,\u2013-]\s*\d+)*\]|\(\d+\)", re.I)
 
 
+_ENUM = re.compile(r"^\s*(?:\(?\d{1,2}[.)]|\(?[a-hA-H][.)])\s+")
+
+
 def _numbers(s: str) -> List[str]:
     out = []
+    s = _ENUM.sub("", s)                                  # "1. Lexical semantics" — a list marker, not a quantity
     s = _REF_NUM.sub(" ", s)  # cross-references are not quantities
     for m in _NUM_RE.finditer(s):
         t = m.group(0).strip()
@@ -391,6 +395,78 @@ def det_glossary(title: str, sents: List[str]) -> Det:
     if not _GLOSS_TITLE.search(title) and len(pairs) < 4:
         return None
     return "LIST_STRUCTURED", "cards", 0.9, {"cards": [{"heading": _cap(t), "body": _cap(d)} for t, d in pairs[:8]]}, f"{len(pairs)} terms with their meanings"
+
+
+def det_outline(title: str, outline: Optional[List[Dict[str, Any]]]) -> Det:
+    """Nested bullets (a slide deck's own hierarchy) become grouped cards: each parent is a card heading, its children the card's items;
+    childless siblings collapse into one row of chips. Nothing is dropped, the nesting is the layout."""
+    items = [o for o in (outline or []) if str(o.get("text", "")).strip()]
+    if len(items) < 4 or not any(int(o.get("level", 0)) > 0 for o in items):
+        return None
+
+    def split_level(level: int, rows: List[Dict[str, Any]]):
+        """[(heading, [children rows])] for items at ``level``; childless ones have an empty list."""
+        groups, cur = [], None
+        for o in rows:
+            lv = int(o.get("level", 0))
+            if lv == level:
+                cur = (str(o["text"]).strip(), [])
+                groups.append(cur)
+            elif lv > level and cur is not None:
+                cur[1].append(o)
+        return groups
+
+    lead = ""
+    rows = items
+    level = min(int(o.get("level", 0)) for o in rows)
+    top = split_level(level, rows)
+    if len(top) == 1 and top[0][1]:                         # one header with everything under it: "Following are the parts of speech:"
+        lead = top[0][0].rstrip(":").strip()
+        rows = top[0][1]
+        level = min(int(o.get("level", 0)) for o in rows)
+        top = split_level(level, rows)
+    elif len(top) >= 2:
+        pre = [o for o in rows if int(o.get("level", 0)) == level][:0]
+    with_kids = [(h, k) for h, k in top if k]
+    bare_all = [h for h, k in top if not k]
+    if len(with_kids) < 2 and not (with_kids and len(bare_all) >= 3):
+        return None
+    first_kid_pos = next((i for i, (h, k) in enumerate(top) if k), 0)
+    pre = [h for h, k in top[:first_kid_pos] if not k]                  # statements that introduce the groups
+    chips = [h.rstrip(":").strip() for h, k in top if not k and h not in pre and len(h.split()) <= 5][:12]
+    post = [h for h, k in top if not k and h not in pre and len(h.split()) > 5][:2]
+    groups = []
+    for h, kids in with_kids[:6]:
+        sub_level = min(int(o.get("level", 0)) for o in kids)
+        texts = []
+        for o in kids:
+            t = str(o["text"]).strip()
+            texts.append(("– " + t) if int(o.get("level", 0)) > sub_level else t)
+        groups.append({"heading": _cap(h.rstrip(":").strip()), "items": texts[:8]})
+    data: Dict[str, Any] = {"groups": groups, "chips": [_cap(c) for c in chips]}
+    leads = ([lead] if lead else []) + pre[:2] + post
+    if leads:
+        data["lead"] = _cap(leads[0].rstrip(":").strip())
+        if len(leads) > 1:
+            data["lead_more"] = [_cap(x) for x in leads[1:3]]
+    return "OUTLINE", "groups", 0.8 if len(groups) >= 2 else 0.74, data, f"{len(groups)} groups of nested points (the deck's own hierarchy)"
+
+
+_AGENDA_TITLE = re.compile(r"^\s*(?:content|contents|agenda|outline|syllabus|topics|table of contents|what we(?:'ll| will) cover|today(?:'s)? (?:topics|plan)|plan|overview of (?:the )?(?:module|unit|lecture|session))\s*:?\s*$", re.I)
+
+
+def det_agenda(title: str, sents: List[str], outline: Optional[List[Dict[str, Any]]]) -> Det:
+    """A "Content / Agenda / Outline" slide: the list of topics becomes a numbered roadmap."""
+    if not _AGENDA_TITLE.match(title or ""):
+        return None
+    items = [str(o["text"]).strip() for o in (outline or []) if int(o.get("level", 0)) == 0] or [_strip_end(x) for x in sents]
+    items = [re.sub(r"^[➔→•\-\s]+", "", it) for it in items if it.strip()]
+    if len(items) == 1:                                       # one line that holds the whole list ("A ➔ B ➔ C")
+        parts = [p.strip(" .;,") for p in re.split(r"\s*[➔→>]+\s*|\s*;\s*", items[0]) if p.strip(" .;,")]
+        items = parts if len(parts) >= 3 else items
+    if not (3 <= len(items) <= 12):
+        return None
+    return "PROCESS_LINEAR", "agenda", 0.92, {"stages": [{"label": _cap(i[:48]), "detail": ""} for i in items[:10]]}, f"an agenda of {len(items)} topics"
 
 
 def det_pros_cons(title: str, sents: List[str]) -> Det:
@@ -836,9 +912,16 @@ def det_definition(title: str, sents: List[str]) -> Det:
     formula = _formula(" ".join(sents))
     title_def = bool(re.match(r"^\s*(?:what (?:is|are)|definition of|defining|meaning of|understanding)\b|\bdefined\b|\bdefinition\b", title, re.I)) and bool(re.search(r"\b(is|are|refers?|means)\b", first))
     if (_DEF_CUE.search(first) or title_def) and len(sents) <= 4:
-        m = re.match(r"^(?:The\s+)?(.{2,40}?)\s+(?:is defined as|refers to|is a measure of|is known as|means|denotes|is)\s+(.+)$", _strip_end(first), re.I)
-        term = _cap(m.group(1)) if m else short_label(first, 3)
-        meaning = _cap(m.group(2)) if m else _strip_end(first)
+        first_d = re.sub(r"^(?:In|On|At|For|As|Within|Under|According to)\s+[^,]{2,40},\s*", "", _strip_end(first))      # "In grammar, a part of speech is …"
+        first_d = re.sub(r"^(?:A|An|The)\s+", "", first_d, flags=re.I)
+        verb = r"\s+(?:is defined as|refers to|is a measure of|is known as|means|denotes|is)\s+"
+        bare = re.sub(r"\s*\([^)]*\)", "", first_d)               # the term without its parenthetical asides; the meaning keeps them
+        m = re.match(r"^(.{2,60}?)" + verb + r"(.+)$", bare, re.I)
+        parts = re.split(verb, first_d, maxsplit=1, flags=re.I)
+        term = _cap(m.group(1).strip(" ,;")) if m else short_label(first, 3)
+        if term.lower() in {"it", "this", "that", "these", "those", "they", "he", "she", "we", "which"}:          # "It is the study of …": the title names the term
+            term = _cap(re.sub(r"\s*\(\d+/\d+\)$", "", re.sub(r"^(?:what|why|how) (?:is|are)\s+(?:the\s+)?", "", title, flags=re.I)).strip()) or term
+        meaning = _cap(parts[1]) if len(parts) == 2 and parts[1].strip() else (_cap(m.group(2)) if m else _strip_end(first))
         if formula:
             return "FORMULA_CALLOUT", "card", 0.86, {"term": term, "statement": _cap(_strip_end(first)), "formula": formula,
                                                      "notes": [_strip_end(s) for s in sents[1:]]}, "a definition with its formula"
@@ -1114,7 +1197,7 @@ def _tidy_pairs(data: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
-def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any = None) -> Decision:
+def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any = None, outline: Optional[List[Dict[str, Any]]] = None) -> Decision:
     """
     Pick the visual and build its data.
 
@@ -1155,6 +1238,8 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     add(det_labelled(title, sents, text))
     add(det_equation(title, sents))
     add(det_glossary(title, sents))
+    add(det_outline(title, outline))
+    add(det_agenda(title, sents, outline))
     add(det_compare(title, sents))
     add(det_parallel_table(title, sents))
     add(det_pros_cons(title, sents))

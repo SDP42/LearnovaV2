@@ -433,13 +433,22 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         if not user_forced and not hard_layout and existing_layout != "QUIZ" and not llm_data:
             from learnova.visuals import decide
 
-            dec = decide(title, vms_source, bullets, vms=vd)
+            dec = decide(title, vms_source, bullets, vms=vd, outline=imp.get("outline"))
             treatment = _FAMILY_TO_TREATMENT.get(dec.family, dec.family)
             family, variant, data = dec.family, dec.variant, dec.data
             visual_reason, visual_alts = dec.reason, dec.alternatives
             engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
             _tk = str(imp.get("takeaway_llm") or dec.takeaway)
             params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk)}
+        # A slide that *is* a picture (a diagram, a table or a chart image from the source deck): keep it as a figure, large and zoomable —
+        # never run a text detector on its title.
+        _img = (original or {}).get("image") if isinstance(original, dict) else None
+        if (_img and _img.get("bytes") and existing_layout != "QUIZ" and len(" ".join(bullets).split()) <= 4 and "[TABLE DATA]" not in _otext):
+            desc = re.sub(r"\s+", " ", str(_img.get("description") or "")).strip()
+            treatment, family, variant = "FIGURE", "FIGURE", "full"
+            data = {"caption": desc[:150], "figure": True}
+            visual_reason, visual_alts, engine_conf = "the slide is a figure — shown large with zoom instead of being redrawn", [], 0.9
+            params = {"notes": [], "takeaway": "", "footer": []}
         animation = plan_animation_steps(
             bullets, treatment, family, takeaway=str(imp.get("takeaway", ""))
         )
@@ -465,6 +474,8 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             source_text=str((original or {}).get("text") or ""),
         )
 
+        if family == "FIGURE" and (original or {}).get("figure_text"):
+            notes = (notes + "\n" if notes else "") + "Text in the figure: " + str(original["figure_text"])[:600]
         if imp.get("think"):
             notes = (notes + "\n" if notes else "") + f"Ask the class: {imp['think']}"
         plan.slides.append(SlidePlan(

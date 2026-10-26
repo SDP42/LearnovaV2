@@ -1105,6 +1105,71 @@ def _prose(c: _Canvas, data) -> bool:
     return True
 
 
+def _outline(c: _Canvas, data) -> bool:
+    """Nested bullets as grouped cards: heading + its points per card, a lead line above, childless siblings as chips below."""
+    groups = [g for g in (data.get("groups") or []) if g.get("heading")][:6]
+    chips = [str(x) for x in (data.get("chips") or []) if str(x).strip()][:12]
+    lead = str(data.get("lead", "")).strip()
+    more = [str(x) for x in (data.get("lead_more") or []) if str(x).strip()]
+    if not groups:
+        return False
+    gap = GUT
+    lead_h = 0.0
+    lead_sz = 0.0
+    if lead:
+        lead_sz = c.fit([lead], c.w, 0.9, 24, 15, bold=True)
+        lead_h = L.block_height([lead], c.w, lead_sz, bold=True) + 0.08
+        if more:
+            lead_h += L.block_height(more, c.w - 0.3, 14, 4) + 0.1
+    chip_rows = 0
+    chip_h = 0.42
+    if chips:
+        per_row = max(1, int(c.w // 2.3))
+        chip_rows = math.ceil(len(chips) / per_row)
+    chips_total = (chip_rows * chip_h + (chip_rows - 1) * 0.12 + gap) if chips else 0.0
+    grid_h = c.h - (lead_h + gap if lead else 0.0) - chips_total
+    n = len(groups)
+    cols = n if n <= 3 else 3 if n in (5, 6) else 2
+    rows = math.ceil(n / cols)
+    cw = (c.w - gap * (cols - 1)) / cols
+    chh = (grid_h - gap * (rows - 1)) / rows
+
+    def make(b, g):
+        ps = [P(str(g["heading"]), b * 1.25, True, c.t.primary_rgb)]
+        for it in g.get("items") or []:
+            sub = str(it).startswith("– ")
+            ps.append(P(str(it)[2:] if sub else str(it), b * (0.92 if sub else 1.0), False, c.t.subtext_rgb if sub else c.t.text_rgb, 4, True))
+        return ps
+
+    fits = [c.fit_paras(lambda b, g_=g: make(b, g_), cw - 2 * PAD, chh - 2 * PAD, 20, 10) for g in groups]
+    b = _shared(fits)
+    y = c.y
+    if lead:
+        with c.group():
+            c.accent_bar(c.x, y + 0.03, lead_h - 0.1, 0.08)
+            c.tb(c.x + 0.25, y, c.w - 0.25, lead_h, [P(lead, lead_sz, True, c.t.primary_rgb)] + [P(m, 14, False, c.t.text_rgb, 4) for m in more], MSO_ANCHOR.MIDDLE)
+        y += lead_h + gap
+    for i, g in enumerate(groups):
+        r, k = divmod(i, cols)
+        x = c.x + k * (cw + gap)
+        yy = y + r * (chh + gap)
+        with c.group():
+            c.card(x, yy, cw, chh)
+            c.accent_bar(x, yy + 0.18, 0.55, 0.07)
+            c.tb(x + PAD, yy + PAD * 0.8, cw - 2 * PAD, chh - 1.6 * PAD, make(b, g), anchor=MSO_ANCHOR.TOP, bullet_color=c.t.accent_rgb)
+    if chips:
+        cy = y + rows * chh + (rows - 1) * gap + gap
+        per_row = max(1, int(c.w // 2.3))
+        with c.group():
+            for k, t in enumerate(chips):
+                r, kk = divmod(k, per_row)
+                w = (c.w - 0.14 * (per_row - 1)) / per_row
+                x = c.x + kk * (w + 0.14)
+                pill = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, cy + r * (chip_h + 0.12), w, chip_h, _blend(c.t.primary_rgb, 0.88), _blend(c.t.primary_rgb, 0.6), radius=0.5)
+                c.tb(0, 0, 0, 0, [P(t, c.fit([t], w - 0.3, chip_h - 0.08, 15, 10, bold=True), True, c.t.primary_rgb)], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=pill, inset=(0.1, 0.02, 0.1, 0.02))
+    return True
+
+
 def _facts_rail(c: _Canvas, facts, x: float, w: float) -> None:
     """"At a glance": the slide's own figures as stacked cards beside the text — a visual anchor made from the content."""
     n = len(facts)
@@ -1249,6 +1314,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             ok = _prose(c, data)
         elif family == "SECTIONS":
             ok = _sections(c, data)
+        elif family == "OUTLINE":
+            ok = _outline(c, data)
         elif family in {"LAYERS", "HIERARCHY_NEST"}:
             ok = _layers(c, {"levels": [{"label": x} if isinstance(x, str) else x for x in data.get("levels", [])]})
         elif family == "SET_DIAGRAM":
@@ -1298,7 +1365,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             with group(slide):
                 box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, band.left, band.top + band.height - note_h, band.width, note_h,
                               _blend(theme.accent_rgb, 0.85), None, radius=0.2)
-                text = " ".join(notes)[:420]
+                text = " ".join(notes)
+                text = text if len(text) <= 230 else text[:230].rsplit(" ", 1)[0].rstrip(",;: ") + "…"
                 nsz = c.fit([text], band.width - 2 * PAD - 0.1, note_h - 0.12, 15, 10)
                 c.tb(0, 0, 0, 0, [P(text, nsz, False, theme.text_rgb)], MSO_ANCHOR.MIDDLE, PP_ALIGN.LEFT, shape=box,
                      inset=(PAD, 0.05, PAD, 0.05))
