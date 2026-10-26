@@ -87,7 +87,7 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
                          f"{e['date']}: {e['title']}.")
     if fam in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT"} and not d.get("agenda"):
         st = d.get("stages") or d.get("nodes") or []
-        if len(st) >= 3:
+        if len(st) >= 3 and not any("?" in str(s.get("label", "")) for s in st):         # example sentences and questions are not an order to learn
             i = min(1, len(st) - 2)
             lab = [s["label"] for s in st]
             return _make(seed, f"What comes right after “{lab[i]}”?", lab[i + 1], [l for j, l in enumerate(lab) if j not in (i, i + 1)] + [t for t in pool_titles if t.lower() != short_label(title, 4).lower() and not re.match(r"(?:agenda|key takeaways|glossary|key terms|checkpoint|overview|thank you)", t, re.I)],

@@ -42,6 +42,18 @@ def _strip_leading_glyph(text: str) -> Tuple[str, bool]:
     return (text[m.end():], True) if m else (text, False)
 
 
+# Characters many fonts lack (they print as an empty box): typographic hyphens, soft hyphens, and the Symbol / Wingdings private-use codes
+# that PowerPoint exports for maths and bullets.
+_SYMBOL_PUA = {0xF0B5: "∝", 0xF0E0: "→", 0xF0D8: "➢", 0xF0B7: "•", 0xF0A7: "▪", 0xF0FC: "✓", 0xF0E7: "", 0xF0E6: "", 0xF0E8: "",
+               0xF0EA: "", 0xF0EB: "", 0xF0EC: "", 0xF0ED: "", 0xF0EE: "", 0xF0EF: "", 0xF0F4: "", 0xF0F6: "", 0xF0F8: "", 0xF0F7: ""}
+
+
+def _clean_text(t: str) -> str:
+    t = t.replace("\u00ad", "").translate({0x2010: "-", 0x2011: "-", 0x2012: "-", 0x2212: "−"})
+    t = re.sub(r"(?<=\w)-{2}(?=\w)", "-", t)                  # "Semi-‐Supervised": a hyphen plus the Unicode hyphen after it
+    return "".join(_SYMBOL_PUA.get(ord(c), chr(ord(c) - 0xF000) if 0xF020 <= ord(c) <= 0xF07E else c) if 0xE000 <= ord(c) <= 0xF8FF else c for c in t)
+
+
 class _Line:
     __slots__ = ("x0", "y0", "x1", "y1", "size", "bold", "text", "font", "glyph")
 
@@ -58,7 +70,7 @@ def _page_lines(page) -> List[_Line]:
             spans = [s for s in l["spans"] if s["text"].strip()]
             if not spans:
                 continue
-            text = re.sub(r"\s+", " ", "".join(s["text"] for s in l["spans"])).strip()
+            text = re.sub(r"\s+", " ", _clean_text("".join(s["text"] for s in l["spans"]))).strip()
             s0 = spans[0]
             size = max(s["size"] for s in spans)
             bold = any(s["flags"] & 16 or "bold" in s["font"].lower() for s in spans)
@@ -221,6 +233,9 @@ def _looks_like_title(t: str) -> bool:
     return bool(words) and letters >= 4 and letters >= 0.65 * len(t.replace(" ", "")) and len(words) <= 14 and any(len(w) >= 3 for w in words)
 
 
+_DANGLING = re.compile(r"\b(?:than|of|the|a|an|and|or|to|in|for|with|on|at|by|is|are|that|as|from|into|between)$", re.I)
+
+
 def _title_of(lines: List[_Line], H: float, body_size: float) -> Tuple[str, List[_Line]]:
     top = [l for l in lines if l.y0 < H * 0.34 and not l.glyph and len(l.text) > 1]
     if not top:
@@ -234,6 +249,13 @@ def _title_of(lines: List[_Line], H: float, body_size: float) -> Tuple[str, List
             parts.append(l)
     parts.sort(key=lambda l: l.y0)
     text = " ".join(p.text for p in parts).strip()
+    if _DANGLING.search(text):                                      # "…has more than" / "one sense?": the rest sits on a smaller second line
+        below = [l for l in lines if l not in parts and not l.glyph and 0 < l.y0 - parts[-1].y1 < big.size * 1.3
+                 and abs(l.x0 - parts[0].x0) < 80 and len(l.text.split()) <= 6]
+        if below:
+            nxt = min(below, key=lambda l: l.y0)
+            parts.append(nxt)
+            text = f"{text} {nxt.text}".strip()
     return (text, parts) if _looks_like_title(text) else ("", [])
 
 
