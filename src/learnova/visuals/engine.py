@@ -560,7 +560,7 @@ def _local_stats(sentence: str) -> List[Tuple[str, str]]:
         after_txt = s[m.end():]
         value = tok
         unit = re.match(r"\s*([A-Za-z]+)", after_txt)
-        if unit and unit.group(1).lower() in _UNITS:
+        if unit and unit.group(1).lower() in _UNITS and re.fullmatch(r"\d[\d,]*(?:\.\d+)?", tok):
             value = f"{tok} {unit.group(1).lower()}"
             after_txt = after_txt[unit.end():]
         after = _words_after(after_txt)
@@ -583,8 +583,22 @@ def det_stats(title: str, sents: List[str]) -> Det:
         return None
     tiles = []
     for s in sents:
-        for k, (value, label) in enumerate(_local_stats(s)[:2]):
-            tiles.append({"value": value, "label": label, "detail": _strip_end(s) if k == 0 else ""})
+        nums = _numbers(s)
+        local = _local_stats(s)
+        # Several figures in one sentence ("5 tests, 37 checks and 29 flows") or a from-X-to-Y change: label each figure by
+        # the phrase next to it. Otherwise the sentence itself is the better label ("Revenue grew year over year").
+        if len(local) >= 3 or (len(local) == 2 and re.search(r"\bfrom\b.+\bto\b", s, re.I)):
+            for k, (value, label) in enumerate(local[:4]):
+                tiles.append({"value": value, "label": label, "detail": _strip_end(s) if k == 0 else ""})
+            continue
+        for k, n in enumerate(nums[:2]):
+            ctx = s
+            for m_ in nums:  # a label should not contain any figure
+                ctx = ctx.replace(m_, " ", 1)
+            ctx = _strip_end(ctx)
+            ctx = re.sub(r"\b(?:to|from|by|of|at|reached|grew|fell|rose|added|is|was|are|were|has|have|had|over|than)\b\s*$", "", ctx.strip(), flags=re.I)
+            label = short_label(re.sub(r"\s{2,}", " ", ctx), 6)
+            tiles.append({"value": n.strip(), "label": label, "detail": _strip_end(s) if k == 0 else ""})
     # de-duplicate by value
     seen, uniq = set(), []
     for t in tiles:

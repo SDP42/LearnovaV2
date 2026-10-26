@@ -89,9 +89,7 @@ class TestResolveTheme:
     def test_auto_detection_picks_bright_themes_by_topic(self):
         assert resolve_theme("Cell Biology Basics", "auto").id == "forest_calm"
         assert resolve_theme("Quarterly Finance Report", "auto").id == "swiss_corporate"
-        unrelated = resolve_theme("Totally Unrelated Words", "auto")          # no keyword: a stable pick from the palette library
-        assert unrelated.id == resolve_theme("Totally Unrelated Words", "auto").id
-        assert sum(unrelated.bg_rgb) > 600
+        assert resolve_theme("Totally Unrelated Words", "auto").id == "canva_bright"
 
     def test_auto_detection_never_picks_a_dark_background(self):
         for title in ("Cyber Security", "Ocean Systems", "Executive Strategy", "Glass Future", "plain"):

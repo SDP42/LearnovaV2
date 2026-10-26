@@ -39,7 +39,7 @@ class Template:
 
 TEMPLATES: Dict[str, Template] = {t.id: t for t in (
     Template("classic", "Classic Banner", "Solid colour banner, rounded cards, bold hero title slide.",
-             "bar", "hero_split", 0.14, True, "circles", "minimal"),
+             "bar", "hero_split", 0.07, True, "circles", "minimal"),
     Template("editorial", "Editorial", "Title above a thin accent rule on white — calm, magazine-like.",
              "underline", "left_band", 0.04, False, "lines", "rule"),
     Template("sidebar", "Side Rail", "A colour rail down the left edge carries the section; roomy content.",

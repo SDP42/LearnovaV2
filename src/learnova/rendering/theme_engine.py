@@ -488,14 +488,6 @@ def auto_detect_theme(topic_title: str) -> ColorPalette:
     for words, tid in rules:
         if any(re.search(r"\b" + re.escape(w), t) for w in words):  # word start: 'art' must not match 'quarterly'
             return THEMES[tid]
-    try:                                    # no keyword hit: a stable, topic-aware pick from the 240-palette library
-        from learnova.rendering.palettes import pick_for_topic
-
-        spec = pick_for_topic(topic_title, mode="light")
-        if spec:
-            return palette_to_theme(spec)
-    except Exception:
-        pass
     return THEMES["canva_bright"]
 
 
