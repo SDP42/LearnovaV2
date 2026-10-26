@@ -47,6 +47,7 @@ def slides_payload(final_deck: List[dict]) -> List[Dict[str, Any]]:
             "has_image": bool(original.get("image")),
             "source_text": original.get("text", "") or original.get("figure_text", ""),
             "family": getattr(sp, "family", None) or improved.get("family"),
+            "explainer": (sp.data if getattr(sp, "family", None) == "STEPPER" and isinstance(getattr(sp, "data", None), dict) else None),
             "variant": getattr(sp, "variant", None),
             "treatment": getattr(sp, "treatment", None),
             "transition": getattr(sp, "transition", None),

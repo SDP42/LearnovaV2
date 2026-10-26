@@ -945,6 +945,64 @@ def deck_narration(deck_id: str, user_id: str = Depends(current_user)) -> dict:
     return {"slides": script, "total_seconds": sum(x["seconds"] for x in script)}
 
 
+# ── Step-by-step explainers ───────────────────────────────────────────────────
+class ExplainIn(BaseModel):
+    problem: str
+
+
+_EXPLAIN_HELP = ("I can solve linear and quadratic equations, systems of equations, percentages, interest, averages, probability, "
+                 "Bayes' rule, derivatives, integrals, geometry formulas and CYK parsing. Write the problem with its numbers, "
+                 "e.g. “Solve 3x + 5 = 20”.")
+
+
+@app.post("/api/explain")
+def explain_problem(body: ExplainIn, user_id: str = Depends(current_user)) -> dict:
+    """Solve one problem the way a patient tutor would: every number is computed exactly, every step carries its reason.
+
+    Returns the structured steps (for the app's own stepper) and a self-contained HTML page that can be dropped into a deck."""
+    from learnova.explain import explainer_html, solve_text
+
+    problem = (body.problem or "").strip()
+    if len(problem) < 3:
+        raise HTTPException(status_code=422, detail="Type the problem you want solved.")
+    ex = solve_text(problem[:2000])
+    if ex is None:
+        raise HTTPException(status_code=422, detail=_EXPLAIN_HELP)
+    return {"explainer": ex.to_dict(), "html": explainer_html(ex)}
+
+
+def _deck_explainers(user_id: str, deck_id: str) -> tuple[dict, list]:
+    record = deck_library.get_deck(user_id, deck_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    slides = (deck_library.read_slides(user_id, deck_id) or {}).get("slides") or []
+    return record, [s for s in slides if isinstance(s.get("explainer"), dict)]
+
+
+@app.get("/api/decks/{deck_id}/explainers")
+def list_deck_explainers(deck_id: str, user_id: str = Depends(current_user)) -> dict:
+    """The solved, step-by-step problems that appear in this deck."""
+    _, found = _deck_explainers(user_id, deck_id)
+    return {"explainers": [{"slide": s.get("index"), "title": s.get("title", ""), "kind": s["explainer"].get("kind", ""),
+                            "problem": s["explainer"].get("problem", ""), "answer": s["explainer"].get("answer", ""),
+                            "steps": len(s["explainer"].get("steps") or [])} for s in found]}
+
+
+@app.get("/api/decks/{deck_id}/explainers/{slide}")
+def download_deck_explainer(deck_id: str, slide: int, user_id: str = Depends(current_user)) -> Response:
+    """One solved problem as a standalone interactive HTML page (open it, share it, or embed it in another deck)."""
+    from learnova.explain import Explainer, explainer_html
+
+    record, found = _deck_explainers(user_id, deck_id)
+    match = next((s for s in found if s.get("index") == slide), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail="no step-by-step solution on that slide")
+    ex = Explainer.from_dict(match["explainer"])
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{pathlib.Path(record.get('title') or 'deck').stem}_slide{slide + 1}")[:60]
+    return Response(content=explainer_html(ex, None, match.get("title", "")).encode("utf-8"), media_type="text/html; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{stem}_explainer.html"'})
+
+
 # ── Share links ───────────────────────────────────────────────────────────────
 class ShareIn(BaseModel):
     days: Optional[int] = 30
