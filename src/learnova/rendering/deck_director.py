@@ -440,6 +440,8 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
             _tk = str(imp.get("takeaway_llm") or dec.takeaway)
             params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk)}
+        if (imp.get("is_glossary") or re.match(r"^(?:glossary|key terms?)\b", title, re.I)) and family == "LIST_STRUCTURED" and isinstance(data, dict):
+            data = {**data, "flip": True}                      # web deck: term on the front, meaning on the back
         # A slide that *is* a picture (a diagram, a table or a chart image from the source deck): keep it as a figure, large and zoomable —
         # never run a text detector on its title.
         _img = (original or {}).get("image") if isinstance(original, dict) else None

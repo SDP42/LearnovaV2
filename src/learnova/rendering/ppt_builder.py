@@ -380,10 +380,12 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         from learnova.ai.image_gen import vector_illustration
         from learnova.visuals.icons import pick_icons
 
-        _seed_text = topic_title + " " + " ".join(str((d.get("improved") or {}).get("title", "")) for d in slides_data[:6])
-        return vector_illustration(pick_icons(_seed_text, 5), theme.primary_hex, theme.accent_hex, topic_title, kind=kind, width=800)
+        from learnova.ai.scenes import scene_illustration
 
-    title_slide = add_title_slide(prs, theme, topic_title, len(slides_data), _hero)
+        _seed_text = " ".join(str((d.get("improved") or {}).get("title", "")) + " " + " ".join(map(str, (d.get("improved") or {}).get("bullets", [])[:1])) for d in slides_data[:8])
+        return scene_illustration(topic_title, _seed_text, theme.primary_hex, theme.accent_hex, topic_title, kind=kind, width=800)["png"]
+
+    title_slide = add_title_slide(prs, theme, topic_title, len(slides_data), _hero, ((slides_data[0].get("deck_meta") or {}).get("subtitle", "") if slides_data else ""))
 
     # ── Content slides ────────────────────────────────────────────────────────
     prev_style = None

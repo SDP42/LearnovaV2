@@ -175,7 +175,7 @@ def summary_slide(entries: List[dict], minimum_slides: int = 3, max_items: int =
     """A closing "Key takeaways" slide: one line per section, taken from the deck's own text (nothing invented)."""
     import copy
 
-    skip = lambda imp: (str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary") or imp.get("is_overview") or imp.get("is_summary"))  # noqa: E731
+    skip = lambda imp: (str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary") or imp.get("is_overview") or imp.get("is_summary") or imp.get("is_activity"))  # noqa: E731
     content = [e for e in entries if not skip(e.get("improved") or {})]
     if len(content) < minimum_slides:
         return 0
@@ -205,6 +205,33 @@ def summary_slide(entries: List[dict], minimum_slides: int = 3, max_items: int =
     return 1
 
 
+def activity_slide(entries: List[dict], gl: Dict[str, Tuple[str, int]], pairs: int = 5) -> int:
+    """An interactive "Match the terms" slide from the deck's own definitions (web deck: click a term, then its meaning)."""
+    import copy
+
+    if any((e.get("improved") or {}).get("is_activity") for e in entries):
+        return 0
+    corpus = " ".join(str((e.get("original") or {}).get("text") or "") for e in entries).lower()
+    cands = []
+    for term, (definition, _) in gl.items():
+        words = len(definition.split())
+        if 3 <= len(term.split()) + 0 <= 3 or len(term) <= 28:
+            if 4 <= words <= 18:
+                cands.append((corpus.count(term), term, definition))
+    cands.sort(reverse=True)
+    chosen = cands[:pairs]
+    if len(chosen) < 4 or not entries:
+        return 0
+    base = copy.deepcopy(entries[0])
+    lines = [f"{t[:1].upper() + t[1:]}: {d}" for _, t, d in chosen]
+    base["original"] = {**(base.get("original") or {}), "text": "\n".join(lines), "title": "Match the terms"}
+    base["original"].pop("image", None)
+    base["improved"] = {"layout_type": "MINIMAL_TEXT", "title": "Match the terms", "bullets": lines, "takeaway": "", "verbatim": [], "is_activity": True,
+                        "activity": {"kind": "match", "pairs": [{"term": t[:1].upper() + t[1:], "definition": d} for _, t, d in chosen]}}
+    entries.append(base)
+    return 1
+
+
 def agenda_slide(entries: List[dict], minimum_sections: int = 4, max_items: int = 8) -> int:
     """An opening "Agenda" roadmap: the deck's own section titles, in order."""
     import copy
@@ -214,7 +241,7 @@ def agenda_slide(entries: List[dict], minimum_sections: int = 4, max_items: int 
     titles: List[str] = []
     for e in entries:
         imp = e.get("improved") or {}
-        if str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary") or imp.get("is_summary") or imp.get("is_agenda"):
+        if str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary") or imp.get("is_summary") or imp.get("is_agenda") or imp.get("is_activity"):
             continue
         t = re.sub(r"\s*\(\d+/\d+\)$", "", str(imp.get("section") or imp.get("title") or "")).strip()
         t = re.sub(r"^[^:]{2,30}:\s*overview$", lambda m: m.group(0).split(":")[0], t, flags=re.I)
@@ -238,6 +265,7 @@ def enrich_deck(entries: List[dict]) -> Dict[str, int]:
     kt = attach_key_terms(entries, gl)
     pr = attach_prompts(entries)
     gs = glossary_slides(entries, gl)
+    act = activity_slide(entries, gl)
     ss = summary_slide(entries)
     ag = agenda_slide(entries)
-    return {"glossary_terms": len(gl), "slides_with_terms": kt, "prompts": pr, "glossary_slides": gs, "summary_slides": ss, "agenda_slides": ag}
+    return {"glossary_terms": len(gl), "slides_with_terms": kt, "prompts": pr, "glossary_slides": gs, "summary_slides": ss, "agenda_slides": ag, "activity_slides": act}

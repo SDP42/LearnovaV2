@@ -45,7 +45,7 @@ _NO_IMAGE_FAMILIES = {
 }
 _CONCEPT_FAMILIES = {"DEFINITION", "FORMULA_CALLOUT", "QUOTE", "KEY_POINTS", "CHECKLIST", "CAUSE_EFFECT", "LIST_STRUCTURED",
                      "PROCESS_LINEAR", "TEXT", "PROSE"}
-MAX_SHARE = 0.45
+MAX_SHARE = 0.8
 
 
 @dataclass
@@ -87,19 +87,14 @@ def plan_image(title: str, text: str, family: str, data: Dict[str, Any], *, has_
         return ImagePlan(False, "the side panel shows this slide's figures instead of a picture")
     if family not in _CONCEPT_FAMILIES or not _size_ok(family, data):
         return ImagePlan(False, "no room beside the visual")
-    if prev_drawn and total >= 4:
-        return ImagePlan(False, "previous slide already has an illustration — pacing")
     if total >= 4 and drawn_so_far >= max(1, math.ceil(total * MAX_SHARE)):
         return ImagePlan(False, "illustration budget for this deck is used")
-    subject = f"{title}. {text}"[:600]
+    subject = f"{title}. {text}"[:700]
     icons = pick_icons(subject, 5)
-    from learnova.visuals.icons import _KEYWORDS  # noqa: PLC0415
+    from learnova.ai.scenes import choose_scene
 
-    matched = [i for i in icons if i in _KEYWORDS and _KEYWORDS[i] and any(
-        w[:5] in subject.lower() for w in _KEYWORDS[i].split()[:40] if len(w) >= 4)]
-    if not matched:
-        return ImagePlan(False, "no concrete subject to depict — a generic picture would be decoration")
-    return ImagePlan(True, f"concept slide about “{title}” — an illustration of {matched[0].replace('-', ' ')} adds meaning", subject, icons)
+    scene = choose_scene(title, text)
+    return ImagePlan(True, f"a {scene} scene drawn for “{title}” — a picture of the idea, not decoration", subject, icons)
 
 
 # ── vector illustrator ───────────────────────────────────────────────────────
@@ -165,13 +160,13 @@ def _cache_path(key: str) -> pathlib.Path:
     return d / f"{key}.png"
 
 
-def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str, *, use_ai: bool = True, title: str = "", style: str = "") -> Dict[str, Any]:
+def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str, *, use_ai: bool = True, title: str = "", style: str = "", avoid: Optional[List[str]] = None) -> Dict[str, Any]:
     """The picture for one slide: an AI image when a provider is configured (and allowed), otherwise the vector illustrator."""
     from learnova.ai import image_providers as ip
 
     style = style or os.getenv("LEARNOVA_IMAGE_STYLE", "flat")
     ai_on = use_ai and bool(ip.provider_name())
-    key = hashlib.sha1(f"{plan.subject}|{primary_hex}|{accent_hex}|{plan.kind}|{ip.provider_name() if ai_on else 'vector'}|{style}".encode()).hexdigest()[:24]
+    key = hashlib.sha1(f"{plan.subject}|{primary_hex}|{accent_hex}|{plan.kind}|{ip.provider_name() if ai_on else 'scene2'}|{style}|{','.join((avoid or [])[-1:])}".encode()).hexdigest()[:24]
     cp = _cache_path(key)
     provider = "cache"
     data: Optional[bytes] = cp.read_bytes() if cp.exists() else None
@@ -181,14 +176,25 @@ def generate_image(plan: ImagePlan, primary_hex: str, accent_hex: str, *, use_ai
             provider = ip.provider_name() if data else "vector"
         else:
             provider = "vector"
+        scene_meta: Dict[str, Any] = {}
         if not data:
-            data = vector_illustration(plan.icons, primary_hex, accent_hex, plan.subject, plan.kind)
+            from learnova.ai.scenes import scene_illustration
+
+            d = scene_illustration(title or plan.subject[:60], plan.subject, primary_hex, accent_hex, plan.subject[:40], plan.kind, avoid=avoid or [])
+            data, scene_meta = d["png"], {"svg": d["svg"], "scene": d["scene"], "alt": d["alt"]}
         try:
             cp.write_bytes(data)
+            if scene_meta:
+                cp.with_suffix(".json").write_text(__import__("json").dumps(scene_meta))
         except OSError:
             pass
+    else:
+        try:
+            scene_meta = __import__("json").loads(cp.with_suffix(".json").read_text()) if cp.with_suffix(".json").exists() else {}
+        except Exception:
+            scene_meta = {}
     return {"bytes": data, "ext": "png", "provider": provider, "icons": plan.icons[:4], "reason": plan.reason,
-            "alt": f"Illustration: {title or plan.subject[:80]}"}
+            "alt": scene_meta.get("alt") or f"Illustration: {title or plan.subject[:80]}", "svg": scene_meta.get("svg", ""), "scene": scene_meta.get("scene", "")}
 
 
 def illustrate_deck(final_deck: List[dict], theme, mode: str = "auto") -> int:
@@ -198,6 +204,7 @@ def illustrate_deck(final_deck: List[dict], theme, mode: str = "auto") -> int:
 
     plan = plan_deck(final_deck)
     drawn, prev, total, ai_used = 0, False, len(final_deck), 0
+    scenes_used: List[str] = []
     max_ai = int(os.getenv("LEARNOVA_IMAGE_MAX", "8"))      # cost control: at most this many generated images per deck
     for i, (entry, sp) in enumerate(zip(final_deck, plan.slides)):
         imp = entry.get("improved") if isinstance(entry.get("improved"), dict) else None
@@ -213,7 +220,9 @@ def illustrate_deck(final_deck: List[dict], theme, mode: str = "auto") -> int:
             imp.pop("illustration", None)
             continue
         use_ai = mode != "vector" and ai_used < max_ai
-        imp["illustration"] = generate_image(ip, theme.primary_hex, theme.accent_hex, use_ai=use_ai, title=str(imp.get("title", "")))
+        imp["illustration"] = generate_image(ip, theme.primary_hex, theme.accent_hex, use_ai=use_ai, title=str(imp.get("title", "")), avoid=scenes_used)
+        if imp["illustration"].get("scene"):
+            scenes_used.append(imp["illustration"]["scene"])
         ai_used += imp["illustration"].get("provider") not in {"vector", "cache"}
         drawn += 1
     return drawn

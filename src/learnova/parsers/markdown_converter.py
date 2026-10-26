@@ -792,10 +792,16 @@ def _convert_to_markdown_impl(
                 md = pages_to_markdown(deck["pages"])
                 if md.strip():
                     logger.info("%s is a slide deck PDF — structured page-per-slide reader (%d pages)", name, len(deck["pages"]))
+                    try:
+                        from learnova.analysis.source_dna import from_pdf as _dna
+
+                        dna = _dna(str(file_path))
+                    except Exception:
+                        dna = None
                     return MarkdownDocument(
-                        markdown=md, source_name=name, source_type="pdf", converter="slide-pdf", assets=[],
+                        markdown=md, source_name=(deck["title"] or name)[:90], source_type="pdf", converter="slide-pdf", assets=[],
                         meta={"slide_pages": deck["pages"], "deck_title": deck["title"], "deck_subtitle": deck["subtitle"],
-                              "pages": len(deck["pages"]), "md_sha": __import__("learnova.pipeline.slide_chunks", fromlist=["x"]).md_fingerprint(md)},
+                              "pages": len(deck["pages"]), "dna": dna, "file_name": name, "md_sha": __import__("learnova.pipeline.slide_chunks", fromlist=["x"]).md_fingerprint(md)},
                     )
         except Exception:
             logger.warning("slide reader failed — using the general converter", exc_info=True)

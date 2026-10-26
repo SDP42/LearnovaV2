@@ -220,6 +220,16 @@ def generate(
     ``markdown_doc`` is a ``MarkdownDocument``; its ``markdown`` field may have
     been edited by the user since ``build_markdown`` produced it.
     """
+    config = config or PipelineConfig()
+    _dna = (getattr(markdown_doc, "meta", None) or {}).get("dna")
+    if _dna and config.theme_id == "auto" and not config.theme_spec:
+        # a converted slide deck keeps the colours of the deck it came from (text and headings re-checked for contrast)
+        try:
+            from learnova.analysis.source_dna import to_theme_spec
+
+            config.theme_spec = to_theme_spec(_dna)
+        except Exception:
+            logger.warning("source colour DNA unavailable", exc_info=True)
     from learnova.ai.improver import improve_chunks
     from learnova.ai.quiz_gen import generate_quizzes, interleave_quizzes_into_slides
     from learnova.parsers.markdown_converter import (
@@ -704,6 +714,11 @@ def generate(
 
     if runner.run("score", _score) is None:
         result.scores = {"slide_scores": [], "overall_score": 0}
+
+    # the converted deck's own subtitle ("By Tina D'abreo") rides along in the deck for the title slide
+    _sub = (getattr(markdown_doc, "meta", None) or {}).get("deck_subtitle")
+    if _sub and result.final_deck:
+        result.final_deck[0].setdefault("deck_meta", {})["subtitle"] = str(_sub)[:120]
 
     # 11/12. Artifact rendering, each in an isolated interpreter
     def _pptx():

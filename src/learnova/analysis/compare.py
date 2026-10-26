@@ -150,7 +150,7 @@ def build_analysis(result: Any) -> Dict[str, Any]:
     balanced = sum(1 for s in content if 18 <= s["after"]["words"] <= 115 or s["after"]["family"] in {"COMPARE_TABLE", "REFERENCES"})
     titles = [s["title"].lower() for s in content]
     unique = len(set(titles)) / max(1, len(titles))
-    aids = sum(1 for e in deck if isinstance(e.get("improved"), dict) and (e["improved"].get("key_terms") or e["improved"].get("is_overview") or e["improved"].get("is_glossary") or e["improved"].get("is_summary") or e["improved"].get("is_agenda")))
+    aids = sum(1 for e in deck if isinstance(e.get("improved"), dict) and (e["improved"].get("key_terms") or e["improved"].get("is_overview") or e["improved"].get("is_glossary") or e["improved"].get("is_summary") or e["improved"].get("is_agenda") or e["improved"].get("is_activity")))
     q_content = round(100 * kept_facts / tot_facts) if tot_facts else 100
     q_design = round((100 * vis_after / n + 100 * balanced / n) / 2)
     q_coherence = round((100 * unique + min(100, 100 * aids / max(1, n) * 2)) / 2)

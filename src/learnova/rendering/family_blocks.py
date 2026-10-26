@@ -31,10 +31,32 @@ def _chip(text: str, i: int, bg: str, fg: str, border: str) -> str:
     )
 
 
+def _flip_cards(cards, theme) -> str:
+    """Study cards: the term on the front; click to turn it over and read the meaning."""
+    cells = ""
+    for i, c in enumerate(cards[:8]):
+        head, body = _esc(str(c.get("heading", ""))), _esc(str(c.get("body", "")))
+        cells += (
+            f'<div class="lv-flip" tabindex="0" role="button" aria-label="Show the meaning of {head}" onclick="this.classList.toggle(\'on\')" '
+            f'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){{this.classList.toggle(\'on\');event.preventDefault();}}" data-el="el.{i}" data-build="{i}" '
+            f'style="flex:1 1 22%;min-width:190px;min-height:130px;position:relative;cursor:pointer;">'
+            f'<div class="lv-flip-f" style="position:absolute;inset:0;background:{theme.primary_hex};color:{_on(theme)};border-radius:14px;display:flex;flex-direction:column;'
+            f'align-items:center;justify-content:center;padding:14px;text-align:center;font-weight:800;font-size:1.15rem;">{head}'
+            f'<span style="font-size:.7rem;font-weight:600;opacity:.75;margin-top:8px;letter-spacing:.06em;">CLICK TO FLIP</span></div>'
+            f'<div class="lv-flip-b" style="position:absolute;inset:0;background:{theme.card_bg_hex};border:2px solid {theme.accent_hex};border-radius:14px;padding:14px;'
+            f'display:flex;align-items:center;font-size:.92rem;line-height:1.4;color:{theme.text_hex};overflow:auto;">{body}</div></div>'
+        )
+    return (f'<style>.lv-flip .lv-flip-b{{opacity:0;transform:rotateY(90deg);transition:all .3s}} .lv-flip.on .lv-flip-b{{opacity:1;transform:none}} '
+            f'.lv-flip.on .lv-flip-f{{opacity:0;transform:rotateY(-90deg)}} .lv-flip .lv-flip-f{{transition:all .3s}} .lv-flip:focus-visible{{outline:3px solid {theme.accent_hex};outline-offset:3px;border-radius:14px}}</style>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:20px;">{cells}</div>')
+
+
 def _cards(data: Dict[str, Any], theme) -> Optional[str]:
     cards = data.get("cards") or []
     if len(cards) < 3:
         return None
+    if data.get("flip") and all(c.get("heading") and c.get("body") for c in cards[:8]):
+        return _flip_cards(cards, theme)
     cells = ""
     for i, c in enumerate(cards[:6]):
         head = _esc(str(c.get("heading", "")))

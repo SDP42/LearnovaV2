@@ -48,6 +48,8 @@ def chunks_from_pages(pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             title = titles[k] if run == 1 else f"{titles[k]} ({k - i + 1}/{run})"
             chunk: Dict[str, Any] = {"id": len(out), "title": title, "text": _text_of(p), "source": p["page"] + 1, "slide_kind": p.get("kind", "content"),
                                      "outline": list(p.get("items") or [])}
+            if p.get("preview"):
+                chunk["source_preview"] = p["preview"]                   # the page as it was, for the web deck's "Original slide" viewer
             if p.get("figure_text"):
                 chunk["figure_text"] = p["figure_text"]                  # what the picture says (OCR): feeds notes, quizzes and the tutor
             fig = p.get("figure")

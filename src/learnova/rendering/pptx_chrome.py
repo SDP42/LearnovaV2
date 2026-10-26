@@ -161,14 +161,14 @@ def _decor(slide, theme, kind: str, on_dark: bool) -> None:
         _rect(slide, W - 4.6, H - 0.7, 1.6, 0.7, _tint(theme.accent_rgb, 0.45))
 
 
-def add_title_slide(prs, theme, topic_title: str, n_slides: int, hero_fn: Optional[Callable[[str], bytes]] = None):
+def add_title_slide(prs, theme, topic_title: str, n_slides: int, hero_fn: Optional[Callable[[str], bytes]] = None, subtitle: str = ""):
     """``hero_fn(kind)`` returns PNG bytes for the vector illustration (``"panel"`` portrait or ``"banner"`` wide)."""
     tpl = get_template(getattr(theme, "template_id", None))
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     W, H, MX = L.SLIDE_W, L.SLIDE_H, L.MARGIN_X
     title = _title_text(topic_title, tpl)
     layout = tpl.title_layout
-    sub_text = f"{n_slides} slides  •  made with Learnova"
+    sub_text = f"{subtitle}  •  {n_slides} slides" if subtitle else f"{n_slides} slides  •  made with Learnova"
 
     light = layout in {"centered", "left_band"}          # these layouts keep the light page colour
     page_bg = theme.bg_rgb if light else theme.primary_rgb

@@ -329,7 +329,18 @@ def _items(body: List[_Line]) -> List[Dict[str, Any]]:
     return [i for i in items if len(i["text"]) > 1]
 
 
-def read_slide_pdf(path: str, ocr: bool = True) -> Optional[Dict[str, Any]]:
+def _preview_jpeg(page, width: int = 560) -> Optional[bytes]:
+    try:
+        import fitz
+
+        z = width / page.rect.width
+        pix = page.get_pixmap(matrix=fitz.Matrix(z, z), alpha=False)
+        return pix.tobytes("jpeg", jpg_quality=52)
+    except Exception:
+        return None
+
+
+def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None) -> Optional[Dict[str, Any]]:
     try:
         import fitz
 
@@ -370,6 +381,7 @@ def read_slide_pdf(path: str, ocr: bool = True) -> Optional[Dict[str, Any]]:
             list(pool.map(_ocr_words, ocr_jobs))
         logger.info("slide-pdf: OCR read %d slide pictures", len(ocr_jobs))
 
+    want_previews = (n <= 140) if previews is None else previews           # keeps the web deck a sane size
     pages: List[Dict[str, Any]] = []
     for pi, (page, lines) in enumerate(zip(doc, pages_lines)):
         H, W = page.rect.height, page.rect.width
@@ -393,8 +405,11 @@ def read_slide_pdf(path: str, ocr: bool = True) -> Optional[Dict[str, Any]]:
             ol, conf, graphic = _ocr_lines(figs[0]["bytes"], figs[0]["bbox"])
             good = [l for l in ol if not l.glyph]
             alpha = sum(1 for l in good if len(re.sub(r"[^A-Za-z]", "", l.text)) >= 0.6 * max(1, len(l.text)))
+            toks = [t for l in good for t in l.text.split()]
+            codey = sum(1 for t in toks if len(t) <= 4 and (t.isupper() or any(ch.isdigit() for ch in t) or re.search(r"[^\w\s]", t)))
+            tabular = bool(toks) and codey / len(toks) >= 0.28 and len(good) >= 6       # a table / tag list photographed: keep the picture
             figure_text = " ".join(l.text for l in sorted(good, key=lambda l: (l.y0, l.x0)))[:1200] if len(good) >= 2 else ""
-            if len(good) >= 3 and conf >= 62 and sum(len(l.text.split()) for l in good) >= 12 and alpha >= 0.7 * len(good) and graphic <= 0.42:
+            if len(good) >= 3 and conf >= 62 and sum(len(l.text.split()) for l in good) >= 12 and alpha >= 0.7 * len(good) and graphic <= 0.42 and not tabular:
                 lines = ol
                 ocr_used = True
                 local_body = Counter()
@@ -437,7 +452,8 @@ def read_slide_pdf(path: str, ocr: bool = True) -> Optional[Dict[str, Any]]:
         elif figure and figure["area"] >= 0.2 and words <= 25 and not tables:
             kind = "figure"
         pages.append({"page": pi, "title": title, "items": [{"level": i["level"], "text": i["text"]} for i in items], "tables": [t["rows"] for t in tables],
-                      "figure": figure, "kind": kind, "labels": labels, "words": words, "ocr": ocr_used, "figure_text": "" if ocr_used else figure_text})
+                      "figure": figure, "kind": kind, "labels": labels, "words": words, "ocr": ocr_used, "figure_text": "" if ocr_used else figure_text,
+                      "preview": _preview_jpeg(page) if want_previews else None})
 
     # a title page: the biggest text of page 1 plus the lines under it
     deck_title, subtitle = "", ""

@@ -126,6 +126,32 @@ def _on_color(hex_color: str) -> str:
     return '#ffffff' if (0.299 * r + 0.587 * g + 0.114 * b) < 150 else '#111827'
 
 
+def _match_activity_html(act: dict, theme) -> str:
+    """Click a term, then the meaning that belongs to it. Right pairs lock in green; a wrong pick shakes. Score and reset included."""
+    import json
+    import random
+
+    pairs = [p for p in act.get("pairs", []) if p.get("term") and p.get("definition")][:6]
+    if len(pairs) < 3:
+        return ""
+    order = list(range(len(pairs)))
+    random.Random(len(pairs) * 7 + len(pairs[0]["term"])).shuffle(order)
+    terms = "".join(f'<button class="lv-m-t" data-k="{i}" onclick="lvMatchPick(this,\'t\')">{html.escape(p["term"][:40])}</button>' for i, p in enumerate(pairs))
+    defs = "".join(f'<button class="lv-m-d" data-k="{i}" onclick="lvMatchPick(this,\'d\')">{html.escape(pairs[i]["definition"][:140])}</button>' for i in order)
+    return (
+        f'<style>.lv-match{{display:grid;grid-template-columns:1fr 1.6fr;gap:22px;margin-top:14px}} .lv-match button{{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:12px 14px;margin:0 0 10px;'
+        f'border:2px solid {theme.primary_hex}44;border-radius:12px;background:{theme.card_bg_hex};color:{theme.text_hex};font-size:.95rem;line-height:1.35;transition:transform .15s,border-color .15s,background .15s}} '
+        f'.lv-match .lv-m-t{{font-weight:800;color:{theme.primary_hex}}} .lv-match button:hover{{transform:translateX(3px);border-color:{theme.primary_hex}}} .lv-match button:focus-visible{{outline:3px solid {theme.accent_hex}}} '
+        f'.lv-match .sel{{border-color:{theme.accent_hex};background:{theme.accent_hex}22}} .lv-match .ok{{border-color:#2f9e63;background:#2f9e6322;pointer-events:none}} '
+        f'.lv-match .bad{{animation:lvShake .35s;border-color:#c0392b}} @keyframes lvShake{{25%{{transform:translateX(-6px)}}75%{{transform:translateX(6px)}}}}</style>'
+        f'<div class="lv-match" data-total="{len(pairs)}"><div>{terms}</div><div>{defs}</div></div>'
+        f'<div style="display:flex;align-items:center;gap:14px;margin-top:6px;font-size:.9rem;color:{theme.subtext_hex};">'
+        f'<b id="lv-m-score" style="color:{theme.primary_hex};font-size:1.05rem;">0 / {len(pairs)} matched</b>'
+        f'<span id="lv-m-msg">Click a term, then its meaning.</span>'
+        f'<button onclick="lvMatchReset()" style="all:unset;cursor:pointer;margin-left:auto;border:1px solid currentColor;border-radius:14px;padding:3px 12px;font-size:.8rem;">Reset</button></div>'
+    )
+
+
 def _image_html(orig: dict, theme, big: bool = False) -> str:
     """
     Render an extracted figure as an inline data-URI <img>. The image policy can
@@ -306,16 +332,15 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     try:
         import base64 as _b64
 
-        from learnova.ai.image_gen import vector_illustration
-        from learnova.visuals.icons import pick_icons
+        from learnova.ai.scenes import scene_illustration
 
-        _seed = topic_title + " " + " ".join(str((d.get("improved") or {}).get("title", "")) for d in slides_data[:6])
-        _hero_png = vector_illustration(pick_icons(_seed, 5), theme.primary_hex, theme.accent_hex, topic_title, kind="panel", width=720)
-        _hero = ("<img alt='' src='data:image/png;base64," + _b64.b64encode(_hero_png).decode("ascii") +
-                 "' style='width:100%;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.28);'/>")
+        _seed = " ".join(str((d.get("improved") or {}).get("title", "")) + " " + " ".join(map(str, (d.get("improved") or {}).get("bullets", [])[:1])) for d in slides_data[:8])
+        _hero_d = scene_illustration(topic_title, _seed, theme.primary_hex, theme.accent_hex, topic_title, kind="panel", width=720)
+        _hero = (f"<div class='lv-illo' style='width:100%;border-radius:22px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.28);'>{_hero_d['svg'].replace('width=', 'data-w=', 1).replace('height=', 'data-h=', 1)}</div>")
     except Exception:
         _hero = ""
     _n_content = sum(1 for d in slides_data if str((d.get("improved") or {}).get("layout_type", "")).upper() != "QUIZ")
+    _deck_sub = str(((slides_data[0].get("deck_meta") or {}).get("subtitle", "")) if slides_data else "")
     _h1_size = "5rem" if tpl.title_layout == "poster" else "3.9rem"
     _h1_tt = "uppercase" if tpl.title_case == "upper" else "none"
     _sub_ink = theme.subtext_hex if _title_light else _on_color(theme.primary_hex)
@@ -330,7 +355,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                 <h1 style="color:{_t_ink};{_hd_font}font-size:{_h1_size};line-height:1.05;margin:0 0 22px;text-transform:{_h1_tt};">
                     {html.escape(topic_title)}
                 </h1>
-                <h3 style="color:{_sub_ink};opacity:.78;font-size:1.35rem;font-weight:500;margin:0;">{_n_content} slides &nbsp;•&nbsp; made with Learnova</h3>
+                <h3 style="color:{_sub_ink};opacity:.78;font-size:1.35rem;font-weight:500;margin:0;">{html.escape(_deck_sub) + " &nbsp;•&nbsp; " if _deck_sub else ""}{_n_content} slides{"" if _deck_sub else " &nbsp;•&nbsp; made with Learnova"}</h3>
                 <p style="color:{_sub_ink};opacity:.6;font-size:.95rem;margin-top:44px;">Press <strong>Space</strong> or <strong>→</strong> to begin</p>
             </div>
             {_hero_flex}
@@ -437,7 +462,9 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             _fam_block = _family_block(sp.family, sp.data, theme)
 
         _family_used = False
-        if _fam_block:
+        if isinstance(imp.get("activity"), dict) and imp["activity"].get("kind") == "match":
+            slide_body = _match_activity_html(imp["activity"], theme)
+        elif _fam_block:
             slide_body = _fam_block
             _family_used = True
 
@@ -595,13 +622,17 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         if _illo and _illo.get("bytes"):
             import base64 as _b64
 
-            _src = "data:image/png;base64," + _b64.b64encode(_illo["bytes"]).decode("ascii")
+            if _illo.get("svg"):         # the scene as live SVG: its floating parts drift (see .lvf in the stylesheet)
+                _art = _illo["svg"].replace("width=", "data-w=", 1).replace("height=", "data-h=", 1)
+                _art = f'<div class="lv-illo" role="img" aria-label="{html.escape(str(_illo.get("alt", "illustration")))}" style="width:100%;border-radius:20px;overflow:hidden;box-shadow:0 10px 28px {theme.primary_hex}26;">{_art}</div>'
+            else:
+                _src = "data:image/png;base64," + _b64.b64encode(_illo["bytes"]).decode("ascii")
+                _art = (f'<img src="{_src}" alt="{html.escape(str(_illo.get("alt", "illustration")))}" style="width:100%;height:100%;min-height:420px;object-fit:cover;'
+                        f'border-radius:20px;box-shadow:0 10px 28px {theme.primary_hex}26;"/>')
             slide_body = (
                 f'<div style="display:flex;gap:22px;align-items:stretch;margin-top:6px;">'
                 f'<div style="flex:1 1 66%;min-width:0;">{slide_body}</div>'
-                f'<div style="flex:0 0 30%;max-width:30%;display:flex;">'
-                f'<img src="{_src}" alt="illustration" style="width:100%;height:100%;min-height:420px;object-fit:cover;'
-                f'border-radius:20px;box-shadow:0 10px 28px {theme.primary_hex}26;"/></div></div>'
+                f'<div style="flex:0 0 30%;max-width:30%;display:flex;align-items:center;">{_art}</div></div>'
             )
         if _text_layout and image_block:
             body_inner = f"""
@@ -620,8 +651,18 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             {takeaway_html}
             """
 
+        _prev = (orig or {}).get("source_preview") if isinstance(orig, dict) else None
+        _orig_btn = ""
+        if _prev:
+            import base64 as _b64p
+
+            _orig_btn = (f'<button class="lv-orig" onclick="lvZoomSrc(this.nextElementSibling.src)" title="See the slide this one was made from" '
+                         f'style="all:unset;cursor:pointer;position:absolute;right:6px;top:6px;z-index:5;font-size:11px;font-weight:700;color:{theme.primary_hex};'
+                         f'border:1px solid {theme.primary_hex}66;border-radius:12px;padding:2px 10px;background:{theme.card_bg_hex}ee;">Original slide ⧉</button>'
+                         f'<img src="data:image/jpeg;base64,{_b64p.b64encode(_prev).decode("ascii")}" alt="" style="display:none"/>')
         slides_html_list.append(f"""
         <section data-transition="{slide_transition}"{' data-force-build="1"' if force_build else ''} style="text-align:left;">
+            {_orig_btn}
             {_slide_header(title_text + step_badge)}
             <div class="lv-body lv-anim">
             {body_inner}
@@ -713,6 +754,15 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             .reveal .lv-anim.lv-run .lv-textbody li,
             .reveal .lv-anim.lv-run figure img {{ animation: none !important; }}
         }}
+        /* Scene illustrations: the small badges and bubbles drift; the picture itself stays put */
+        .lv-illo svg {{ width:100%; height:auto; display:block; }}
+        @keyframes lvDrift0 {{ 0%,100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-9px); }} }}
+        @keyframes lvDrift1 {{ 0%,100% {{ transform: translate(0,0); }} 50% {{ transform: translate(7px,-6px); }} }}
+        @keyframes lvDrift2 {{ 0%,100% {{ transform: translate(0,0); }} 50% {{ transform: translate(-6px,8px); }} }}
+        .lv-illo .lvf0 {{ animation: lvDrift0 5.5s ease-in-out infinite; }}
+        .lv-illo .lvf1 {{ animation: lvDrift1 6.5s ease-in-out infinite; }}
+        .lv-illo .lvf2 {{ animation: lvDrift2 7.5s ease-in-out infinite; }}
+        @media (prefers-reduced-motion: reduce) {{ .lv-illo .lvf {{ animation: none !important; }} }}
         /* Reveal fragments (staged flow / forced-build slides) fade + rise */
         .reveal .slides section .fragment.lv-step {{
             opacity: 0; transform: translateY(12px);
@@ -920,7 +970,41 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             }});
         }})();
 
+        // "Match the terms": pick a term, then a meaning
+        var lvPick = null, lvDone = 0;
+        function lvMatchPick(btn, side) {{
+            var box = btn.closest('.lv-match');
+            if (!box || btn.classList.contains('ok')) return;
+            if (!lvPick || lvPick.side === side) {{
+                if (lvPick) lvPick.el.classList.remove('sel');
+                lvPick = {{el: btn, side: side}};
+                btn.classList.add('sel');
+                return;
+            }}
+            var a = lvPick.el, b = btn;
+            a.classList.remove('sel');
+            lvPick = null;
+            if (a.dataset.k === b.dataset.k) {{
+                a.classList.add('ok'); b.classList.add('ok');
+                lvDone++;
+                var total = parseInt(box.dataset.total, 10);
+                document.getElementById('lv-m-score').textContent = lvDone + ' / ' + total + ' matched';
+                document.getElementById('lv-m-msg').textContent = lvDone === total ? 'All matched. Nicely done.' : 'Correct.';
+            }} else {{
+                [a, b].forEach(function (x) {{ x.classList.add('bad'); setTimeout(function () {{ x.classList.remove('bad'); }}, 400); }});
+                document.getElementById('lv-m-msg').textContent = 'Not that one, try again.';
+            }}
+        }}
+        function lvMatchReset() {{
+            lvPick = null; lvDone = 0;
+            document.querySelectorAll('.lv-match button').forEach(function (x) {{ x.classList.remove('ok', 'sel', 'bad'); }});
+            var sc = document.getElementById('lv-m-score'), box = document.querySelector('.lv-match');
+            if (sc && box) sc.textContent = '0 / ' + box.dataset.total + ' matched';
+            var m = document.getElementById('lv-m-msg'); if (m) m.textContent = 'Click a term, then its meaning.';
+        }}
+
         // Click a figure to see it full screen; click again (or Esc) to close.
+        function lvZoomSrc(src) {{ var i = new Image(); i.src = src; lvZoom(i); }}
         function lvZoom(img) {{
             var o = document.createElement('div');
             o.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,14,10,.86);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
