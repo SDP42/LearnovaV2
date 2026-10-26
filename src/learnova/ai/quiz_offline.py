@@ -90,7 +90,7 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
         if len(st) >= 3:
             i = min(1, len(st) - 2)
             lab = [s["label"] for s in st]
-            return _make(seed, f"What comes right after “{lab[i]}”?", lab[i + 1], [l for j, l in enumerate(lab) if j not in (i, i + 1)] + [t for t in pool_titles if t.lower() != short_label(title, 4).lower()],
+            return _make(seed, f"What comes right after “{lab[i]}”?", lab[i + 1], [l for j, l in enumerate(lab) if j not in (i, i + 1)] + [t for t in pool_titles if t.lower() != short_label(title, 4).lower() and not re.match(r"(?:agenda|key takeaways|glossary|key terms|checkpoint|overview|thank you)", t, re.I)],
                          f"The order is: " + " → ".join(lab) + ".", "apply")
     if fam == "COMPARE_TABLE" and d.get("rows") and len(d.get("headers", [])) >= 2:
         a, b = d["headers"][:2]

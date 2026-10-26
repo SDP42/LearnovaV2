@@ -67,9 +67,9 @@ def _size_ok(family: str, data: Dict[str, Any]) -> bool:
     if family == "CHECKLIST":
         return len(data.get("items") or []) <= 5
     if family == "PROCESS_LINEAR":
-        return len(data.get("stages") or []) <= 4
+        return len(data.get("stages") or []) <= 3
     if family == "CAUSE_EFFECT":
-        return len(data.get("nodes") or []) <= 4
+        return len(data.get("nodes") or []) <= 3
     if family == "LIST_STRUCTURED":
         return len(data.get("cards") or []) <= 4
     return True

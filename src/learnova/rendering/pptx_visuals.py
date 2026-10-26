@@ -912,6 +912,7 @@ def _chart(c: _Canvas, data, kind: str) -> bool:
         gf = c.s.shapes.add_chart(ctype, Inches(c.x + inset), Inches(c.y + inset), Inches(c.w - 2 * inset), Inches(c.h - 2 * inset), cd)
         ch = gf.chart
         ch.has_legend = kind == "pie"
+        ch.has_title = False                      # the slide title says it; "Value" above the plot is noise
         ch.font.size = Pt(14)
         ch.font.color.rgb = c.t.text_rgb
         if kind == "pie":

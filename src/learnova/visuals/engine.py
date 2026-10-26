@@ -146,7 +146,7 @@ _NUM_RE = re.compile(_NUM, re.I)
 _YEAR_RE = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
 
 
-_REF_NUM = re.compile(r"\b(?:tables?|figures?|fig\.?|sections?|pages?|steps?|chapters?|appendix|eq\.?|equations?|slides?)\s*\d+(?:\.\d+)*|\[\d+(?:[,\u2013-]\s*\d+)*\]|\(\d+\)", re.I)
+_REF_NUM = re.compile(r"\b(?:[QH][1-4]|FY\s?\d{2,4})\b|\b(?:tables?|figures?|fig\.?|sections?|pages?|steps?|chapters?|appendix|eq\.?|equations?|slides?)\s*\d+(?:\.\d+)*|\[\d+(?:[,\u2013-]\s*\d+)*\]|\(\d+\)", re.I)
 
 
 def _numbers(s: str) -> List[str]:
@@ -550,17 +550,32 @@ def det_layers(title: str, sents: List[str]) -> Det:
     return "LAYERS", "stack", 0.84, {"levels": levels}, f"{len(levels)} nested / stacked levels"
 
 
+_STAGE_VERBS = r"(?:became|reached|received|signed|got|made|completed|converted(?: to| into)?|moved to|turned into|passed|attended|booked|joined|enrolled(?: in)?|were|was|are)"
+
+
+def _stage_label(sentence: str, m: "re.Match") -> str:
+    """The noun beside a count: "8,000 leads" → Leads; "1,400 reached a demo" → Demo; "…generated 8,000 leads" → Leads."""
+    after = sentence[m.end():]
+    after = re.sub(r"^\s*(?:of\s+(?:these|them|those)\s*,?\s*)?", "", after)
+    v = re.match(r"\s*" + _STAGE_VERBS + r"\s+(?:a|an|the|their|its)?\s*([A-Za-z][\w' -]{1,40})", after, re.I)
+    words = (v.group(1) if v else re.sub(r"^\s*(?:a|an|the)\s+", "", after.strip(" ,;")) )
+    words = re.split(r"[,;.]|\band\b|\bwhile\b|\bbut\b", words)[0].split()
+    return _cap(" ".join(words[:3])) if words else ""
+
+
 def det_funnel(title: str, sents: List[str]) -> Det:
     vals = []
     for s in sents:
-        nums = _numbers(s)
-        if not nums:
-            continue
-        v = _to_float(nums[0])
-        label = _strip_end(s.replace(nums[0], "", 1))
-        label = re.sub(r"^\s*(?:the|a|an)\s+", "", label, flags=re.I)
-        if v is not None:
-            vals.append((v, short_label(label, 5), _strip_end(s)))
+        s_clean = _REF_NUM.sub(lambda mm: " " * len(mm.group(0)), s)
+        for m in _NUM_RE.finditer(s_clean):
+            tok = m.group(0).strip().rstrip(",. ")
+            v = _to_float(tok)
+            if v is None or (re.fullmatch(r"\d{4}", tok) and _YEAR_RE.fullmatch(tok)):
+                continue
+            label = _stage_label(s_clean, m)
+            if not label:
+                label = short_label(re.sub(r"^\s*(?:the|a|an)\s+", "", _strip_end(s.replace(tok, "", 1)), flags=re.I), 5)
+            vals.append((v, label, _strip_end(s)))
     steep = vals and vals[0][0] > vals[-1][0] * 4
     cue = bool(re.search(r"funnel|pipeline|conversion|stages|admission|hiring|recruit|sales", title, re.I))
     if len(vals) >= 3 and all(vals[i][0] >= vals[i + 1][0] for i in range(len(vals) - 1)) and (steep or (cue and vals[0][0] > vals[-1][0] * 1.5)):
@@ -588,6 +603,11 @@ def _subject_before_verb(s: str) -> str:
 
 _VERBS_TAIL = {"generated", "provided", "reached", "totalled", "totaled", "was", "were", "is", "are", "had", "has", "contributed", "earned", "made",
                "sold", "scored", "got", "gets", "recorded", "posted", "delivered", "brought", "produced", "came", "stood", "at", "of", "with", "for"}
+
+
+def pretty_value(tok: str) -> str:
+    """"41 percent" → "41%"; amounts keep their words ("$14 million")."""
+    return re.sub(r"\s*percent\b", "%", tok.strip(), flags=re.I)
 
 
 def _fmt_of(tok: str) -> str:
@@ -701,7 +721,7 @@ def _words_before(text: str, limit: int = 4) -> List[str]:
         toks.pop()
     out: List[str] = []
     for tok in reversed(toks):
-        if tok in ",;:.()" or re.search(r"\d", tok) or tok.lower() in _UNITS:     # another figure ends the phrase
+        if tok in ",;:.()" or re.search(r"\d", tok) or tok.lower() in _UNITS or tok.lower() in {"percent", "million", "billion", "thousand", "%"}:     # another figure ends the phrase
             break
         out.append(tok)
         if len(out) >= limit:
@@ -730,6 +750,13 @@ def _local_stats(sentence: str) -> List[Tuple[str, str]]:
         before = _words_before(s[:m.start()])
         words = after if after else before
         label = _cap(" ".join(words)) if words else (found[-1][1] if found else short_label(s, 6))   # "from 12 to 2": same subject
+        near = s[max(0, m.start() - 24):m.start()].lower()
+        if re.search(r"%|percent", tok, re.I) and re.search(r"\b(?:up|grew|grow|rose|rise|increased?|growth|gain(?:ed)?)\b\s*$", near.strip()):
+            subject = found[0][1].split(" ")[0] if found else (short_label(s, 2) or "Value")
+            label = f"{_cap(subject)} growth"
+        elif re.search(r"%|percent", tok, re.I) and re.search(r"\b(?:down|fell|fall|dropped?|declined?|decreased?|lost)\b\s*$", near.strip()):
+            subject = found[0][1].split(" ")[0] if found else (short_label(s, 2) or "Value")
+            label = f"{_cap(subject)} decline"
         found.append((value, label))
     # "from X to Y" with one shared label reads as before / after
     if len(found) == 2 and found[0][1] == found[1][1] and re.search(r"\bfrom\b.+\bto\b", s, re.I):
@@ -752,7 +779,7 @@ def det_stats(title: str, sents: List[str]) -> Det:
         # the phrase next to it. Otherwise the sentence itself is the better label ("Revenue grew year over year").
         if len(local) >= 3 or (len(local) == 2 and re.search(r"\bfrom\b.+\bto\b", s, re.I)):
             for k, (value, label) in enumerate(local[:4]):
-                tiles.append({"value": value, "label": label, "detail": _strip_end(s) if k == 0 else ""})
+                tiles.append({"value": pretty_value(value), "label": label, "detail": _strip_end(s) if k == 0 else ""})
             continue
         for k, n in enumerate(nums[:2]):
             ctx = s
@@ -761,7 +788,10 @@ def det_stats(title: str, sents: List[str]) -> Det:
             ctx = _strip_end(ctx)
             ctx = re.sub(r"\b(?:to|from|by|of|at|reached|grew|fell|rose|added|is|was|are|were|has|have|had|over|than)\b\s*$", "", ctx.strip(), flags=re.I)
             label = short_label(re.sub(r"\s{2,}", " ", ctx), 6)
-            tiles.append({"value": n.strip(), "label": label, "detail": _strip_end(s) if k == 0 else ""})
+            if len(nums) >= 2 and len(local) == len(nums) and k < len(local):
+                # two figures in one sentence would share one label ("The company added new customers" twice): use the phrase beside each
+                label = local[k][1] if (k > 0 or any(local[j][1] != local[0][1] for j in range(1, len(local)))) else label
+            tiles.append({"value": pretty_value(n), "label": label, "detail": _strip_end(s) if k == 0 else ""})
     # de-duplicate by value
     seen, uniq = set(), []
     for t in tiles:
