@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { useAuth } from "@/auth";
+import Cursor from "@/components/fx/Cursor";
 import markup from "../landing/landing.html?raw";
 import "../landing/landing.css";
 import "../landing/landing-extra.css";
@@ -421,6 +422,7 @@ export default function Landing() {
       ) : null}
       {/* Static, trusted markup ported from the design board. */}
       <div className="l-L" dangerouslySetInnerHTML={{ __html: markup }} />
+      <Cursor />
     </div>
   );
 }

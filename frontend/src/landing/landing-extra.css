@@ -241,3 +241,12 @@ html.lenis, html.lenis body { height: auto; }
 /* 03: room above the row for the repair loop, below for the refine loop */
 .l-L .l-flow { height: calc(680 * var(--u)); }
 .l-L .l-fl { top: calc(320 * var(--u)); }
+
+/* Cursor on the landing page: the same dot-and-ring as the original site, in this page's brown and orange. */
+html.has-custom-cursor {
+  --cursor: rgba(64, 43, 37, 0.78);
+  --cursor-ring: #F47B45;
+  --cursor-active: rgba(244, 123, 69, 0.96);
+  --cursor-active-ring: #402B25;
+}
+.cursor-dot { transition-property: width, height, background-color, box-shadow, opacity, scale; }
