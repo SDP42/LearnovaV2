@@ -727,18 +727,17 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     <!-- Reveal.js + notes plugin: bundled inline (offline-safe). Mermaid on CDN. -->
     {_body_scripts()}
     <script>
-        // Progressive reveal (one idea per click) is OFF by default: a study
-        // deck opened directly should show the WHOLE slide so it can be read.
-        // It turns ON only when actually presenting — ?build / ?present in the
-        // URL, window.__learnovaBuild set by an embedder, or the presenter
-        // console calling __enableBuilds().
+        // Progressive reveal: ideas appear one at a time (click / arrow key) — the
+        // first idea is on screen at once, the rest follow in order. A reader who
+        // wants the whole slide opens the deck with ?flat (or ?read), sets
+        // window.__learnovaFlat, or uses the "Reading mode" switch bottom-right.
         var LV_BUILD = (function () {{
             try {{
                 var s = (location.search + location.hash);
-                if (/[?#&](build|present)\\b/.test(s)) return true;
-                if (window.__learnovaBuild) return true;
-                return false;
-            }} catch (e) {{ return false; }}
+                if (/[?#&](flat|read)\\b/.test(s)) return false;
+                if (window.__learnovaFlat) return false;
+                return true;
+            }} catch (e) {{ return true; }}
         }})();
 
         function lvApplyBuilds() {{
@@ -747,9 +746,9 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                 // A [data-force-build] section always animates its steps in,
                 // even when the deck is in flat reading mode.
                 var forced = !!el.closest('[data-force-build]');
-                if (LV_BUILD || forced) {{
+                var i = parseInt(el.getAttribute('data-build'), 10);
+                if ((LV_BUILD || forced) && !(i === 0)) {{      // build 0 is on screen when the slide opens
                     el.classList.add('fragment', 'lv-step');
-                    var i = parseInt(el.getAttribute('data-build'), 10);
                     if (!isNaN(i)) el.setAttribute('data-fragment-index', i);
                 }} else {{
                     el.classList.remove('fragment', 'lv-step');
