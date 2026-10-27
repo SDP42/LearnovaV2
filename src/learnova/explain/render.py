@@ -75,7 +75,7 @@ def explainer_html(ex: Explainer, theme: Optional[Any] = None, title: str = "") 
 <title>{_esc(title or ex.kind.title())} — step by step</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet">
 <style>:root{{--primary:{c['primary']};--accent:{c['accent']};--bg:{c['bg']};--card:{c['card']};--text:{c['text']};--sub:{c['sub']};--on:{_on_color(c['primary'])}}}{_CSS}</style></head>
-<body><main class="ex"><span class="kind" id="kind"></span><h1 id="h1"></h1><div class="problem" id="problem"></div>
+<body><main class="ex"><span class="kind" id="kind"></span><h1 id="h1"></h1><div class="problem" id="problem"></div>{'<p style="margin:6px 0 0;font-size:13px;color:#8F3A18">Written by an AI model, not computed by Learnova — check the numbers.</p>' if ex.source == "llm" else ""}
 <section class="stage" id="stage" aria-live="polite"></section>
 <div class="answer" id="answer"></div>
 <div class="bar"><button class="alt" id="prev">← Back</button><button class="go" id="next">Next step →</button><button class="alt" id="play">▶ Play</button><button class="alt" id="all">Show all</button><div class="dots" id="dots"></div></div>

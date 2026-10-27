@@ -967,6 +967,10 @@ def explain_problem(body: ExplainIn, user_id: str = Depends(current_user)) -> di
         raise HTTPException(status_code=422, detail="Type the problem you want solved.")
     ex = solve_text(problem[:2000])
     if ex is None:
+        from learnova.explain.llm import llm_explain
+
+        ex = llm_explain(problem[:2000])                 # only when an AI key is set; marked as not computed by Learnova
+    if ex is None:
         raise HTTPException(status_code=422, detail=_EXPLAIN_HELP)
     return {"explainer": ex.to_dict(), "html": explainer_html(ex)}
 
