@@ -15,6 +15,7 @@ JSON classification, favour the fast model") without hardcoding a vendor.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from learnova.logging_config import logger
@@ -146,6 +147,15 @@ def _is_retryable(exc: Exception) -> bool:
     return any(n in text for n in needles)
 
 
+def _is_dead_key(exc: Exception) -> bool:
+    """A key that will not work again this run: rejected, unauthorised, or its daily quota used up."""
+    text = f"{type(exc).__name__} {exc}".lower()
+    return any(n in text for n in (
+        "401", "403", "unauthorized", "unauthorised", "permission denied", "invalid api key", "invalid_api_key",
+        "api key not valid", "api_key_invalid", "incorrect api key", "exceeded your current quota", "per day", "daily limit",
+    ))
+
+
 class LLMRouter(LLMProvider):
     """Tries each provider in order, falling through on retryable failures."""
 
@@ -191,7 +201,9 @@ class LLMRouter(LLMProvider):
     # run instead of being retried on every one of the ~200 pipeline calls —
     # that retry storm was adding minutes of dead wait to a single deck.
     _TRIP_AFTER = 4
+    _RETRY_AFTER_S = 900
     _fail_streak: Dict[str, int] = {}
+    _tripped_at: Dict[str, float] = {}
 
     def _attempt(self, call: Callable[[LLMProvider, dict], str], task: Optional[str],
                  kwargs: dict) -> str:
@@ -201,11 +213,14 @@ class LLMRouter(LLMProvider):
                 "No LLM provider is configured. Set GROQ_API_KEY and/or NVIDIA_API_KEY."
             )
 
+        now = time.time()
+        for n in list(self._fail_streak):                   # a switched-off provider gets another chance after a while
+            if self._fail_streak[n] >= self._TRIP_AFTER and now - self._tripped_at.get(n, now) > self._RETRY_AFTER_S:
+                self._fail_streak[n] = 0
         live = [(n, p) for n, p in chain
                 if self._fail_streak.get(n, 0) < self._TRIP_AFTER]
-        if not live:  # every provider tripped — give the top one one more try
-            self._fail_streak.clear()
-            live = chain
+        if not live:  # every key is dead or tripped: answer at once so the caller uses its offline logic
+            raise RuntimeError("All LLM providers are switched off for this run (keys rejected or quota used up).")
 
         errors: List[str] = []
         for name, provider in live:
@@ -236,9 +251,13 @@ class LLMRouter(LLMProvider):
                 return result
             except Exception as exc:
                 errors.append(f"{name}: {exc}")
-                self._fail_streak[name] = self._fail_streak.get(name, 0) + 1
+                dead = _is_dead_key(exc)
+                # a rejected or exhausted key is switched off for the rest of the run at once; other errors after a streak
+                self._fail_streak[name] = self._TRIP_AFTER if dead else self._fail_streak.get(name, 0) + 1
                 tripped = self._fail_streak[name] >= self._TRIP_AFTER
-                if _is_retryable(exc) and len(live) > 1:
+                if tripped:
+                    self._tripped_at[name] = time.time()
+                if (_is_retryable(exc) or dead) and len(live) > 1:
                     logger.warning(
                         "LLMRouter: %s failed (%s) — falling through to next provider.%s",
                         name, exc,
@@ -354,6 +373,8 @@ def reset_router() -> None:
     """Drop the shared router so the next call re-reads API keys (after a key is added or removed in Settings)."""
     global _default_router
     _default_router = None
+    LLMRouter._fail_streak.clear()                      # a new key deserves a fresh start
+    LLMRouter._tripped_at.clear()
 
 
 def get_router() -> LLMRouter:

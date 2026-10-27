@@ -6,6 +6,7 @@ not computed by Learnova itself.
 
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from learnova.explain.model import Explainer, Step
@@ -17,10 +18,14 @@ _SYSTEM = ("You are a patient tutor. Solve the problem for a complete beginner, 
            "\"recap\":[\"3 short reminders\"]}. 3 to 8 steps. Check your arithmetic.")
 
 
+_PROBLEM = re.compile(r"\d|\b(?:solve|find|calculate|compute|evaluate|simplify|prove|derive|determine|how (?:many|much)|what is the|probability|"
+                      r"differentiate|integrate|parse|classify|tag|convert|estimate|minimi[sz]e|maximi[sz]e)\b", re.I)
+
+
 def llm_explain(problem: str) -> Optional[Explainer]:
     from learnova.ai import assist
 
-    if not assist.llm_available():
+    if not _PROBLEM.search(problem or "") or not assist.llm_available():   # only problems to solve, not essays or poems
         return None
     try:
         from learnova.ai.assist import TASK_IMPROVE, get_router

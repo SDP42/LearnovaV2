@@ -37,6 +37,7 @@ DELAY_BETWEEN_CALLS = 0.3
 # Set to True on the first 429 / quota error so all remaining images skip
 # Gemini immediately and fall back to local Tesseract OCR.
 _gemini_quota_exceeded: bool = False
+_gemini_off_at: float = 0.0
 
 
 def _mime_from_ext(ext: str) -> str:
@@ -100,7 +101,12 @@ def describe_images(images: list[dict]) -> list[dict]:
     Returns:
         List like [{"index": 0, "description": "...", "bytes": b"..."}, ...]
     """
-    global _gemini_quota_exceeded
+    global _gemini_quota_exceeded, _gemini_off_at
+    import time as _time
+
+    if _gemini_quota_exceeded and _time.time() - _gemini_off_at > 900:     # quotas reset; try Gemini again after a while
+        _gemini_quota_exceeded = False
+    failures = 0
 
     # Try to create the provider once; if it fails (bad key, no env var), use local OCR only.
     provider: Optional[GeminiVisionProvider] = None
@@ -140,14 +146,17 @@ def describe_images(images: list[dict]) -> list[dict]:
                     or "timed out" in err_str.lower()
                     or "timeout" in err_str.lower()
                 ):
-                    _gemini_quota_exceeded = True
+                    _gemini_quota_exceeded, _gemini_off_at = True, _time.time()
                     logger.warning(
                         "Gemini Vision quota/timeout hit for image %s; "
                         "switching ALL remaining images to local Tesseract OCR.",
                         image.get("index", idx),
                     )
                 else:
+                    failures += 1
                     logger.warning("Gemini Vision OCR failed for image %s: %s", image.get("index", idx), e)
+                    if failures >= 2:                       # a rejected key fails every time: stop asking
+                        _gemini_quota_exceeded, _gemini_off_at = True, _time.time()
 
         # ── 2. Local Tesseract OCR fallback ─────────────────────────────────
         if not description:

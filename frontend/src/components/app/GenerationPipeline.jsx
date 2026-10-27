@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const PHASES = [
   { key: "read", label: "Reading", sub: "Pulling text, figures and structure", icon: BookOpenText, stages: ["convert", "chunk", "vision_ocr", "index"] },
   { key: "understand", label: "Understanding", sub: "Finding the ideas and how they connect", icon: Brain, stages: ["layout", "visual_plan", "visual_data", "expand", "enhance", "density"] },
-  { key: "design", label: "Designing", sub: "Illustrating and scoring every slide", icon: LayoutPanelTop, stages: ["illustrate", "score"] },
+  { key: "design", label: "Designing", sub: "Illustrating and scoring every slide", icon: LayoutPanelTop, stages: ["illustrate", "labs", "score"] },
   { key: "quiz", label: "Quizzing", sub: "Writing checkpoint questions", icon: ListChecks, stages: ["quiz"] },
   { key: "pack", label: "Packaging", sub: "Building your PowerPoint and web deck", icon: PackageCheck, stages: ["build_pptx", "build_html"] },
 ];
@@ -22,7 +22,7 @@ const PHASES = [
 const ORDER = [
   "convert", "chunk", "vision_ocr", "index",
   "layout", "visual_plan", "visual_data", "expand", "enhance", "density",
-  "quiz", "illustrate", "score",
+  "quiz", "illustrate", "labs", "score",
   "build_pptx", "build_html",
 ];
 
@@ -40,6 +40,7 @@ const STAGE_LABEL = {
   density: "Tuning how much text each slide holds",
   quiz: "Writing checkpoint questions",
   illustrate: "Illustrating the slides",
+  labs: "Building interactive labs",
   score: "Scoring every slide",
   build_pptx: "Building the PowerPoint",
   build_html: "Building the web deck",

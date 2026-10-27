@@ -282,6 +282,8 @@ def footer_rows(imp: Dict[str, Any], takeaway: str) -> List[List[str]]:
     rows: List[List[str]] = []
     if takeaway:
         rows.append(["Key takeaway", takeaway])
+    if imp.get("explain"):
+        rows.append(["In plain words", str(imp["explain"])])
     kt = imp.get("key_terms") or []
     if kt:
         rows.append(["Key terms", "  ·  ".join(f"{t['term']} — {t['definition']}" for t in kt[:3])])

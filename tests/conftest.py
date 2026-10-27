@@ -29,3 +29,20 @@ def fixtures_dir() -> pathlib.Path:
 def sample_pptx(fixtures_dir: pathlib.Path) -> pathlib.Path:
     """Path to the generated sample deck (scripts/generate_sample.py)."""
     return fixtures_dir / "sample_test_presentation.pptx"
+
+
+@pytest.fixture(autouse=True)
+def _no_live_ai(request, monkeypatch):
+    """Tests run on the offline logic: provider keys from .env are hidden unless a test is marked ``live``."""
+    if request.node.get_closest_marker("live"):
+        yield
+        return
+    for var in ("GEMINI_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "GEMINI_IMAGE_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    try:
+        from learnova.providers import router
+
+        monkeypatch.setattr(router, "_default_router", None)      # rebuilt without keys: no provider is available
+    except Exception:
+        pass
+    yield

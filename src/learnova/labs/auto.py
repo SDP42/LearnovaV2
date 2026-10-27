@@ -138,6 +138,7 @@ _LLM_SYSTEM = (
     "  function readInputs()     // read the form fields back into an input object\n"
     "  function build(input)     // return frames: [{k:'short label', title:'what this step decides', explain:'HTML: why, with the arithmetic', view:'HTML: the current state, e.g. a <table class=\"t\"> with <td class=\"cur\"> for the cell being decided, class=\"ok\"/\"src\"/\"path\" for others'}]\n"
     "Each frame is ONE small decision a beginner can follow. Compute every number in code; never hard-code results. "
+    "The first frame sets up the problem; the LAST frame must have k:'Answer' and state the final result in plain words. "
     "Reply ONLY with JSON: {\"title\":\"... Lab\",\"lead\":\"one-sentence HTML intro\",\"cond\":\"the key formula or rule\",\"inputs\":\"HTML form fields with ids your fill/readInputs use (textarea/input type=text inside <div class=row><div><label>..</label>...</div></div>)\",\"ideas\":[\"3-4 key ideas\"],\"js\":\"the JavaScript\"}"
 )
 
@@ -171,14 +172,20 @@ def lab_for_slide(title: str, text: str, family: str, data: Dict[str, Any], bull
     """{id, name, html} for a slide, generated now (or read from the cache)."""
     clean_title = re.sub(r"\s*\(\d+/\d+\)\s*$", "", str(title)).strip() or "This topic"
     kind, items, cols = _items_from(family, data, bullets)
-    key = hashlib.sha1(json.dumps([clean_title, kind, items, cols, use_ai], sort_keys=True).encode()).hexdigest()[:12]
+    try:
+        from learnova.ai import assist
+
+        ai_on = bool(use_ai and assist.llm_available())
+    except Exception:
+        ai_on = False
+    key = hashlib.sha1(json.dumps([clean_title, kind, items, cols, ai_on], sort_keys=True).encode()).hexdigest()[:12]
     lab_id = f"auto-{key}"
     path = AUTO_DIR / f"{lab_id}.html"
     if path.is_file():
         html_text = path.read_text(encoding="utf-8")
         name = re.search(r"<title>(.*?)</title>", html_text)
         return {"id": lab_id, "name": name.group(1) if name else f"{clean_title} lab", "html": html_text}
-    obj = _llm_lab(clean_title, text) if use_ai else None
+    obj = _llm_lab(clean_title, text) if ai_on else None
     if obj:
         html_text = page(title=obj["title"][:80], h1=obj["title"][:80], topics=clean_title.lower(), lead=obj.get("lead", ""), cond=obj.get("cond", ""),
                          view="Interactive view", inputs=obj["inputs"], ideas=[str(x) for x in (obj.get("ideas") or [])][:5], js=obj["js"])

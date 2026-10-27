@@ -205,3 +205,64 @@ def enrich_slides(items: List[Dict[str, str]], max_slides: int = 15) -> Dict[int
         if (ex and len(ex.split()) <= 45) or terms:
             out[sid] = {"example": ex if len(ex.split()) <= 45 else "", "terms": terms}
     return out
+
+
+_AI_POLISH_SYSTEM = (
+    "You improve lecture slides for students, using ONLY each slide's own content. For every slide return:\n"
+    "- title: an assertion title, 6 to 14 words, sentence case, no trailing period, that states the slide's main point "
+    "(e.g. 'The Viterbi algorithm keeps only the best path into each state', not 'Viterbi algorithm'). Keep technical terms.\n"
+    "- explain: ONLY if the slide has fewer than 45 words: 2 or 3 plain sentences (max 60 words) that unpack the slide's own idea "
+    "for a beginner; otherwise an empty string. Never add facts that contradict or go beyond the slide's topic.\n"
+    "- example: one concrete example or analogy (max 30 words) consistent with the slide, or an empty string.\n"
+    "- terms: up to 2 technical terms from the slide with plain definitions (max 18 words each).\n"
+    "Reply ONLY with a JSON array [{\"id\":0,\"title\":\"...\",\"explain\":\"...\",\"example\":\"...\",\"terms\":[{\"term\":\"...\",\"definition\":\"...\"}]}]."
+)
+
+
+def _content_words(text: str) -> set:
+    return {w for w in re.findall(r"[a-z]{4,}", (text or "").lower())} - {"this", "that", "with", "from", "they", "have", "which", "their", "there", "these", "those", "into", "about", "what", "when", "where"}
+
+
+def ai_polish(slides: List[Dict[str, str]], batch: int = 10, max_slides: int = 80) -> Dict[int, Dict[str, Any]]:
+    """Assertion titles, a plain-words explanation for thin slides, an example and key terms — in batches, grounded in each
+    slide's own words. ``slides``: [{"id", "title", "text"}]. Slides whose answer fails a check (or a batch that fails because a
+    quota ran out) are simply left out, so the rule-based version stays."""
+    if not slides or not llm_available():
+        return {}
+    out: Dict[int, Dict[str, Any]] = {}
+    for start in range(0, min(len(slides), max_slides), batch):
+        chunk = slides[start:start + batch]
+        prompt = "\n\n".join(f"### id={s['id']} · {s['title']} · {len(s['text'].split())} words\n{s['text'][:900]}" for s in chunk)
+        try:
+            raw = get_router().generate(prompt, system_prompt=_AI_POLISH_SYSTEM, task=TASK_IMPROVE, temperature=0.3, max_tokens=2600, timeout=60.0)
+        except Exception as exc:
+            logger.info("assist.ai_polish stopped (%s); remaining slides keep the rule-based version", exc)
+            break
+        by_id = {s["id"]: s for s in chunk}
+        raw = (raw or "").translate({0x2011: "-", 0x2010: "-", 0x2012: "-", 0x00A0: " ", 0x202F: " "})   # glyphs many fonts lack
+        for item in _json_block(raw) or []:
+            try:
+                sid = int(item["id"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            src = by_id.get(sid)
+            if not src:
+                continue
+            words = _content_words(src["title"] + " " + src["text"])
+            res: Dict[str, Any] = {}
+            title = re.sub(r"[.\s]+$", "", str(item.get("title") or "").strip())
+            if 4 <= len(title.split()) <= 16 and len(_content_words(title) & words) >= 1:
+                res["title"] = title[:120]
+            ex = str(item.get("explain") or "").strip()
+            if ex and len(ex.split()) <= 75 and len(_content_words(ex) & words) >= 2:
+                res["explain"] = ex
+            eg = str(item.get("example") or "").strip()
+            if eg and len(eg.split()) <= 40:
+                res["example"] = eg
+            terms = [{"term": str(t["term"]).strip()[:40], "definition": str(t["definition"]).strip()[:140]}
+                     for t in (item.get("terms") or []) if isinstance(t, dict) and t.get("term") and t.get("definition")][:2]
+            if terms:
+                res["terms"] = terms
+            if res:
+                out[sid] = res
+    return out

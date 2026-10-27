@@ -121,7 +121,7 @@ def _base(title: str) -> str:
     return re.sub(r"\s*\(\d+/\d+\)\s*$", "", title).strip().lower()
 
 
-def slide_lab(imp: dict, family: str, data: dict, state: Dict[str, object]) -> Optional[Dict[str, object]]:
+def slide_lab(imp: dict, family: str, data: dict, state: Dict[str, object], dry: Optional[list] = None) -> Optional[Dict[str, object]]:
     """The lab a slide gets, if any: a built-in or teacher lab for its topic, else one generated now from the slide.
 
     One lab per topic (continuation slides share it), the same lab at most twice per deck, and generated labs only for
@@ -146,9 +146,35 @@ def slide_lab(imp: dict, family: str, data: dict, state: Dict[str, object]) -> O
     if (family not in auto.AUTO_FAMILIES or state["auto"] >= MAX_AUTO_PER_DECK or _WEAK_TITLE.search(base)
             or not (1 <= len(words) <= 8) or re.search(r"\b(?:following|below|above|incorrectly)\b", base) or not _readable_title(base)):
         return None
+    if dry is not None:                                   # planning pass: note what to generate, build nothing
+        dry.append((title, " ".join(bullets), family, data or {}, bullets))
+        state["auto"] += 1
+        state["topics"].add(base)
+        return {"id": "", "name": "", "auto": True}
     made = auto.lab_for_slide(title, " ".join(bullets), family, data or {}, bullets)
     if not made:
         return None
     state["auto"] += 1
     state["topics"].add(base)
     return {"id": made["id"], "name": made["name"], "auto": True}
+
+
+def prefetch(final_deck: list, workers: int = 4) -> int:
+    """Generate a deck's labs in parallel before the builders run (an AI-written lab takes several seconds each);
+    the builders then read them from the cache. Returns how many were prepared."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from learnova.labs import auto
+    from learnova.rendering.deck_director import plan_deck
+
+    plan = plan_deck(final_deck)
+    todo: list = []
+    state = new_deck_state()
+    for entry, sp in zip(final_deck, plan.slides):
+        imp = entry.get("improved") if isinstance(entry.get("improved"), dict) else {}
+        slide_lab(imp, str(getattr(sp, "family", "") or ""), getattr(sp, "data", None) or {}, state, dry=todo)
+    if not todo:
+        return 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        done = list(pool.map(lambda a: auto.lab_for_slide(*a), todo))
+    return sum(1 for d in done if d)

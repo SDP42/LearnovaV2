@@ -52,6 +52,7 @@ STAGES: List[str] = [
     "density",
     "quiz",
     "illustrate",
+    "labs",
     "score",
     "build_pptx",
     "build_html",
@@ -437,14 +438,30 @@ def generate(
                 from learnova.ai import assist
 
                 if assist.llm_available():
-                    thin = [{"id": i, "title": str((e.get("improved") or {}).get("title") or ""), "text": str((e.get("original") or {}).get("text") or "")}
-                            for i, e in enumerate(result.improved) if (e.get("improved") or {}).get("short") and "[TABLE DATA]" not in str((e.get("original") or {}).get("text") or "")]
-                    for sid, extra in assist.enrich_slides(thin).items():
+                    # With a working key: assertion titles, plain-words explanations for thin slides, examples and key terms.
+                    # Anything the AI cannot do (quota, bad answer) keeps the rule-based version.
+                    todo = []
+                    for i, e in enumerate(result.improved):
+                        imp = e.get("improved") or {}
+                        orig = e.get("original") or {}
+                        if (str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_agenda") or imp.get("is_summary") or imp.get("is_glossary")
+                                or imp.get("is_activity") or orig.get("slide_kind") in {"title", "section"} or "[TABLE DATA]" in str(orig.get("text") or "")):
+                            continue
+                        text = " ".join(map(str, imp.get("bullets") or [])) or str(orig.get("text") or "")
+                        if len(text.split()) >= 4:
+                            todo.append({"id": i, "title": str(imp.get("title") or ""), "text": text})
+                    for sid, extra in assist.ai_polish(todo).items():
                         imp = result.improved[sid]["improved"]
+                        if extra.get("title"):
+                            imp["source_title"] = imp.get("title")
+                            imp["title"] = extra["title"]
+                        if extra.get("explain"):
+                            imp["explain"] = extra["explain"]
                         if extra.get("example"):
                             imp["example"] = extra["example"]
                         for t in extra.get("terms", []):
                             imp.setdefault("key_terms", []).append(t)
+                    stats["ai_polished"] = sum(1 for e in result.improved if (e.get("improved") or {}).get("source_title"))
             except Exception:
                 logger.exception("LLM enrichment failed")
             logger.info("preserve mode: %d slides, %s", len(result.improved), stats)
@@ -709,6 +726,17 @@ def generate(
         return f"{illustrate_deck(result.final_deck, theme, config.image_mode)} illustration(s)"
 
     runner.run("illustrate", _illustrate, skip=(not config.enable_illustrations) or config.image_mode == "off", skip_reason="disabled")
+
+    # 6d. Interactive labs for the deck's topics, generated in parallel (AI-written with a key) so the builders find them ready.
+    def _labs():
+        from learnova.labs import prefetch
+
+        return f"{prefetch(result.final_deck)} lab(s)"
+
+    try:
+        runner.run("labs", _labs)
+    except Exception:
+        logger.exception("lab prefetch failed")
 
     # 7. Engagement scoring
     def _score():
