@@ -572,4 +572,149 @@ def solve_cyk(text: str) -> Optional[Explainer]:
     return Explainer("CYK parsing", f"Parse “{' '.join(words)}” with the given grammar", steps, "Accepted: S derives the sentence" if ok else "Rejected: no parse", ["Fill by span length, shortest first.", "Check every split point.", "Accept if S is in the top cell."])
 
 
-SOLVERS = [solve_cyk, solve_bayes, solve_system, solve_quadratic, solve_linear, solve_derivative, solve_integral, solve_interest, solve_percent, solve_stats, solve_probability, solve_geometry, solve_speed]
+# ── NLP: bigram language model ──────────────────────────────────────────────
+def _frac(f: Fraction) -> str:
+    return f"{f.numerator}/{f.denominator}" if f.denominator != 1 else str(f.numerator)
+
+
+def solve_bigram(text: str) -> Optional[Explainer]:
+    t = _norm_text(text)
+    if not re.search(r"\bbigram", t, re.I):
+        return None
+    m = re.search(r"corpus\s*[:\-]?\s*(.+?)(?:\b(?:compute|find|calculate|what is|probability of|P\()|$)", t, re.I | re.S)
+    q = re.search(r"(?:P\(|probability of|sentence)\s*[\"“']?((?:<s>\s*)?[\w' ]+?(?:\s*</s>)?)[\"”']?\s*\)?\s*(?:[?.]|using|with|$)", t.split("orpus", 1)[-1] if m else t, re.I)
+    if not m or not q:
+        return None
+    raw = [x.strip() for x in re.split(r"</s>|\n|(?<=[.!?])\s+", m.group(1)) if x.strip()]
+    sents = [["<s>"] + [w for w in re.findall(r"[\w']+", x.replace("<s>", " ")) if w] + ["</s>"] for x in raw]
+    sents = [x for x in sents if len(x) > 2]
+    words = ["<s>"] + re.findall(r"[\w']+", q.group(1).replace("<s>", " ").replace("</s>", " ")) + ["</s>"]
+    if len(sents) < 2 or len(words) < 3:
+        return None
+    smooth = bool(re.search(r"add-?one|laplace|smooth", t, re.I))
+    uni: Dict[str, int] = {}
+    bi: Dict[Tuple[str, str], int] = {}
+    for x in sents:
+        for a, b in zip(x, x[1:]):
+            uni[a] = uni.get(a, 0) + 1
+            bi[(a, b)] = bi.get((a, b), 0) + 1
+    V = len({w for x in sents for w in x if w != "<s>"})
+    steps = [Step("Read the corpus", [" ".join(x) for x in sents],
+                  "A bigram model guesses each word from the one word before it. We add <s> at the start and </s> at the end of every sentence so the first and last words also have a neighbour.", "Bigram: P(wᵢ | wᵢ₋₁)")]
+    rule = "P(b | a) = (count(a b) + 1) / (count(a) + V)" if smooth else "P(b | a) = count(a b) / count(a)"
+    steps.append(Step("Write the rule", [rule] + ([f"V = {V} distinct words"] if smooth else []),
+                      "Count how often the pair appears and divide by how often the first word appears (as a left neighbour)." + (" Add-one smoothing adds 1 to every pair so unseen pairs do not make the whole sentence impossible." if smooth else ""), ""))
+    total = Fraction(1)
+    lines = []
+    for a, b in zip(words, words[1:]):
+        c_ab, c_a = bi.get((a, b), 0), uni.get(a, 0)
+        if smooth:
+            pr = Fraction(c_ab + 1, c_a + V)
+            lines.append(f"P({b} | {a}) = ({c_ab} + 1) / ({c_a} + {V}) = {mark(_frac(pr))}")
+        else:
+            if c_a == 0:
+                return None
+            pr = Fraction(c_ab, c_a)
+            lines.append(f"P({b} | {a}) = {c_ab} / {c_a} = {mark(_frac(pr))}")
+        total *= pr
+    steps.append(Step("Look up every pair", lines, "Go along the sentence two words at a time and read each count off the corpus.", ""))
+    prod = " × ".join(l.split(" = ")[-1].replace("[[", "").replace("]]", "") for l in lines)
+    steps.append(Step("Multiply them", [f"P(sentence) = {prod}", f"= {mark(_frac(total))} ≈ {float(total):.4g}"],
+                      "The model assumes each word depends only on the previous one, so the sentence probability is the product of the pair probabilities.", "Chain rule + Markov assumption"))
+    if total == 0:
+        steps.append(Step("Why it is zero", ["One pair never occurs in the corpus"], "A single unseen pair makes the product zero — this is why smoothing is used.", ""))
+    return Explainer("bigram probability", f"P({' '.join(words)})", steps, f"P = {_frac(total)} ≈ {float(total):.4g}", ["Pad with <s> and </s>.", "P(b|a) = count(a b) / count(a).", "Multiply along the sentence."])
+
+
+# ── NLP: multinomial Naive Bayes (add-one) ──────────────────────────────────
+def solve_naive_bayes(text: str) -> Optional[Explainer]:
+    t = _norm_text(text)
+    if not re.search(r"naive\s*bayes|classify|which class", t, re.I):
+        return None
+    docs = [(c.strip().lower(), re.findall(r"[a-z']+", w.lower())) for c, w in re.findall(r"(?:^|\n|;)\s*(?:d\d+\s*)?\(?\s*([A-Za-z+\-]+)\s*\)?\s*[:=]\s*[\"“']?([a-z][a-z' ,]+)[\"”']?", t)
+            if c.strip().lower() not in {"test", "classify", "new", "query", "document", "doc"}]
+    tm = re.search(r"(?:test|classify|new document|query)\s*(?:document)?\s*[:=]?\s*[\"“']?([a-z][a-z' ,]+)[\"”']?", t, re.I)
+    classes = sorted({c for c, _ in docs})
+    if len(docs) < 3 or len(classes) < 2 or not tm:
+        return None
+    test = re.findall(r"[a-z']+", tm.group(1).lower())
+    vocab = sorted({w for _, ws in docs for w in ws})
+    V = len(vocab)
+    steps = [Step("List the training documents", [f"{c}: {' '.join(ws)}" for c, ws in docs], "Naive Bayes learns two things from the labelled documents: how common each class is, and how often each word appears inside each class.", "")]
+    prior = {c: Fraction(sum(1 for d, _ in docs if d == c), len(docs)) for c in classes}
+    steps.append(Step("Priors: how common is each class?", [f"P({c}) = {_frac(prior[c])}" for c in classes], "Count the documents of each class and divide by the total number of documents.", "P(c) = docs in c / all docs"))
+    score = {}
+    lines_all = []
+    for c in classes:
+        words_c = [w for d, ws in docs if d == c for w in ws]
+        n_c = len(words_c)
+        pr = prior[c]
+        parts = [_frac(prior[c])]
+        lines = []
+        for w in test:
+            if w not in vocab:
+                continue
+            lw = Fraction(words_c.count(w) + 1, n_c + V)
+            lines.append(f"P({w} | {c}) = ({words_c.count(w)} + 1) / ({n_c} + {V}) = {_frac(lw)}")
+            pr *= lw
+            parts.append(_frac(lw))
+        score[c] = pr
+        lines_all.append(Step(f"Likelihoods for “{c}”", lines + [f"score({c}) = {' × '.join(parts)} = {mark(f'{float(pr):.4g}')}"],
+                              f"For each test word, count it in the {c} documents, add 1 (add-one smoothing, so an unseen word is not zero), and divide by the {c} word count plus the vocabulary size {V}. Multiply everything with the prior.", "P(w|c) = (count(w,c) + 1) / (words in c + V)"))
+    steps += lines_all
+    skipped = [w for w in test if w not in vocab]
+    best = max(classes, key=lambda c: score[c])
+    steps.append(Step("Pick the larger score", [f"{c}: {float(score[c]):.4g}" for c in classes] + ([f"(ignored unknown words: {', '.join(skipped)})"] if skipped else []),
+                      "The class with the larger product is the more probable one for this document.", "argmax over classes"))
+    return Explainer("Naive Bayes", f"Classify “{' '.join(test)}”", steps, f"{best}", ["Prior × product of smoothed word likelihoods.", "Ignore words never seen in training.", "Choose the class with the larger score."])
+
+
+# ── NLP: Viterbi decoding for an HMM ────────────────────────────────────────
+def solve_viterbi(text: str) -> Optional[Explainer]:
+    t = _norm_text(text)
+    if not re.search(r"viterbi|hmm|hidden markov", t, re.I):
+        return None
+    sm = re.search(r"states?\s*[:=]\s*([A-Za-z0-9_, ]+?)(?:;|\n|\.\s)", t, re.I)
+    om = re.search(r"observ\w*\s*[:=]\s*([A-Za-z0-9_, ]+?)(?:;|\n|\.\s|$)", t, re.I)
+    if not sm or not om:
+        return None
+    states = [x for x in re.split(r"[,\s]+", sm.group(1).strip()) if x]
+    obs = [x for x in re.split(r"[,\s]+", om.group(1).strip()) if x]
+    num_ = r"(\d*\.?\d+)"
+    start = {a: float(v) for a, v in re.findall(r"(?:start|initial|π|pi)\w*\s*[:=]?[^;\n]*?\b([A-Za-z0-9_]+)\s*=\s*" + num_, t)}
+    start = {}
+    blk = re.search(r"(?:start|initial|pi|π)\w*\s*[:=]\s*([^;\n]+)", t, re.I)
+    if blk:
+        start = {a: float(v) for a, v in re.findall(r"([A-Za-z0-9_]+)\s*=\s*" + num_, blk.group(1))}
+    trans = {(a, b): float(v) for a, b, v in re.findall(r"([A-Za-z0-9_]+)\s*(?:->|→|to)\s*([A-Za-z0-9_]+)\s*=\s*" + num_, t)}
+    emit = {(a, o): float(v) for a, o, v in re.findall(r"([A-Za-z0-9_]+)\s*:\s*([A-Za-z0-9_]+)\s*=\s*" + num_, t)}
+    if not (2 <= len(states) <= 4 and 2 <= len(obs) <= 6) or set(start) != set(states) or len(trans) < len(states) ** 2 or not emit:
+        return None
+    V = [{s: start[s] * emit.get((s, obs[0]), 0.0) for s in states}]
+    back: List[Dict[str, str]] = [{}]
+    g = lambda: [[""] + [f"t{i + 1}:{o}" for i, o in enumerate(obs)]] + [[s] + [f"{V[i][s]:.4g}" if i < len(V) else "" for i in range(len(obs))] for s in states]
+    steps = [Step("Set up", [f"States: {', '.join(states)}", f"Observations: {' '.join(obs)}"],
+                  "Viterbi finds the single most likely sequence of hidden states. It fills a table: one column per observation, one row per state. Each cell keeps the best probability of any path that ends in that state at that time.", "v_t(s) = max over previous states of v_{t-1}(r) × a(r→s) × b(s, o_t)")]
+    steps.append(Step(f"First column (observation “{obs[0]}”)", [f"v1({s}) = π({s}) × b({s}, {obs[0]}) = {start[s]:g} × {emit.get((s, obs[0]), 0):g} = {mark(f'{V[0][s]:.4g}')}" for s in states],
+                      "At the first step there is no previous state: multiply the start probability by the chance the state emits the first observation.", "", g(), [(i + 1, 1) for i in range(len(states))]))
+    for k in range(1, len(obs)):
+        col, bp, lines = {}, {}, []
+        for s in states:
+            cands = {r: V[k - 1][r] * trans.get((r, s), 0.0) * emit.get((s, obs[k]), 0.0) for r in states}
+            r = max(cands, key=cands.get)
+            col[s], bp[s] = cands[r], r
+            lines.append(f"v{k + 1}({s}) = max(" + ", ".join(f"{V[k - 1][q]:.4g}×{trans.get((q, s), 0):g}" for q in states) + f") × {emit.get((s, obs[k]), 0):g} = {mark(f'{cands[r]:.4g}')}  ← from {r}")
+        V.append(col)
+        back.append(bp)
+        steps.append(Step(f"Column {k + 1} (observation “{obs[k]}”)", lines,
+                          "For each state, try arriving from every previous state: previous cell × transition. Keep the best one, remember where it came from (the backpointer), then multiply by the emission probability.", "", g(), [(i + 1, k + 1) for i in range(len(states))]))
+    last = max(states, key=lambda s: V[-1][s])
+    path = [last]
+    for k in range(len(obs) - 1, 0, -1):
+        path.insert(0, back[k][path[0]])
+    steps.append(Step("Follow the backpointers", [f"Best final state: {last} ({V[-1][last]:.4g})", "Path: " + " → ".join(path)],
+                      "Start from the largest value in the last column and walk back along the remembered arrows to recover the whole state sequence.", "", g(), [(states.index(last) + 1, len(obs))]))
+    return Explainer("Viterbi decoding", f"Most likely states for {' '.join(obs)}", steps, " → ".join(path), ["One column per observation.", "Keep the max and its backpointer.", "Trace back from the best final cell."])
+
+
+SOLVERS = [solve_viterbi, solve_naive_bayes, solve_bigram, solve_cyk, solve_bayes, solve_system, solve_quadratic, solve_linear, solve_derivative, solve_integral, solve_interest, solve_percent, solve_stats, solve_probability, solve_geometry, solve_speed]

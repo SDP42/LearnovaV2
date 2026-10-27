@@ -57,3 +57,16 @@ def test_html_is_self_contained_and_round_trips():
     assert "<script>" in page and "Next step" in page and "const EX=" in page and "</script></body>" in page
     back = Explainer.from_dict(ex.to_dict())
     assert [s.title for s in back.steps] == [s.title for s in ex.steps] and back.answer == ex.answer
+
+
+def test_nlp_solvers_match_textbook_answers():
+    from learnova.explain import solve_text
+
+    bi = solve_text("Using a bigram model on the corpus: <s> I am Sam </s> <s> Sam I am </s> <s> I do not like green eggs and ham </s>. Compute P(<s> I am Sam </s>).")
+    assert bi and bi.kind == "bigram probability" and bi.answer.startswith("P = 1/9")
+    nb = solve_text("Naive Bayes. Training: comedy: fun couple love love; action: fast furious shoot; comedy: couple fly fast fun fun; "
+                    "action: furious shoot shoot fun; action: fly fast shoot love. Test: fast couple shoot fly")
+    assert nb and nb.answer == "action"
+    vit = solve_text("Viterbi for the HMM. States: H, C; Observations: 3 1 3; Start: H=0.8, C=0.2; Transition: H->H=0.6, H->C=0.4, C->H=0.5, "
+                     "C->C=0.5; Emission: H:1=0.2, H:2=0.4, H:3=0.4, C:1=0.5, C:2=0.4, C:3=0.1")
+    assert vit and vit.answer == "H → C → H" and all(s.explain for s in vit.steps)

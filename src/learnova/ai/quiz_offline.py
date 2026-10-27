@@ -87,7 +87,7 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
                          f"{e['date']}: {e['title']}.")
     if fam in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT"} and not d.get("agenda"):
         st = d.get("stages") or d.get("nodes") or []
-        if len(st) >= 3 and not any("?" in str(s.get("label", "")) for s in st):         # example sentences and questions are not an order to learn
+        if len(st) >= 3 and not any("?" in str(s.get("label", "")) or str(s.get("label", "")).lstrip()[:1] in "\"“'‘" or len(str(s.get("label", "")).split()) > 6 for s in st):         # example sentences and questions are not an order to learn
             i = min(1, len(st) - 2)
             lab = [s["label"] for s in st]
             return _make(seed, f"What comes right after “{lab[i]}”?", lab[i + 1], [l for j, l in enumerate(lab) if j not in (i, i + 1)] + [t for t in pool_titles if t.lower() != short_label(title, 4).lower() and not re.match(r"(?:agenda|key takeaways|glossary|key terms|checkpoint|overview|thank you)", t, re.I)],
@@ -116,7 +116,7 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
                      f"{d['formula']}", "apply")
     if fam == "STAT_TILES" and d.get("tiles"):
         t = d["tiles"][0]
-        if len(str(t["label"]).split()) > 5 or str(t["label"]).rstrip().endswith("."):      # a sentence is not a measure
+        if len(str(t["label"]).split()) > 5 or str(t["label"]).rstrip().endswith(".") or len(re.sub(r"[^A-Za-z]", "", str(t["label"]))) < 3:      # a sentence or a stray mark is not a measure
             return None
         return _make(seed, f"What was the figure for “{_clip(t['label'], 8)}”?", t["value"], _perturb_num(t["value"], r), t.get("detail") or t["label"])
     if fam.startswith("CHART_") and d.get("points"):
@@ -154,9 +154,27 @@ def _cloze(idx: int, title: str, bullets: List[str], pool_words: List[str]) -> O
 
         key = max(cands, key=score)
         blanked = re.sub(rf"\b{re.escape(key)}\b", "_____", text, count=1)
-        near = sorted({w for w in pool_words if w.lower() != key.lower() and abs(len(w) - len(key)) <= 3}, key=lambda w: (abs(len(w) - len(key)), w))
+        shape = lambda w: ("U" if w.isupper() else "C" if w[:1].isupper() else "l")          # noqa: E731
+        suffix = lambda w: next((x for x in ("tion", "sion", "ing", "ity", "ness", "ment", "ous", "ive", "al", "ed", "ly", "s") if w.lower().endswith(x)), "")  # noqa: E731
+        near = [w for w in pool_words if w.lower() != key.lower() and shape(w) == shape(key) and abs(len(w) - len(key)) <= 4]
+        near = sorted(near, key=lambda w: (suffix(w) != suffix(key), abs(len(w) - len(key))))    # same word class first
         q = _make(f"{idx}:{title}:cloze", f"Fill in the blank: “{_clip(blanked, 26)}”", key, near, f"“{text.rstrip('.')}.”", "recall")
         if q:
+            return q
+    return None
+
+
+def _term_question(idx: int, imp: dict, terms: Dict[str, str], used: set) -> Optional[Dict[str, Any]]:
+    """Concept check from the document's own definitions: "Which term means …?" with the deck's other terms as options."""
+    for kt in imp.get("key_terms") or []:
+        term, definition = str(kt.get("term", "")), str(kt.get("definition", ""))
+        if not term or term in used or len(definition.split()) < 4 or len(terms) < 4:
+            continue
+        others = [t for t in terms if t.lower() != term.lower() and t.lower() not in definition.lower()]
+        q = _make(f"{idx}:term:{term}", f"Which term matches this description: “{_clip(definition, 18)}”?", term, others,
+                  f"{term}: {definition}", "understand")
+        if q:
+            used.add(term)
             return q
     return None
 
@@ -176,7 +194,17 @@ def offline_quizzes(slides: List[dict], frequency: int = 4, positions: Optional[
         imp = e["improved"]
         pool_defs += [_clip(b, 14) for b in (imp.get("bullets") or []) if len(str(b).split()) >= 4]
         pool_words += _WORD.findall(" ".join(map(str, imp.get("bullets") or [])) + " " + str(imp.get("title", "")))
-    pool_words = [w for w in dict.fromkeys(w for w in pool_words if w.lower() not in _STOP)]
+    freq: Dict[str, int] = {}
+    for w in pool_words:
+        freq[w.lower()] = freq.get(w.lower(), 0) + 1
+    # distractors are the deck's own recurring concepts first (a real alternative), one-off words last
+    pool_words = sorted(dict.fromkeys(w for w in pool_words if w.lower() not in _STOP), key=lambda w: -freq[w.lower()])
+    terms: Dict[str, str] = {}
+    for e in entries:
+        for kt in (e["improved"].get("key_terms") or []):
+            if kt.get("term") and kt.get("definition"):
+                terms.setdefault(str(kt["term"]), str(kt["definition"]))
+    used_terms: set = set()
     pool_titles = [short_label(str((e['improved'] or {}).get('title', '')), 4) for e in entries]
     if positions:
         marks = [p - 1 for p in positions if 1 <= p <= len(entries)]
@@ -192,6 +220,11 @@ def offline_quizzes(slides: List[dict], frequency: int = 4, positions: Optional[
             title = str(imp.get("title", ""))
             bullets = [str(b) for b in (imp.get("bullets") or [])]
             text = str((entries[j].get("original") or {}).get("text") or "\n".join(bullets))
+            q = _term_question(j, imp, terms, used_terms)
+            if q:
+                q["source_slides"] = [title]
+                quizzes.append(q)
+                break
             dec = decide(title, text, bullets)
             q = _from_decision(j, title, dec, [x for x in pool_defs if x not in bullets], pool_words, pool_titles) or _cloze(j, title, bullets, pool_words)
             if q:

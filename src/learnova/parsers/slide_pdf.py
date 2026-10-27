@@ -80,7 +80,7 @@ def _vocab(extra: Optional[set] = None) -> set:
                     words |= {w.strip().lower() for w in fh if w.strip().isalpha() and len(w.strip()) > 2}
             except OSError:
                 pass
-        words |= _SHORT_OK | {"the", "and", "for", "from", "with", "tampa", "denver", "table", "morning", "flights"}
+        words |= _SHORT_OK | {"the", "and", "for", "from", "with", "tampa", "denver", "bayes", "markov", "viterbi", "table", "morning", "flights"}
         _VOCAB = words
     return _VOCAB | (extra or set())
 
@@ -557,7 +557,7 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
         for it in (pg["items"][:1] + pg["items"][-1:]):
             if len(it["text"].split()) <= 4 and len(it["text"]) <= 28:
                 ends[_norm(it["text"])] += 1
-    credit = {k for k, v in ends.items() if k and v >= max(5, n // 20)}
+    credit = {k for k, v in ends.items() if k and v >= max(4, n // 30)}
     if credit:
         for pg in pages:
             kept = [it for it in pg["items"] if _norm(it["text"]) not in credit]

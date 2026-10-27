@@ -18,6 +18,13 @@ def api_client():
     return TestClient(main.app)
 
 
+@pytest.fixture()
+def built_photosynthesis(monkeypatch):
+    """A pre-built gallery deck for 'photosynthesis' without needing one on disk."""
+    monkeypatch.setattr(gstore, "ready_slugs", lambda: {"photosynthesis"})
+    monkeypatch.setattr(gstore, "get_deck_meta", lambda slug: {"slide_count": 12, "overall_score": 80} if slug == "photosynthesis" else None)
+
+
 def test_catalog_loads_and_has_breadth():
     entries = gcat.load_catalog(force=True)
     assert len(entries) >= 1000
@@ -113,7 +120,7 @@ def test_assistant_recognises_gallery_check():
         assert r.entities.get("topic"), utt
 
 
-def test_assistant_confirms_and_offers_a_ready_deck(monkeypatch):
+def test_assistant_confirms_and_offers_a_ready_deck(monkeypatch, built_photosynthesis):
     import learnova.assistant.orchestrator as orch
     from learnova.assistant.session import SessionContext
 
@@ -131,7 +138,7 @@ def test_assistant_confirms_and_offers_a_ready_deck(monkeypatch):
     assert "create" in r2.message.lower() or "generate" in r2.message.lower()
 
 
-def test_search_gallery_tool_ranks_ready_first():
+def test_search_gallery_tool_ranks_ready_first(built_photosynthesis):
     from learnova.assistant.tools import search_gallery
 
     res = search_gallery("photosynthesis")
