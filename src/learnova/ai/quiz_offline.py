@@ -116,6 +116,8 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
                      f"{d['formula']}", "apply")
     if fam == "STAT_TILES" and d.get("tiles"):
         t = d["tiles"][0]
+        if len(str(t["label"]).split()) > 5 or str(t["label"]).rstrip().endswith("."):      # a sentence is not a measure
+            return None
         return _make(seed, f"What was the figure for “{_clip(t['label'], 8)}”?", t["value"], _perturb_num(t["value"], r), t.get("detail") or t["label"])
     if fam.startswith("CHART_") and d.get("points"):
         p = d["points"][0]

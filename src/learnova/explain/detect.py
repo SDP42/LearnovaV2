@@ -48,6 +48,9 @@ def from_worked(data: Dict[str, Any]) -> Optional[Explainer]:
              "solve": "Work out the unknown.", "substitute": "Replace the letter by its value.", "divide": "Do the same division to both sides.", "multiply": "Multiply both sides by the same number.",
              "add": "Add the same amount to both sides.", "subtract": "Subtract the same amount from both sides.", "differentiate": "Apply the rule term by term.", "integrate": "Apply the reverse rule term by term.",
              "evaluate": "Put the numbers in and calculate.", "check": "Substitute the answer back to make sure it works."}
+    explained = sum(1 for r in rows if str(r.get("reason", "")).strip() or str(r["step"]).split()[0].lower().strip(":,") in verbs)
+    if explained < 0.6 * len(rows):                     # no real reasons to show: a stepper of filler lines is worse than the slide itself
+        return None
     steps = [Step("Read the problem", [problem], "Before calculating, say in your own words what is being asked and what is already known.", "")]
     for i, r in enumerate(rows, 1):
         reason = str(r.get("reason", "")).strip()

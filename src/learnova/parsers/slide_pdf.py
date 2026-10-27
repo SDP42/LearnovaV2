@@ -37,7 +37,63 @@ def _is_glyph(text: str, font: str) -> bool:
     return len(t) == 1 and t in "oOØq§vü" and bool(_SYMBOL_FONTS.search(font or ""))
 
 
+def _segment_glued(token: str, vocab: set) -> str:
+    """"CONSTRUCTINGTHETRIANGULARTABLE" → "CONSTRUCTING THE TRIANGULAR TABLE", using the deck's own words plus the system dictionary."""
+    if len(token) < 6 or not token.isalpha() or token.lower() in vocab or not token.isupper() or (token[-1] == "S" and token[:-1].lower() in vocab):     # only SHOUTED titles lose their spaces this way
+        return token
+    low = token.lower()
+    n = len(low)
+    best = [None] * (n + 1)
+    best[0] = (0.0, [])
+    for i in range(n):
+        if best[i] is None:
+            continue
+        for j in range(i + 1, min(n, i + 18) + 1):
+            w = low[i:j]
+            if w in vocab and (len(w) > 3 or w in _SHORT_OK):
+                sc = best[i][0] + len(w) ** 2
+                if best[j] is None or sc > best[j][0]:
+                    best[j] = (sc, best[i][1] + [(i, j)])
+    if best[n] is None or len(best[n][1]) < 2:
+        return token
+    parts = [token[i:j] for i, j in best[n][1]]
+    merged: List[str] = []
+    for part in parts:                                    # inflection endings belong to the word before them
+        if merged and part.lower() in {"ing", "ed", "es", "ly", "er", "ion", "al"}:
+            merged[-1] += part
+        else:
+            merged.append(part)
+    return " ".join(merged)
+
+
+_VOCAB = None
+_SHORT_OK = {"of", "to", "in", "is", "a", "an", "on", "or", "by", "at", "as", "all", "the", "and", "for", "are", "not", "how", "why", "use", "can", "its", "one", "two", "from", "ing", "ed", "es", "ly", "er", "ion", "al"}
+
+
+def _vocab(extra: Optional[set] = None) -> set:
+    global _VOCAB
+    if _VOCAB is None:
+        words = set()
+        for path in ("/usr/share/dict/propernames", "/usr/share/dict/words", "/usr/share/dict/american-english"):
+            try:
+                with open(path, encoding="utf-8", errors="ignore") as fh:
+                    words |= {w.strip().lower() for w in fh if w.strip().isalpha() and len(w.strip()) > 2}
+            except OSError:
+                pass
+        words |= _SHORT_OK | {"the", "and", "for", "from", "with", "tampa", "denver", "table", "morning", "flights"}
+        _VOCAB = words
+    return _VOCAB | (extra or set())
+
+
+def _fix_glued(text: str, extra: Optional[set] = None) -> str:
+    v = _vocab(extra)
+    return " ".join(_segment_glued(w, v) for w in text.split())
+
+
 def _strip_leading_glyph(text: str) -> Tuple[str, bool]:
+    m0 = re.match(r"^\s*([^\w\s(\[\"'“‘$€£])\s*(?=\w)", text)
+    if m0 and not m0.group(1).isalnum():
+        return text[m0.end():], True
     m = re.match(r"^\s*([➔→➢➤►▶◆◇■□▪▫●○•◦‣⁃✓✔❖➜➝➞➡-])\s*", text)
     return (text[m.end():], True) if m else (text, False)
 
@@ -85,7 +141,7 @@ def _page_lines(page) -> List[_Line]:
             spans = [s for s in l["spans"] if s["text"].strip()]
             if not spans:
                 continue
-            text = re.sub(r"\s+", " ", _clean_text(_join_spans(l["spans"]))).strip()
+            text = _fix_glued(re.sub(r"\s+", " ", _clean_text(_join_spans(l["spans"]))).strip())
             s0 = spans[0]
             size = max(s["size"] for s in spans)
             bold = any(s["flags"] & 16 or "bold" in s["font"].lower() for s in spans)
@@ -212,7 +268,7 @@ def _ocr_lines(png: bytes, bbox: Tuple[float, float, float, float]) -> Tuple[Lis
         if glyph_w is not None:
             gx0 = x0 + glyph_w["x"] * sx
             lines.append(_Line(gx0, y0 + glyph_w["y"] * sy, gx0 + glyph_w["w"] * sx, y0 + (glyph_w["y"] + glyph_w["h"]) * sy, size, False, "•", "ocr", True))
-        lines.append(_Line(x0 + lx0 * sx, y0 + ly0 * sy, x0 + lx1 * sx, y0 + ly1 * sy, size, bold, text, "ocr", False))
+        lines.append(_Line(x0 + lx0 * sx, y0 + ly0 * sy, x0 + lx1 * sx, y0 + ly1 * sy, size, bold, _fix_glued(text), "ocr", False))
     return lines, (sum(confs) / len(confs) if confs else 0.0), _graphic_ratio(png, res["words"], res["w"], res["h"])
 
 

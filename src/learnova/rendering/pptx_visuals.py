@@ -401,10 +401,10 @@ def _process(c: _Canvas, data, cyclic: bool, foot_text: str = "") -> bool:
     if data.get("agenda") and len(items) >= 5:                   # a long agenda reads as a two-column numbered list, not tiny chevrons
         _grid(c, items, numbered=True, cols=2, icons=False)
         return True
-    return _flow(c, items, cyclic, foot_text or ("↻  and the cycle repeats" if cyclic else ""), max_pt=20 if data.get("agenda") else 30)
+    return _flow(c, items, cyclic, foot_text or ("↻  and the cycle repeats" if cyclic else ""), max_pt=20 if data.get("agenda") else 22)
 
 
-def _flow(c: _Canvas, items: List[Tuple[str, str]], cyclic: bool = False, foot_text: str = "", max_pt: float = 30) -> bool:
+def _flow(c: _Canvas, items: List[Tuple[str, str]], cyclic: bool = False, foot_text: str = "", max_pt: float = 22) -> bool:
     n = len(items)
     per = n if n <= 4 else math.ceil(n / 2)
     foot = 0.5 if foot_text else 0.0
@@ -620,7 +620,7 @@ def _pros_cons(c: _Canvas, data) -> bool:
     th = c.h - 2 * PAD - head_h - 0.15
     cols = (("Advantages", pros, RGBColor(0x1A, 0x7F, 0x4B)), ("Trade-offs", cons, RGBColor(0xB2, 0x3B, 0x3B)))
     def make(b, items, col): return [P(t, b, False, c.t.text_rgb, 8, True) for t in items]
-    b = min(c.fit_paras(lambda s, it=it, col=col: make(s, it, col), tw, th, 30, 10.5) for _, it, col in cols)
+    b = min(c.fit_paras(lambda s, it=it, col=col: make(s, it, col), tw, th, 24, 10.5) for _, it, col in cols)
     need = max(L.paras_height([(p.text, p.size, p.bold, p.before) for p in make(b, it, col)], tw) for _, it, col in cols)
     ch_all = min(c.h, max(need + 2 * PAD + head_h + 0.15 + 0.3, c.h * 0.6))
     oy = (c.h - ch_all) / 2
@@ -900,7 +900,7 @@ def _quote(c: _Canvas, data) -> bool:
         return False
     attr = str(data.get("attribution") or "")
     tw, th = c.w - 2 * PAD - 0.5, c.h - 2 * PAD - (0.6 if attr else 0)
-    b = c.fit_paras(lambda s: [P("“" + t + "”", s, True, c.t.primary_rgb)], tw, th, 34, 14)
+    b = c.fit_paras(lambda s: [P("“" + t + "”", s, True, c.t.primary_rgb)], tw, th, 28, 14)
     need = L.paras_height([("“" + t + "”", b, True, 0)], tw) + (0.6 if attr else 0) + 2 * PAD
     bh = min(c.h, max(need * 1.25, c.h * 0.55))
     y = c.y + (c.h - bh) / 2
