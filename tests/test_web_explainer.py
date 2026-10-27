@@ -70,3 +70,10 @@ def test_a_tiny_deck_is_padded_to_a_real_one():
     md = "## The Machine Learning Workflow\n1. Frame the problem and the metric.\n2. Collect and label a dataset.\n3. Split into train, validation and test sets.\n\n## Common Pitfalls\n- Data leakage: test information leaks into training.\n- Class imbalance makes accuracy meaningless.\n"
     res = generate(from_typed_text(md, "ml"), PipelineConfig(enable_enhancement=False, enable_vision_ocr=False, enable_quizzes=True, build_pptx=False, build_html=False))
     assert len(res.final_deck) >= 5
+
+
+def test_every_topic_slide_in_the_web_deck_has_an_illustration():
+    html = _deck().html_bytes.decode("utf-8")
+    topic_slides = html.count('<section data-transition') - html.count("lv-quiz")
+    art = html.count('class="lv-illo"') + html.count('class="lv-spot"')
+    assert art >= 2 and art >= topic_slides - 1

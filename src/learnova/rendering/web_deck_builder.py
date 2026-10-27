@@ -307,8 +307,16 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
     _upper = "uppercase" if tpl.title_case == "upper" or tpl.id in {"classic", "bold"} else "none"
     _hd_font = f"font-family:'{theme.heading_font}',sans-serif;"
 
-    def _slide_header(title_html: str) -> str:
-        """Header treatment per template (mirrors pptx_chrome.add_header)."""
+    def _slide_header(title_html: str, spot: str = "") -> str:
+        """Header treatment per template (mirrors pptx_chrome.add_header); ``spot`` is a small illustration at its right end."""
+        head = _slide_header_plain(title_html)
+        if not spot:
+            return head
+        return (f'<div style="display:flex;align-items:center;gap:16px;"><div style="flex:1 1 auto;min-width:0;">{head}</div>'
+                f'<div class="lv-spot" aria-hidden="true" style="flex:0 0 132px;height:82px;border-radius:14px;overflow:hidden;margin-bottom:10px;'
+                f'box-shadow:0 6px 18px {theme.primary_hex}22;">{spot}</div></div>')
+
+    def _slide_header_plain(title_html: str) -> str:
         if tpl.header == "bar":
             return (f'<div style="background:{theme.primary_hex};border-bottom:6px solid {theme.accent_hex};border-radius:{max(0, round(tpl.card_radius * 40))}px;'
                     f'padding:12px 22px;margin-bottom:12px;"><h2 style="color:{_on_color(theme.primary_hex)};{_hd_font}font-size:2rem;margin:0;text-transform:{_upper};">{title_html}</h2></div>')
@@ -370,6 +378,22 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         </div>
     </section>
     """)
+
+    from learnova.ai.scenes import deck_prior as _deck_prior, scene_illustration as _scene
+
+    _prior = _deck_prior([f"{(d.get('improved') or {}).get('title', '')} {' '.join(map(str, (d.get('improved') or {}).get('bullets') or []))}" for d in slides_data])
+    _scenes_used: list = []
+    # Wide visuals keep the full width; their illustration sits in the header instead of a side panel.
+    _WIDE = {"COMPARE_TABLE", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
+             "FUNNEL", "LAYERS", "OUTLINE", "COMPARE_VISUAL", "ALGORITHM_TRACE", "DATA_STRUCTURE", "FUNCTION_PLOT", "FIGURE"}
+
+    def _scene_svg(title: str, text: str, kind: str, width: int) -> str:
+        try:
+            d = _scene(title, text, theme.primary_hex, theme.accent_hex, title, kind=kind, width=width, avoid=_scenes_used, prior=_prior, png=False)
+        except Exception:
+            return ""
+        _scenes_used.append(d["scene"])
+        return d["svg"].replace("width=", "data-w=", 1).replace("height=", "data-h=", 1)
 
     prev_style = None
     for idx, data in enumerate(slides_data, 1):
@@ -642,6 +666,26 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                 f'<div style="flex:1 1 66%;min-width:0;">{slide_body}</div>'
                 f'<div style="flex:0 0 30%;max-width:30%;display:flex;align-items:center;">{_art}</div></div>'
             )
+        # Every topic slide carries an illustration drawn from its own words: a side panel when there is room,
+        # a compact one in the header when the visual needs the full width. Quizzes and picture slides are left alone.
+        _spot = ""
+        _has_art = bool(_illo and _illo.get("bytes"))
+        if layout_type != "QUIZ" and not _is_figure and not image_block and not _has_art:
+            _fam = str(getattr(sp, "family", "") or "") if sp else ""
+            _txt = " ".join(str(b) for b in (imp.get("bullets") or []))
+            _plain_title = str(imp.get("title", ""))
+            if _fam in _WIDE or _fam.startswith("CHART_"):
+                _spot = _scene_svg(_plain_title, _txt, "banner", 300)
+            else:
+                _art = _scene_svg(_plain_title, _txt, "panel", 360)
+                if _art:
+                    _art = (f'<div class="lv-illo" role="img" aria-label="Illustration for {html.escape(_plain_title)}" style="width:100%;border-radius:20px;'
+                            f'overflow:hidden;box-shadow:0 10px 28px {theme.primary_hex}26;">{_art}</div>')
+                    slide_body = (
+                        f'<div style="display:flex;gap:22px;align-items:stretch;margin-top:6px;">'
+                        f'<div style="flex:1 1 68%;min-width:0;">{slide_body}</div>'
+                        f'<div style="flex:0 0 28%;max-width:28%;display:flex;align-items:center;">{_art}</div></div>'
+                    )
         if _text_layout and image_block:
             body_inner = f"""
             <div style="display:flex; gap:26px; align-items:flex-start;">
@@ -671,7 +715,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         slides_html_list.append(f"""
         <section data-transition="{slide_transition}"{' data-force-build="1"' if force_build else ''} style="text-align:left;">
             {_orig_btn}
-            {_slide_header(title_text + step_badge)}
+            {_slide_header(title_text + step_badge, _spot)}
             <div class="lv-body lv-anim">
             {body_inner}
             </div>
@@ -764,6 +808,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         }}
         /* Scene illustrations: the small badges and bubbles drift; the picture itself stays put */
         .lv-illo svg {{ width:100%; height:auto; display:block; }}
+        .lv-spot svg {{ width:100%; height:100%; display:block; }}
         @keyframes lvDrift0 {{ 0%,100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-9px); }} }}
         @keyframes lvDrift1 {{ 0%,100% {{ transform: translate(0,0); }} 50% {{ transform: translate(7px,-6px); }} }}
         @keyframes lvDrift2 {{ 0%,100% {{ transform: translate(0,0); }} 50% {{ transform: translate(-6px,8px); }} }}

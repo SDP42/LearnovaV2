@@ -430,7 +430,8 @@ def _context(title: str, text: str, seed: int) -> Dict:
 
 
 def scene_illustration(title: str, text: str, primary: str, accent: str, seed: str, kind: str = "panel", width: int = 800,
-                       avoid: Optional[List[str]] = None, scene: Optional[str] = None, prior: Optional[Dict[str, float]] = None) -> Dict:
+                       avoid: Optional[List[str]] = None, scene: Optional[str] = None, prior: Optional[Dict[str, float]] = None,
+                       png: bool = True) -> Dict:
     """{"svg", "png", "scene", "alt"} for one slide."""
     W = width
     H = int(width * 1.25) if kind == "panel" else int(width * 0.62)
@@ -443,4 +444,4 @@ def scene_illustration(title: str, text: str, primary: str, accent: str, seed: s
     body = frame(W, H, P, r) + fn(W, H, P, r, icons, ctx)
     body += sparkles(W, H, P, r, (W / 2, H / 2, min(W, H) * 0.33))
     svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">{body}</svg>'
-    return {"svg": svg, "png": svg_to_png(svg, W, H, alpha=True), "scene": name, "alt": f"Illustration for “{title}” ({name.replace('_', ' ')} scene)"}
+    return {"svg": svg, "png": svg_to_png(svg, W, H, alpha=True) if png else b"", "scene": name, "alt": f"Illustration for “{title}” ({name.replace('_', ' ')} scene)"}
