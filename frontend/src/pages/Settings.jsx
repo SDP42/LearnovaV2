@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Check, Keyboard, Server, SlidersHorizontal, UserRound, X } from "lucide-react";
+import { Check, KeyRound, Keyboard, Server, SlidersHorizontal, UserRound, X } from "lucide-react";
+import ProviderKeys from "@/components/app/ProviderKeys";
 import { toast } from "sonner";
 import * as api from "@/api";
 import { UserProfile } from "@/auth";
@@ -118,6 +119,12 @@ export default function Settings() {
                 </div>
               </div>
               <p className="mt-3 text-xs text-[#715A4E]">Saved in this browser and used whenever you generate a new deck.</p>
+            </Section>
+          </StaggerItem>
+
+          <StaggerItem>
+            <Section icon={KeyRound} title="AI keys">
+              <ProviderKeys />
             </Section>
           </StaggerItem>
 

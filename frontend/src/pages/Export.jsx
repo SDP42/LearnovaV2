@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CountUp, Stagger, StaggerItem } from "@/components/app/motion";
+import SharePanel from "@/components/app/SharePanel";
 
 export default function Export() {
   const { jobId } = useParams();
@@ -161,6 +162,11 @@ export default function Export() {
               </div>
             ))}
           </div>
+        </StaggerItem>
+
+        <StaggerItem className="w-full text-left">
+          <h2 className="t-h2 mb-3">Share and study</h2>
+          <SharePanel deckId={jobId} name={(s?.source_name || "deck").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40)} />
         </StaggerItem>
 
         <StaggerItem className="w-full text-left">

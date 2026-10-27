@@ -497,3 +497,29 @@ export async function explainProblem(problem) {
     })
   );
 }
+
+// ── AI provider keys ────────────────────────────────────────────────────────
+export async function providersStatus() {
+  return json(await fetch(`${BASE}/api/providers`, { headers: await authHeaders() }));
+}
+export async function saveProviderKey(provider, key) {
+  return json(await fetch(`${BASE}/api/providers`, { method: "POST", headers: await authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ provider, key }) }));
+}
+export async function removeProviderKey(provider) {
+  return json(await fetch(`${BASE}/api/providers/${encodeURIComponent(provider)}`, { method: "DELETE", headers: await authHeaders() }));
+}
+
+// ── Share links (public read-only view of a deck) ───────────────────────────
+export async function createShare(deckId, days = 30) {
+  return json(await fetch(`${BASE}/api/decks/${deckId}/shares`, { method: "POST", headers: await authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ days }) }));
+}
+export async function listShares(deckId) {
+  return json(await fetch(`${BASE}/api/decks/${deckId}/shares`, { headers: await authHeaders() }));
+}
+export async function revokeShare(deckId, token) {
+  const r = await fetch(`${BASE}/api/decks/${deckId}/shares/${token}`, { method: "DELETE", headers: await authHeaders() });
+  if (!r.ok) throw new Error("Could not turn the link off");
+}
+
+// ── Study pack exports ──────────────────────────────────────────────────────
+export const studyPackPath = (deckId, kind) => `/api/decks/${deckId}/export/${kind}`;
