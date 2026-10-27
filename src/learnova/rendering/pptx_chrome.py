@@ -83,11 +83,24 @@ def _title_text(title: str, template) -> str:
 
 
 # ── header ────────────────────────────────────────────────────────────────────
-def add_header(slide, title_text: str, theme) -> None:
+SPOT_W, SPOT_H = 1.55, 0.96      # the header illustration (a 0.62-aspect scene) at the right end of the title row
+
+
+def add_header(slide, title_text: str, theme, spot_png: Optional[bytes] = None) -> None:
+    _draw_header(slide, title_text, theme, (SPOT_W + 0.25) if spot_png else 0.0)
+    if spot_png:                                    # drawn last, so it sits on top of the header band
+        import io
+
+        tpl = get_template(getattr(theme, "template_id", None))
+        top = 0.07 if tpl.header == "bar" else 0.12
+        slide.shapes.add_picture(io.BytesIO(spot_png), Inches(L.SLIDE_W - L.MARGIN_X - SPOT_W), Inches(top), Inches(SPOT_W), Inches(SPOT_H))
+
+
+def _draw_header(slide, title_text: str, theme, reserve: float = 0.0) -> None:
     tpl = get_template(getattr(theme, "template_id", None))
     W, MX = L.SLIDE_W, L.MARGIN_X
     title = _title_text(title_text, tpl)
-    full_w = W - 2 * MX
+    full_w = W - 2 * MX - reserve
 
     if tpl.header == "bar":
         _rect(slide, 0, 0, W, 1.1, theme.primary_rgb)

@@ -78,8 +78,8 @@ def _add_slide_transition(slide, name: str = "none"):
         pass
 
 
-def _add_header_bar(slide, title_text: str, theme: ColorPalette):
-    add_header(slide, title_text, theme)
+def _add_header_bar(slide, title_text: str, theme: ColorPalette, spot_png=None):
+    add_header(slide, title_text, theme, spot_png)
 
 
 def _add_footer(slide, n: int, total: int, theme: ColorPalette):
@@ -390,6 +390,10 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
     # ── Content slides ────────────────────────────────────────────────────────
     prev_style = None
     slide_meta = [{"slide": title_slide, "idx": None, "layout": "TITLE"}]
+    from learnova.ai.scenes import deck_prior as _deck_prior, scene_illustration as _scene_ill
+
+    _prior = _deck_prior([f"{(d.get('improved') or {}).get('title', '')} {' '.join(map(str, (d.get('improved') or {}).get('bullets') or []))}" for d in slides_data])
+    _spot_scenes: list = []
     for idx, data in enumerate(slides_data):
         orig = data.get("original", {})
         imp = data.get("improved", {})
@@ -434,7 +438,19 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         band = L.content_band(has_takeaway=bool(footer_rows),
                               has_quiz=bool(inline_quiz))
 
-        _add_header_bar(slide, title_text, theme)
+        # Every topic slide gets an illustration: the planned side picture where there is one, otherwise a compact
+        # scene in the header drawn from the slide's own words (quizzes and picture slides are left alone).
+        _spot = None
+        if (layout_type != "QUIZ" and not (orig.get("image") or {}).get("bytes") and not (imp.get("illustration") or {}).get("bytes")
+                and not (_sp is not None and getattr(_sp, "family", "") == "FIGURE")):
+            try:
+                _d = _scene_ill(str(title_text), " ".join(map(str, imp.get("bullets") or [])), theme.primary_hex, theme.accent_hex, str(title_text),
+                                kind="banner", width=240, avoid=_spot_scenes, prior=_prior)
+                _spot = _d["png"] or None
+                _spot_scenes.append(_d["scene"])
+            except Exception:
+                _spot = None
+        _add_header_bar(slide, title_text, theme, _spot)
         _add_footer(slide, idx + 1, len(slides_data), theme)
 
         # ── 0a. FIGURE — the slide is a picture (diagram / table image from the source): large, framed, with its caption

@@ -10,6 +10,7 @@ which the web deck animates, and as PNG for PowerPoint.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import math
 import random
@@ -429,6 +430,11 @@ def _context(title: str, text: str, seed: int) -> Dict:
     return {"numbers": nums[:6] if len(nums) >= 3 else [], "words": uniq[:4], "syntax": bool(re.search(r"\b(parse|syntax|constituen|cfg|cyk|grammar)\w*", f"{title} {text}".lower())), "seed": seed}
 
 
+@functools.lru_cache(maxsize=512)
+def _png_cached(svg: str, w: int, h: int) -> bytes:
+    return svg_to_png(svg, w, h, alpha=True)
+
+
 def scene_illustration(title: str, text: str, primary: str, accent: str, seed: str, kind: str = "panel", width: int = 800,
                        avoid: Optional[List[str]] = None, scene: Optional[str] = None, prior: Optional[Dict[str, float]] = None,
                        png: bool = True) -> Dict:
@@ -444,4 +450,4 @@ def scene_illustration(title: str, text: str, primary: str, accent: str, seed: s
     body = frame(W, H, P, r) + fn(W, H, P, r, icons, ctx)
     body += sparkles(W, H, P, r, (W / 2, H / 2, min(W, H) * 0.33))
     svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">{body}</svg>'
-    return {"svg": svg, "png": svg_to_png(svg, W, H, alpha=True) if png else b"", "scene": name, "alt": f"Illustration for “{title}” ({name.replace('_', ' ')} scene)"}
+    return {"svg": svg, "png": _png_cached(svg, W, H) if png else b"", "scene": name, "alt": f"Illustration for “{title}” ({name.replace('_', ' ')} scene)"}
