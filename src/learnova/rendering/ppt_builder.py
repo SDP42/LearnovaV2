@@ -452,6 +452,14 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                 _spot = None
         _add_header_bar(slide, title_text, theme, _spot)
         _add_footer(slide, idx + 1, len(slides_data), theme)
+        if layout_type != "QUIZ" and not (imp.get("is_summary") or imp.get("is_agenda") or imp.get("is_glossary")):
+            from learnova.labs import find_lab, lab_url
+
+            _lab = find_lab(str(title_text), " ".join(map(str, imp.get("bullets") or [])))
+            if _lab:
+                from learnova.rendering.pptx_chrome import add_lab_button
+
+                add_lab_button(slide, theme, str(_lab["name"]), lab_url(str(_lab["id"])))
 
         # ── 0a. FIGURE — the slide is a picture (diagram / table image from the source): large, framed, with its caption
         _family_drawn = False

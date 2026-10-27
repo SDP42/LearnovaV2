@@ -383,6 +383,9 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
     _prior = _deck_prior([f"{(d.get('improved') or {}).get('title', '')} {' '.join(map(str, (d.get('improved') or {}).get('bullets') or []))}" for d in slides_data])
     _scenes_used: list = []
+    from learnova.labs import find_lab as _find_lab, lab_html as _lab_html
+
+    _lab_docs: dict = {}            # lab id → its page, embedded once per deck as an inert text holder
     # Wide visuals keep the full width; their illustration sits in the header instead of a side panel.
     _WIDE = {"COMPARE_TABLE", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
              "FUNNEL", "LAYERS", "OUTLINE", "COMPARE_VISUAL", "ALGORITHM_TRACE", "DATA_STRUCTURE", "FUNCTION_PLOT", "FIGURE"}
@@ -686,6 +689,17 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                         f'<div style="flex:1 1 68%;min-width:0;">{slide_body}</div>'
                         f'<div style="flex:0 0 28%;max-width:28%;display:flex;align-items:center;">{_art}</div></div>'
                     )
+        # An interactive lab for this topic (e.g. Region Growing): a button that opens the simulation over the slide.
+        _lab_btn = ""
+        if layout_type != "QUIZ" and not (imp.get("is_summary") or imp.get("is_agenda") or imp.get("is_glossary")):
+            _lab = _find_lab(str(imp.get("title", "")), " ".join(map(str, imp.get("bullets") or [])))
+            if _lab:
+                if _lab["id"] not in _lab_docs:
+                    _lab_docs[_lab["id"]] = (_lab_html(_lab["id"]) or "").replace("</script>", "<\\/script>")
+                _lab_btn = (f'<button class="lv-labbtn" onclick="lvExplain(\'lab-{_lab["id"]}\')" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;'
+                            f'margin:0 0 10px;padding:7px 16px;border-radius:999px;background:{theme.accent_hex};color:{_on_color(theme.accent_hex)};font-weight:800;font-size:.85rem;'
+                            f'box-shadow:0 4px 14px {theme.primary_hex}33;">▶ Open the interactive lab: {html.escape(str(_lab["name"]))}</button>')
+                slide_body = _lab_btn + slide_body
         if _text_layout and image_block:
             body_inner = f"""
             <div style="display:flex; gap:26px; align-items:flex-start;">
@@ -724,6 +738,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         """)
 
     slides_content = "\n".join(slides_html_list)
+    slides_content += "".join(f'<script type="text/plain" id="lab-{k}-doc">{v}</script>' for k, v in _lab_docs.items() if v)
 
     return f"""<!DOCTYPE html>
 <html lang="en">

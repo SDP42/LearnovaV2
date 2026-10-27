@@ -95,6 +95,7 @@ NVIDIA key improves the writing, unlocks AI-generated pictures and an AI fallbac
 - **Step-by-step explainers** (`src/learnova/explain/`): linear and quadratic equations, systems, percentages, interest, statistics, probability, Bayes' rule, derivatives, integrals, geometry, **CYK parsing, bigram probability, Naive Bayes and Viterbi**. Every number is computed with SymPy or exact fractions. With a key, an AI fallback handles anything else and is clearly labelled.
 - **An illustration on every topic slide**, drawn from the slide's own words in the deck's colours — a side panel where there is room, a compact header illustration on wide visuals (PowerPoint and web deck).
 - **Web deck:** one standalone HTML file with click-by-click reveals, flip cards, click-to-match, figure zoom, the original slide on demand, and the full explainer in an overlay.
+- **Interactive labs:** a slide about a hard topic (e.g. *region growing*) gets its simulation — opened over the slide in the web deck and from a clickable button in the PowerPoint. Teachers add their own lab as one HTML file (`POST /api/labs`, topics in `<meta name="learnova-topics">`).
 - **Checkpoint quizzes** from the deck's own definitions, tables, steps and figures, with distractors of the same word type.
 - **Tutor** grounded in the deck, with selectable personas.
 

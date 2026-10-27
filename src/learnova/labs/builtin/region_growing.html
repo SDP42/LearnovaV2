@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="learnova-topics" content="region growing, region-based segmentation, region based segmentation, seeded region growing, seed pixel, image segmentation">
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Region Growing Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: lab bench — pixel grid on the left, live "what is happening" panel on the right, theory and presets below */
+:root{
+  --bg:#f3f5f8; --paper:#ffffff; --ink:#172131; --muted:#5d6879; --line:#d8dee8; --grid:#e8edf4;
+  --accent:#2457c5; --ok:#16845b; --ok-soft:#dcf3e8; --no:#c23b2c; --no-soft:#fbe3df;
+  --r1:#3b7be0; --r1s:#d6e5fb; --r2:#e08a1e; --r2s:#fbe8cc; --r3:#22a06b; --r3s:#d4f1e3;
+  --r4:#c2489a; --r4s:#f6d9ec; --r5:#7a5ad8; --r5s:#e5ddfa; --r6:#0f8fa3; --r6s:#d2eef2;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f141c; --paper:#161d28; --ink:#e5eaf2; --muted:#9aa5b6; --line:#2a3443; --grid:#1d2633;
+  --accent:#7ea6f5; --ok:#4fd39b; --ok-soft:#173528; --no:#f2867a; --no-soft:#3a1f1c;
+  --r1:#6ea0f0; --r1s:#1d3150; --r2:#f2a64a; --r2s:#3d2c14; --r3:#4cc893; --r3s:#173a2b;
+  --r4:#e47cc0; --r4s:#3d1d33; --r5:#a58cf0; --r5s:#2b2350; --r6:#4cc4d6; --r6s:#14373d; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --paper:#161d28; --ink:#e5eaf2; --muted:#9aa5b6; --line:#2a3443; --grid:#1d2633;
+  --accent:#7ea6f5; --ok:#4fd39b; --ok-soft:#173528; --no:#f2867a; --no-soft:#3a1f1c;
+  --r1:#6ea0f0; --r1s:#1d3150; --r2:#f2a64a; --r2s:#3d2c14; --r3:#4cc893; --r3s:#173a2b;
+  --r4:#e47cc0; --r4s:#3d1d33; --r5:#a58cf0; --r5s:#2b2350; --r6:#4cc4d6; --r6s:#14373d; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;margin:0}
+.wrap{max-width:1120px;margin:0 auto;padding-block:26px 70px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:2.4rem;font-weight:750;letter-spacing:-.01em}
+h2{font-size:1.5rem;font-weight:750;margin-bottom:10px}
+h3{font-size:1.05rem;font-weight:600}
+.lead{color:var(--muted);max-width:68ch;margin:8px 0 22px}
+.lead b{color:var(--ink)}
+.cond{display:inline-block;font-family:var(--mono);font-weight:700;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:6px 12px;margin:2px 0 4px}
+
+/* presets */
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px}
+.preset{all:unset;cursor:pointer;background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.preset:hover{border-color:var(--accent)}
+.preset[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.preset:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.preset .tag{font:700 .7rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.preset strong{font-family:var(--display);font-size:1.05rem}
+.preset span.d{font-size:.88rem;color:var(--muted)}
+
+/* lab */
+.lab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:18px;align-items:start}
+@media (max-width:860px){.lab{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px}
+.gridwrap{display:flex;flex-direction:column;gap:10px}
+.axis{display:grid;grid-template-columns:22px repeat(var(--cols,8),1fr);gap:4px;font:500 .72rem var(--mono);color:var(--muted);text-align:center}
+.img{display:grid;grid-template-columns:22px repeat(var(--cols,8),1fr);gap:4px}
+.rowlbl{font:500 .72rem var(--mono);color:var(--muted);display:flex;align-items:center;justify-content:center}
+.px{position:relative;aspect-ratio:1;max-width:100%;border-radius:7px;border:1.5px solid var(--line);background:var(--grid);
+  display:flex;align-items:center;justify-content:center;font:700 var(--fs,clamp(.95rem,2.6vw,1.35rem)) var(--mono);color:var(--ink);cursor:pointer;
+  transition:background .25s,border-color .25s,transform .15s;padding:0}
+.px:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.px:hover{border-color:var(--muted)}
+.px.center{box-shadow:0 0 0 3px var(--ink) inset}
+.px.seed::after{content:"S";position:absolute;top:2px;left:4px;font:700 .6rem var(--mono);color:var(--ink);opacity:.8}
+.px.nbr{border-style:dashed;border-color:var(--muted)}
+.px.chk-ok{border-color:var(--ok);border-width:3px;transform:scale(1.06);z-index:2}
+.px.chk-no{border-color:var(--no);border-width:3px;transform:scale(1.06);z-index:2;background:var(--no-soft)}
+.px.rej{background-image:repeating-linear-gradient(45deg,transparent 0 5px,color-mix(in srgb,var(--no) 22%,transparent) 5px 7px)}
+.px.active{animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.8)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.px,.px.active{transition:none;animation:none}}
+.imgbox{position:relative}
+.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;overflow:visible}
+.bubble{position:absolute;z-index:6;width:max-content;max-width:min(240px,64%);background:var(--ink);color:var(--paper);border-radius:10px;padding:8px 11px 9px;font-size:.88rem;line-height:1.38;pointer-events:none;box-shadow:0 8px 22px rgba(10,20,40,.22);transition:left .28s ease,top .28s ease,opacity .2s}
+.bubble.ok{background:var(--ok)} .bubble.no{background:var(--no)} .bubble.info{background:var(--accent)}
+.bubble .bt{font:700 .98rem var(--display);margin-bottom:2px}
+.bubble .m{font-family:var(--mono);font-weight:700}
+.bubble[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.bubble{transition:none}}
+.stepban{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stepban .n{font:700 1rem var(--mono);width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--paper);display:flex;align-items:center;justify-content:center;flex:none}
+.stepban .t{font:700 1.05rem var(--display);flex:1;min-width:0}
+.wpill{font:700 .85rem var(--mono);border:1.5px dashed var(--ok);color:var(--ok);border-radius:999px;padding:3px 10px}
+.wpill[hidden]{display:none}
+.px .mk{position:absolute;bottom:1px;right:4px;font-size:.62rem;font-weight:700}
+.custom{margin-top:30px}
+.custom[hidden]{display:none}
+.custom h2{margin-bottom:4px}
+.custom .hint{color:var(--muted);font-size:.92rem;margin:0 0 12px}
+.crow{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;margin-bottom:12px}
+.crow label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:700;color:var(--muted)}
+.crow input[type=number]{width:84px;font:700 1rem var(--mono);padding:6px 8px;border:1.5px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}
+.crow input:focus-visible,.cgrid input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.cgridwrap{overflow-x:auto;padding-bottom:4px}
+.cgrid{display:grid;gap:4px;width:max-content}
+.cgrid .h{font:500 .72rem var(--mono);color:var(--muted);text-align:center;align-self:center}
+.cgrid input{width:46px;height:40px;text-align:center;font:700 1rem var(--mono);border:1.5px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);padding:0}
+.cgrid input.bad{border-color:var(--no);background:var(--no-soft)}
+.cgrid input.isseed{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+details.paste{margin-top:10px;font-size:.9rem}
+details.paste summary{cursor:pointer;font-weight:700;color:var(--accent)}
+details.paste textarea{width:100%;min-height:110px;font:500 .95rem var(--mono);border:1.5px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:8px;margin-top:8px}
+.cerr{color:var(--no);font-weight:700;font-size:.9rem;min-height:1.2em;margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.82rem;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1.5px solid var(--line)}
+
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:700 .9rem var(--body);border:1.5px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:7px 13px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.45;cursor:default}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px;margin-top:12px;font-size:.88rem}
+.settings label{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-weight:700}
+.settings output{font-family:var(--mono);color:var(--ink)}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;padding:5px 12px;font:700 .85rem var(--body);color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg button:focus-visible{outline:2px solid var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.toggle{grid-column:1/-1;flex-direction:row!important;align-items:center;gap:8px!important;color:var(--ink)!important}
+
+/* explanation panel */
+.panel{display:flex;flex-direction:column;gap:14px}
+.now{border-radius:12px;padding:16px;border:1.5px solid var(--line);background:var(--paper)}
+.now .k{font:700 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.now .msg{font-size:1.08rem;margin-top:6px}
+.now.ok{border-color:var(--ok);background:var(--ok-soft)}
+.now.no{border-color:var(--no);background:var(--no-soft)}
+.calc{font-family:var(--mono);font-size:.95rem;margin-top:10px;display:grid;gap:3px}
+.calc .v{font-weight:700}
+.verdict{font-weight:700}
+.ok .verdict{color:var(--ok)} .no .verdict{color:var(--no)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:8px;padding:8px 10px}
+.stat .k{font:700 .66rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font:700 1.25rem var(--mono);font-variant-numeric:tabular-nums}
+@media (max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+.bar svg{display:block;width:100%;height:auto}
+.barcap{font-size:.84rem;color:var(--muted);margin-top:4px}
+
+.algo{list-style:none;margin:0;padding:0;display:grid;gap:4px;counter-reset:a}
+.algo li{counter-increment:a;display:flex;gap:10px;padding:6px 8px;border-radius:7px;font-size:.92rem;color:var(--muted);transition:background .2s}
+.algo li::before{content:counter(a);font:700 .8rem var(--mono);min-width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none}
+.algo li.on{background:var(--r1s);color:var(--ink);font-weight:700}
+.algo li.on::before{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+
+.log{max-height:190px;overflow:auto;font:500 .8rem var(--mono);display:flex;flex-direction:column-reverse;gap:2px;background:var(--bg);border-radius:8px;padding:8px 10px}
+.log div.ok{color:var(--ok)} .log div.no{color:var(--no)} .log div.info{color:var(--muted)} .log div.done{color:var(--accent);font-weight:700}
+
+.result{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;font:700 .82rem var(--mono);border-radius:999px;padding:3px 10px;border:1.5px solid}
+
+/* theory */
+.theory{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:30px}
+.theory p{margin:.4em 0}
+.theory ul{margin:.3em 0;padding-left:1.2em}
+.conn{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-around;margin-top:8px}
+.conn figure{margin:0;text-align:center;font-size:.85rem;color:var(--muted)}
+.conn svg{display:block;width:110px;height:110px;margin:0 auto 4px}
+.walk{counter-reset:w;display:grid;gap:10px}
+.walk li{list-style:none}
+.hl{font-family:var(--mono);font-weight:700;background:var(--bg);padding:1px 6px;border-radius:5px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <h1>Region Growing, step by step</h1>
+  <p class="lead">Pixels are grouped into larger regions based on a condition. We start from one <b>seed pixel</b>, look at its <b>neighbours</b> one by one, and <b>accept</b> a neighbour only if the region still satisfies the condition after adding it. Condition from your notes:</p>
+  <div class="cond">max[P(x,y)] − min[P(x,y)] ≤ T &nbsp;&nbsp;(T = <span id="tTop">3</span>)</div>
+  <p class="lead" style="margin-top:8px">Choose an example, then press <b>Step</b> to watch one decision at a time, or <b>Play</b> to animate. Click any grey pixel to make it the next seed. To use your own numbers, go to <a href="#custom" style="color:var(--accent);font-weight:700">Try your own input</a> at the bottom.</p>
+
+  <div class="presets" role="group" aria-label="Examples">
+    <button class="preset" type="button" id="p-notes" data-p="notes" aria-pressed="true"><span class="tag">Example 1 · from notes</span><strong>Seed 6, T = 3</strong><span class="d">Seed at (2,3), then seed 3 at (5,5). Gives R1 and R2 as in your notes.</span></button>
+    <button class="preset" type="button" id="p-thr" data-p="thr" aria-pressed="false"><span class="tag">Example 2 · threshold change</span><strong>Same seed, T = 2</strong><span class="d">Stricter condition, so R1 shrinks and more regions appear.</span></button>
+    <button class="preset" type="button" id="p-seed" data-p="seed" aria-pressed="false"><span class="tag">Example 3 · seed change</span><strong>Start from 3 at (5,5)</strong><span class="d">Same T = 3, different starting pixel, so the regions come out different.</span></button>
+    <button class="preset" type="button" id="p-img" data-p="img" aria-pressed="false"><span class="tag">Example 4 · new input image</span><strong>Bright object, T = 2</strong><span class="d">A bright square on a dark background. The object is separated from the background.</span></button>
+  </div>
+
+  <div class="lab">
+    <div class="card gridwrap">
+      <div class="stepban"><span class="n" id="banN">·</span><span class="t" id="banT">Press Step to start</span><span class="wpill" id="wpill" hidden></span></div>
+      <div class="imgbox" id="imgbox">
+        <div class="axis" id="axis" aria-hidden="true"></div>
+        <div class="img" id="img" role="grid" aria-label="Image pixel values"></div>
+        <svg class="ov" id="ov" aria-hidden="true"></svg>
+        <div class="bubble" id="bub" hidden></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--grid)"></i>not assigned yet</span>
+        <span><i style="box-shadow:inset 0 0 0 3px var(--ink)"></i>pixel whose neighbours we examine</span>
+        <span><i style="border:2px dashed var(--muted)"></i>its neighbours</span>
+        <span><i style="border:3px solid var(--ok)"></i>accepted now</span>
+        <span><i style="border:3px solid var(--no);background:var(--no-soft)"></i>rejected now</span>
+        <span><i class="px rej" style="width:14px;height:14px;aspect-ratio:auto;border-radius:4px;display:inline-block"></i>rejected for this region</span>
+      </div>
+      <div class="controls">
+        <button class="btn primary" type="button" id="bStep">Step</button>
+        <button class="btn" type="button" id="bPlay">Play</button>
+        <button class="btn" type="button" id="bRegion">Finish region</button>
+        <button class="btn" type="button" id="bAll">Run to end</button>
+        <button class="btn" type="button" id="bReset">Reset</button>
+      </div>
+      <div class="settings">
+        <label>Threshold T <output id="tOut">3</output><input type="range" id="tIn" min="0" max="6" step="1" value="3"></label>
+        <label>Speed <input type="range" id="spd" min="80" max="1400" step="20" value="650"></label>
+        <label>Connectivity
+          <span class="seg" role="group" aria-label="Connectivity"><button type="button" id="c8" aria-pressed="true">8-conn</button><button type="button" id="c4" aria-pressed="false">4-conn</button></span>
+        </label>
+        <label class="toggle"><input type="checkbox" id="edit"> Edit pixel values (click: +1, Shift+click: −1)</label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="now" id="now" aria-live="polite">
+        <div class="k" id="nowK">Ready</div>
+        <div class="msg" id="nowMsg">Press <b>Step</b> to pick the seed pixel.</div>
+        <div class="calc" id="calc"></div>
+      </div>
+      <div class="card">
+        <div class="stats">
+          <div class="stat"><div class="k">Region</div><div class="v" id="sReg">–</div></div>
+          <div class="stat"><div class="k">Min</div><div class="v" id="sMin">–</div></div>
+          <div class="stat"><div class="k">Max</div><div class="v" id="sMax">–</div></div>
+          <div class="stat"><div class="k">Pixels</div><div class="v" id="sCnt">0</div></div>
+        </div>
+        <div class="bar" style="margin-top:12px"><svg id="bar" viewBox="0 0 440 96" role="img" aria-label="Intensity number line showing the current region range and allowed window"></svg></div>
+        <div class="barcap">Shaded box = values already in the region (min to max). Dashed window = values that can still be accepted: from <b>max − T</b> to <b>min + T</b>. The dot is the pixel being checked.</div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:8px">Algorithm (from your notes)</h3>
+        <ol class="algo" id="algo">
+          <li>Pick up a pixel as the <b>seed pixel</b>.</li>
+          <li>Examine its nearest neighbours one by one (4-, D- or 8-connectivity).</li>
+          <li>Accept a neighbouring pixel if it satisfies the condition.</li>
+          <li>Examine the neighbours of this new pixel.</li>
+          <li>Continue till no new pixel is accepted.</li>
+          <li>Give a unique label to the current region.</li>
+          <li>Select a new seed pixel and continue the procedure.</li>
+          <li>Do this until all pixels are assigned to some region.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:8px">Regions found</h3>
+        <div class="result" id="result"><span style="color:var(--muted);font-size:.9rem">None yet.</span></div>
+        <h3 style="margin:14px 0 8px">Step log</h3>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="theory">
+    <div class="card">
+      <h2>Example 1 worked out</h2>
+      <ol class="walk">
+        <li><b>Seed:</b> pixel (2,3) = <span class="hl">6</span>. Region = {6}, min = max = 6.</li>
+        <li><b>First neighbours:</b> 6, 6, 6, 7 are checked. Adding 7 makes max = 7, min = 6, difference 1 ≤ 3, so it is accepted.</li>
+        <li><b>A 4 appears:</b> max 7 − min 4 = 3 ≤ 3, so it is accepted. Now the window is exactly [4, 7].</li>
+        <li><b>A 3 appears:</b> 7 − 3 = 4 &gt; 3, so it is <b>rejected</b>. Every 0–3 pixel is rejected the same way.</li>
+        <li><b>Stop:</b> no new pixel can be accepted, so this is <b>R1</b> = all connected pixels with values 4–7 (36 pixels).</li>
+        <li><b>New seed:</b> (5,5) = <span class="hl">3</span>. It grows through 2, 3, 0, 1 with range [0, 3] and becomes <b>R2</b> (28 pixels). All 64 pixels are now assigned.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>What changes the answer</h2>
+      <ul>
+        <li><b>Threshold T:</b> smaller T means a stricter condition. With T = 2 the first region keeps only values 5–7, and the 4s go to other regions. Larger T gives fewer, bigger regions.</li>
+        <li><b>Seed pixel:</b> the region depends on where you start. Seed 3 first (Example 3) takes values 2–5, which is a different split from Example 1.</li>
+        <li><b>Order of checking:</b> the range is updated after every accepted pixel, so what gets accepted early decides the window for later pixels.</li>
+        <li><b>Connectivity:</b> with 4-connectivity, pixels touching only at a corner are not neighbours, so regions can break apart.</li>
+      </ul>
+      <h3 style="margin-top:12px">Exam points</h3>
+      <ul>
+        <li>Region growing is a <b>similarity-based</b> (region-based) segmentation method.</li>
+        <li><b>Pros:</b> connected regions, simple, works on noisy edges.</li>
+        <li><b>Cons:</b> depends on the seed and threshold choice; computationally slow.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Which pixels are neighbours?</h2>
+      <div class="conn" id="conn"></div>
+      <p style="font-size:.9rem;color:var(--muted)">The dark centre is the current pixel. Shaded cells are the neighbours examined in step 2.</p>
+    </div>
+  </div>
+
+  <div class="card custom" id="custom">
+    <h2>Try your own input</h2>
+    <p class="hint">No image upload needed: type the pixel numbers yourself. 1) Set rows and columns and press <b>Make grid</b>. 2) Type each pixel value (0–255). 3) Set the seed pixel and threshold T. 4) Press <b>Run on my input</b>. Your numbers load into the step-by-step grid above with the same explanations.</p>
+    <div class="crow">
+      <label for="cR">Rows<input type="number" id="cR" min="1" max="12" value="5"></label>
+      <label for="cC">Columns<input type="number" id="cC" min="1" max="12" value="5"></label>
+      <button class="btn" type="button" id="cMake">Make grid</button>
+      <button class="btn" type="button" id="cRand">Fill random 0–9</button>
+      <button class="btn" type="button" id="cClear">Clear</button>
+    </div>
+    <div class="cgridwrap"><div class="cgrid" id="cgrid"></div></div>
+    <details class="paste"><summary>Or paste the whole image as text</summary>
+      <label for="cText" style="display:block;color:var(--muted);margin-top:6px">One row per line, values separated by spaces or commas. Rows and columns are taken from what you paste.</label>
+      <textarea id="cText" spellcheck="false" placeholder="5 6 6 6 7&#10;6 7 6 7 5&#10;0 3 2 3 3"></textarea>
+      <button class="btn" type="button" id="cPaste" style="margin-top:6px">Use pasted values</button>
+    </details>
+    <div class="crow" style="margin-top:14px">
+      <label for="cSR">Seed row<input type="number" id="cSR" min="1" max="12" value="1"></label>
+      <label for="cSC">Seed column<input type="number" id="cSC" min="1" max="12" value="1"></label>
+      <label for="cT">Threshold T<input type="number" id="cT" min="0" max="255" value="3"></label>
+      <button class="btn primary" type="button" id="cRun">Run on my input</button>
+    </div>
+    <div class="cerr" id="cErr" role="alert"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var NOTES=[[5,6,6,6,7,7,6,6],[6,7,6,7,5,5,4,7],[6,6,4,4,3,2,5,6],[5,4,5,4,2,3,4,6],[0,3,2,3,3,2,4,7],[0,0,0,0,2,2,5,6],[1,1,0,1,0,3,4,4],[1,0,1,0,2,3,5,4]];
+  var OBJ=[[1,1,2,1,0,1,2,1],[2,1,1,2,1,1,1,0],[1,2,8,8,9,7,1,2],[0,1,9,8,8,8,2,1],[1,1,8,9,7,8,1,1],[2,0,7,8,8,9,0,2],[1,2,1,2,1,1,2,1],[0,1,1,0,2,1,1,0]];
+  var PRESETS={
+    notes:{img:NOTES,T:3,seeds:[[1,2],[4,4]]},
+    thr:{img:NOTES,T:2,seeds:[[1,2]]},
+    seed:{img:NOTES,T:3,seeds:[[4,4]]},
+    img:{img:OBJ,T:2,seeds:[[3,3],[0,0]]}
+  };
+  var N8=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]], N4=[[-1,0],[0,-1],[0,1],[1,0]];
+  var S={}, cells=[], timer=null, preset='notes';
+  var $=function(id){return document.getElementById(id)};
+  var imgEl=$('img');
+
+  // build grid for any size
+  function buildGrid(R,C){
+    S.R=R; S.C=C; imgEl.innerHTML=''; cells=[];
+    var box=$('imgbox'); box.style.setProperty('--cols',C);
+    var big=Math.max(R,C), wide=S.img&&S.img.some(function(row){return row.some(function(v){return v>99})});
+    var fs=big<=8?'clamp(.95rem,2.6vw,1.35rem)':big<=10?'clamp(.8rem,2.1vw,1.1rem)':'clamp(.7rem,1.8vw,.95rem)';
+    if(wide) fs='clamp(.62rem,1.6vw,.9rem)';
+    box.style.setProperty('--fs',fs);
+    var ax='<span></span>'; for(var k=0;k<C;k++) ax+='<span>'+(k+1)+'</span>'; $('axis').innerHTML=ax;
+    for(var r=0;r<R;r++){
+      var rl=document.createElement('div'); rl.className='rowlbl'; rl.textContent=r+1; imgEl.appendChild(rl);
+      cells.push([]);
+      for(var c=0;c<C;c++){
+        var b=document.createElement('button'); b.type='button'; b.className='px'; b.id='px'+r+'_'+c;
+        b.dataset.r=r; b.dataset.c=c; imgEl.appendChild(b); cells[r].push(b);
+        b.addEventListener('click',onCell);
+      }
+    }
+  }
+  function rv(i){return 'var(--r'+(((i-1)%6)+1)+')'} function rs(i){return 'var(--r'+(((i-1)%6)+1)+'s)'}
+  function P(rc){return '('+(rc[0]+1)+','+(rc[1]+1)+')'}
+
+  function load(name){
+    stop(); preset=name; var p=PRESETS[name];
+    document.querySelectorAll('.preset').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.p===name))});
+    if(!p){ return; }
+    S.img=p.img.map(function(r){return r.slice()});
+    buildGrid(S.img.length,S.img[0].length);
+    $('tIn').max=Math.max(6,Math.max.apply(null,S.img.map(function(r){return Math.max.apply(null,r)})));
+    $('tIn').value=p.T; S.plan=p.seeds.map(function(s){return s.slice()});
+    reset();
+  }
+  function reset(){
+    stop();
+    S.T=+$('tIn').value; $('tOut').textContent=S.T; $('tTop').textContent=S.T;
+    S.nb=$('c4').getAttribute('aria-pressed')==='true'?N4:N8;
+    S.lab=[]; for(var r=0;r<S.R;r++){var z=[]; for(var q=0;q<S.C;q++) z.push(0); S.lab.push(z);}
+    S.phase='idle'; S.id=0; S.cur=null; S.planIdx=0; S.userSeed=null; S.regions=[]; S.check=null; S.note=null; S.ban=[0,'Press Step to start'];
+    S.vmax=Math.max.apply(null,S.img.map(function(r){return Math.max.apply(null,r)})); S.vmax=Math.max(S.vmax,7);
+    $('log').innerHTML='';
+    say('Ready','Press <b>Step</b> to pick the seed pixel.','', '');
+    setAlgo(0); render();
+  }
+  function say(k,msg,calc,cls){
+    $('nowK').textContent=k; $('nowMsg').innerHTML=msg; $('calc').innerHTML=calc||'';
+    $('now').className='now'+(cls?' '+cls:'');
+  }
+  function log(t,cls){var d=document.createElement('div'); d.className=cls||''; d.textContent=t; $('log').prepend(d);}
+  function setAlgo(n){document.querySelectorAll('#algo li').forEach(function(li,i){li.classList.toggle('on',i===n-1)})}
+  function unassigned(){for(var r=0;r<S.R;r++)for(var c=0;c<S.C;c++)if(!S.lab[r][c])return [r,c];return null}
+
+  function startRegion(seed){
+    S.id++; var v=S.img[seed[0]][seed[1]];
+    S.cur={id:S.id,seed:seed,queue:[seed],min:v,max:v,count:1,center:null,ni:0,rej:{}};
+    S.lab[seed[0]][seed[1]]=S.id; S.phase='grow'; S.check=null;
+    setAlgo(1);
+    say('Step 1 · seed pixel','Pick seed pixel <b>'+P(seed)+' = '+v+'</b>. Region R'+S.id+' starts with just this pixel.',
+      '<div>min = max = <span class="v">'+v+'</span></div><div>max − min = 0 ≤ '+S.T+'</div>','');
+    log('R'+S.id+': seed '+P(seed)+' = '+v,'done');
+    S.ban=[S.id>1?7:1, S.id>1?'New seed → start region R'+S.id:'Pick the seed pixel'];
+    S.note={cell:seed,kind:'info',html:'<div class="bt">Seed = '+v+'</div>Why this pixel? '+S.seedWhy+'.<br>R'+S.id+' = {'+v+'}, so min = max = <span class="m">'+v+'</span>'};
+  }
+  function finishRegion(){
+    var c=S.cur; setAlgo(6);
+    S.regions.push({id:c.id,min:c.min,max:c.max,count:c.count,seed:c.seed});
+    say('Steps 5–6 · label the region','No new pixel can be accepted, so the region is complete. It gets the unique label <b>R'+c.id+'</b>.',
+      '<div>R'+c.id+': values '+c.min+' to '+c.max+', '+c.count+' pixels</div>','');
+    log('R'+c.id+' done: values '+c.min+'–'+c.max+', '+c.count+' px','done');
+    S.ban=[6,'Region complete → label it R'+c.id];
+    S.note={cell:c.seed,kind:'info',html:'<div class="bt">R'+c.id+' complete ✓</div>No grey neighbour fits <span class="m">'+Math.max(0,c.max-S.T)+'–'+(c.min+S.T)+'</span> any more.<br>All '+c.count+' coloured pixels get the label R'+c.id+'.'+(unassigned()?'<br>Grey pixels remain → pick a new seed.':'<br>Nothing grey left → done!')};
+    S.cur=null; S.phase=unassigned()?'idle':'end'; S.check=null;
+    if(S.phase==='end'){ setTimeout(function(){},0); }
+  }
+  function step(){
+    S.check=null;
+    if(S.phase==='end'){ S.ban=[8,'All pixels assigned → segmentation done']; S.note=null; setAlgo(8); say('Step 8 · finished','All '+(S.R*S.C)+' pixels are assigned to some region.','',''); stop(); render(); return false; }
+    if(S.phase==='idle'){
+      var seed=null;
+      S.seedWhy='';
+      if(S.userSeed && !S.lab[S.userSeed[0]][S.userSeed[1]]){seed=S.userSeed; S.seedWhy='you clicked this pixel';}
+      else { while(S.planIdx<S.plan.length){var s=S.plan[S.planIdx++]; if(!S.lab[s[0]][s[1]]){seed=s; S.seedWhy=(preset==='notes'?'given in the question (pink box in notes)':'chosen for this example'); break;}} }
+      if(!seed){ seed=unassigned(); S.seedWhy='first grey pixel (top-left first) not in any region yet'; }
+      S.userSeed=null;
+      if(S.id>0){ setAlgo(7); log('Step 7: new seed '+P(seed),'info'); }
+      startRegion(seed); if(S.id>1){ setAlgo(7); $('nowK').textContent='Step 7 · new seed pixel'; }
+      render(); return true;
+    }
+    var c=S.cur;
+    // need a new centre?
+    while(true){
+      if(!c.center || c.ni>=S.nb.length){
+        if(!c.queue.length){ finishRegion(); render(); return true; }
+        c.center=c.queue.shift(); c.ni=0;
+        var isSeed=c.center[0]===c.seed[0]&&c.center[1]===c.seed[1];
+        setAlgo(isSeed?2:4);
+        say(isSeed?'Step 2 · examine neighbours':'Step 4 · neighbours of the new pixel',
+          'Now examine the neighbours of <b>'+P(c.center)+' = '+S.img[c.center[0]][c.center[1]]+'</b> one by one (dashed cells).','','');
+        log('examine neighbours of '+P(c.center),'info');
+        S.ban=[isSeed?2:4, isSeed?'Look at the seed\'s neighbours':'Grow from a newly added pixel'];
+        S.note={cell:c.center,kind:'',html:'<div class="bt">Grow from this '+S.img[c.center[0]][c.center[1]]+'</div>'+(isSeed?'Start with the seed.':'It joined R'+c.id+' earlier, so now its neighbours get a chance.')+'<br>Check the dashed '+(S.nb.length===8?'8':'4')+' neighbours one by one.'};
+        render(); return true;
+      }
+      var d=S.nb[c.ni++], y=c.center[0]+d[0], x=c.center[1]+d[1];
+      if(y<0||y>=S.R||x<0||x>=S.C||S.lab[y][x]) continue;
+      var v=S.img[y][x], nmax=Math.max(c.max,v), nmin=Math.min(c.min,v), diff=nmax-nmin, ok=diff<=S.T;
+      S.check={r:y,c:x,v:v,ok:ok};
+      setAlgo(3); S.ban=[3,'Check one neighbour: does it fit?'];
+      var calc='<div>new max = max('+c.max+', '+v+') = <span class="v">'+nmax+'</span></div>'+
+               '<div>new min = min('+c.min+', '+v+') = <span class="v">'+nmin+'</span></div>'+
+               '<div>max − min = '+nmax+' − '+nmin+' = <span class="v">'+diff+'</span> '+(ok?'≤':'&gt;')+' '+S.T+'</div>'+
+               '<div class="verdict">'+(ok?'✓ Accept: add to R'+c.id:'✗ Reject: leave it for another region')+'</div>';
+      if(ok){
+        var widen=(nmax!==c.max||nmin!==c.min);
+        S.note={cell:[y,x],from:c.center,kind:'ok',html:'<div class="bt">Check '+v+' ✓ accept</div>'+why(v,c)+'<span class="m">'+nmax+' − '+nmin+' = '+diff+' ≤ '+S.T+'</span> → joins R'+c.id+(widen?'<br>Range grows to <span class="m">'+nmin+'–'+nmax+'</span>':'')};
+        S.lab[y][x]=c.id; c.queue.push([y,x]); c.max=nmax; c.min=nmin; c.count++; delete c.rej[y+','+x];
+        say('Step 3 · check a neighbour','Check pixel <b>'+P([y,x])+' = '+v+'</b>. If we add it to R'+c.id+'…',calc,'ok');
+        log('  '+P([y,x])+'='+v+' → '+nmax+'−'+nmin+'='+diff+' ✓','ok');
+      } else {
+        c.rej[y+','+x]=1;
+        S.note={cell:[y,x],from:c.center,kind:'no',html:'<div class="bt">Check '+v+' ✗ reject</div>'+why(v,c)+'<span class="m">'+nmax+' − '+nmin+' = '+diff+' &gt; '+S.T+'</span> → too different, stays grey for a later region'};
+        say('Step 3 · check a neighbour','Check pixel <b>'+P([y,x])+' = '+v+'</b>. If we add it to R'+c.id+'…',calc,'no');
+        log('  '+P([y,x])+'='+v+' → '+nmax+'−'+nmin+'='+diff+' ✗','no');
+      }
+      render(); return true;
+    }
+  }
+  function render(){
+    var c=S.cur, nbset={};
+    if(c&&c.center){ S.nb.forEach(function(d){var y=c.center[0]+d[0],x=c.center[1]+d[1]; if(y>=0&&y<S.R&&x>=0&&x<S.C) nbset[y+','+x]=1;}); }
+    for(var r=0;r<S.R;r++)for(var k=0;k<S.C;k++){
+      var b=cells[r][k], L=S.lab[r][k], key=r+','+k;
+      b.textContent=S.img[r][k];
+      var cls='px';
+      if(L){ b.style.background=rs(L); b.style.borderColor=rv(L); } else { b.style.background=''; b.style.borderColor=''; }
+      if(c&&c.center&&c.center[0]===r&&c.center[1]===k) cls+=' center';
+      if(nbset[key]) cls+=' nbr';
+      if(c&&c.rej[key]&&!L) cls+=' rej';
+      if(S.check&&S.check.r===r&&S.check.c===k){ cls+=S.check.ok?' chk-ok active':' chk-no'; b.style.borderColor=''; }
+      var isSeed=(c&&c.seed[0]===r&&c.seed[1]===k)||S.regions.some(function(g){return g.seed[0]===r&&g.seed[1]===k});
+      if(isSeed) cls+=' seed';
+      b.className=cls;
+      b.setAttribute('aria-label','row '+(r+1)+' column '+(k+1)+' value '+S.img[r][k]+(L?' region '+L:' unassigned'));
+    }
+    $('sReg').textContent=c?'R'+c.id:'–'; $('sReg').style.color=c?rv(c.id):'';
+    $('sMin').textContent=c?c.min:'–'; $('sMax').textContent=c?c.max:'–'; $('sCnt').textContent=c?c.count:0;
+    drawBar(); drawNote();
+    var res=$('result');
+    if(!S.regions.length){res.innerHTML='<span style="color:var(--muted);font-size:.9rem">None yet.</span>';}
+    else res.innerHTML=S.regions.map(function(g){return '<span class="chip" style="border-color:'+rv(g.id)+';background:'+rs(g.id)+'">R'+g.id+' · '+g.min+'–'+g.max+' · '+g.count+' px</span>'}).join('');
+    var done=S.phase==='end';
+    $('bStep').disabled=done&&false;
+  }
+  // explains how the candidate changes (or does not change) the region's max and min
+  function why(v,c){
+    var reg='R'+c.id+' now has min <span class="m">'+c.min+'</span>, max <span class="m">'+c.max+'</span>.<br>';
+    if(v>c.max) return reg+v+' is bigger than '+c.max+' → <b>new max = '+v+'</b>, min stays '+c.min+'.<br>';
+    if(v<c.min) return reg+v+' is smaller than '+c.min+' → <b>new min = '+v+'</b>, max stays '+c.max+'.<br>';
+    return reg+v+(v===c.min||v===c.max?' is already in the range '+c.min+'–'+c.max:' lies between '+c.min+' and '+c.max)+' → max and min <b>do not change</b>.<br>';
+  }
+  function drawNote(){
+    var box=$('imgbox'), bub=$('bub'), ov=$('ov');
+    $('banN').textContent=S.ban[0]||'·'; $('banT').textContent=S.ban[1];
+    var c=S.cur, wp=$('wpill');
+    if(c){ wp.hidden=false; wp.textContent='R'+c.id+' accepts '+Math.max(0,c.max-S.T)+' – '+(c.min+S.T); } else wp.hidden=true;
+    ov.innerHTML='';
+    if(!S.note){ bub.hidden=true; return; }
+    var B=box.getBoundingClientRect(), n=S.note;
+    var cr=cells[n.cell[0]][n.cell[1]].getBoundingClientRect();
+    var cx=cr.left-B.left+cr.width/2, cy=cr.top-B.top+cr.height/2;
+    if(n.from){
+      var fr=cells[n.from[0]][n.from[1]].getBoundingClientRect();
+      var fx=fr.left-B.left+fr.width/2, fy=fr.top-B.top+fr.height/2;
+      var col=n.kind==='ok'?'var(--ok)':'var(--no)';
+      var dx=cx-fx, dy=cy-fy, L=Math.hypot(dx,dy)||1, sh=cr.width*0.42;
+      var ex=cx-dx/L*sh, ey=cy-dy/L*sh, sx=fx+dx/L*cr.width*0.3, sy=fy+dy/L*cr.width*0.3;
+      ov.innerHTML='<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="'+col+'"/></marker></defs>'+
+        '<line x1="'+sx+'" y1="'+sy+'" x2="'+ex+'" y2="'+ey+'" stroke="'+col+'" stroke-width="3" stroke-linecap="round" marker-end="url(#ah)"/>';
+    }
+    bub.className='bubble '+n.kind; bub.innerHTML=n.html; bub.hidden=false;
+    var bw=bub.offsetWidth, bh=bub.offsetHeight, W=B.width, H=B.height, gap=cr.width*0.62;
+    var left = cx < W/2 ? cx+gap : cx-gap-bw;
+    if(left<0) left=4; if(left+bw>W) left=W-bw-4;
+    var top=cy-bh/2; if(top<0) top=0; if(top+bh>H) top=H-bh;
+    // if the bubble would cover the cell (narrow screens), put it above or below instead
+    if(cx>left-6 && cx<left+bw+6 && cy>top-6 && cy<top+bh+6){ top = cy < H/2 ? cy+gap : cy-gap-bh; if(top<0)top=0; if(top+bh>H) top=H-bh; }
+    bub.style.left=left+'px'; bub.style.top=top+'px';
+  }
+  window.addEventListener('resize',function(){ if(S.lab) drawNote(); });
+  function drawBar(){
+    var svg=$('bar'), W=440, x0=20, x1=420, n=S.vmax, sx=function(v){return x0+(x1-x0)*v/n}, h='';
+    var c=S.cur;
+    if(c){
+      var lo=Math.max(0,c.max-S.T), hi=Math.min(n,c.min+S.T);
+      h+='<rect x="'+(sx(lo)-8)+'" y="18" width="'+(sx(hi)-sx(lo)+16)+'" height="40" rx="7" fill="none" stroke="var(--ok)" stroke-width="1.6" stroke-dasharray="5 4"/>';
+      h+='<text x="'+((sx(lo)+sx(hi))/2)+'" y="13" text-anchor="middle" font-size="11" fill="var(--ok)" font-family="JetBrains Mono, monospace">accept window '+lo+'–'+hi+'</text>';
+      h+='<rect x="'+(sx(c.min)-6)+'" y="25" width="'+(sx(c.max)-sx(c.min)+12)+'" height="26" rx="5" fill="'+rs(c.id)+'" stroke="'+rv(c.id)+'" stroke-width="1.6"/>';
+    }
+    h+='<line x1="'+x0+'" y1="38" x2="'+x1+'" y2="38" stroke="var(--muted)" stroke-width="1.2"/>';
+    var stp=Math.ceil(n/10)||1;
+    for(var v=0;v<=n;v++){ if(v%stp&&v!==n) continue; h+='<line x1="'+sx(v)+'" y1="34" x2="'+sx(v)+'" y2="42" stroke="var(--muted)"/><text x="'+sx(v)+'" y="78" text-anchor="middle" font-size="13" fill="var(--ink)" font-family="JetBrains Mono, monospace">'+v+'</text>'; }
+    if(S.check){ var col=S.check.ok?'var(--ok)':'var(--no)'; h+='<circle cx="'+sx(S.check.v)+'" cy="38" r="8" fill="'+col+'" stroke="var(--paper)" stroke-width="2"/><text x="'+sx(S.check.v)+'" y="93" text-anchor="middle" font-size="10" fill="'+col+'" font-family="JetBrains Mono, monospace">checking</text>'; }
+    if(!c) h+='<text x="220" y="16" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="JetBrains Mono, monospace">no region growing right now</text>';
+    svg.innerHTML=h;
+  }
+  function onCell(e){
+    var r=+this.dataset.r, c=+this.dataset.c;
+    if($('edit').checked){
+      var d=e.shiftKey?-1:1; S.img[r][c]=Math.max(0,Math.min(255,S.img[r][c]+d));
+      var keepPlan=S.plan; reset(); S.plan=keepPlan; log('edited '+P([r,c])+' → '+S.img[r][c]+' (restarted)','info'); return;
+    }
+    if(S.lab[r][c]){ say(S.cur?'Busy':'Already assigned', S.cur?'Finish the current region first, or click a grey pixel to queue it as the next seed.':'That pixel already belongs to R'+S.lab[r][c]+'. Pick a grey pixel.','',''); return; }
+    S.userSeed=[r,c];
+    if(S.phase==='idle'){ step(); }
+    else say('Next seed chosen','<b>'+P([r,c])+' = '+S.img[r][c]+'</b> will be the seed for the next region.','','');
+  }
+  function stop(){ if(timer){clearInterval(timer);timer=null;} $('bPlay').textContent='Play'; }
+  function play(){
+    if(timer){stop();return;}
+    $('bPlay').textContent='Pause';
+    timer=setInterval(function(){ if(S.phase==='end'){step();stop();return;} step(); }, +$('spd').value);
+  }
+  $('bStep').addEventListener('click',function(){stop();step();});
+  $('bPlay').addEventListener('click',play);
+  $('spd').addEventListener('input',function(){ if(timer){stop();play();} });
+  $('bRegion').addEventListener('click',function(){
+    stop(); var guard=0;
+    if(S.phase==='idle') step();
+    while(S.phase==='grow'&&guard++<2000) step();
+  });
+  $('bAll').addEventListener('click',function(){ stop(); var g=0; while(S.phase!=='end'&&g++<5000) step(); step(); });
+  $('bReset').addEventListener('click',function(){ var keep=S.plan; reset(); });
+  $('tIn').addEventListener('input',function(){ reset(); });
+  $('c8').addEventListener('click',function(){ $('c8').setAttribute('aria-pressed','true'); $('c4').setAttribute('aria-pressed','false'); reset(); });
+  $('c4').addEventListener('click',function(){ $('c4').setAttribute('aria-pressed','true'); $('c8').setAttribute('aria-pressed','false'); reset(); });
+  document.querySelectorAll('.preset').forEach(function(b){ b.addEventListener('click',function(){ load(b.dataset.p); }); });
+
+  // connectivity diagrams
+  function connSvg(type){
+    var s='', z=34, o=4;
+    for(var r=0;r<3;r++)for(var c=0;c<3;c++){
+      var ctr=r===1&&c===1, orth=(r===1)!==(c===1), diag=!ctr&&!orth;
+      var on=(type==='4'&&orth)||(type==='D'&&diag)||(type==='8'&&!ctr);
+      s+='<rect x="'+(o+c*z)+'" y="'+(o+r*z)+'" width="'+(z-4)+'" height="'+(z-4)+'" rx="5" fill="'+(ctr?'var(--ink)':on?'var(--r1s)':'var(--grid)')+'" stroke="'+(on?'var(--r1)':'var(--line)')+'" stroke-width="1.5"/>';
+      if(ctr) s+='<text x="'+(o+c*z+15)+'" y="'+(o+r*z+20)+'" text-anchor="middle" font-size="11" fill="var(--paper)" font-family="JetBrains Mono, monospace">p</text>';
+    }
+    return '<svg viewBox="0 0 110 110" role="img" aria-label="'+type+'-connectivity">'+s+'</svg>';
+  }
+  $('conn').innerHTML='<figure>'+connSvg('4')+'<figcaption><b>4-connectivity</b><br>up, down, left, right</figcaption></figure>'+
+    '<figure>'+connSvg('D')+'<figcaption><b>D-connectivity</b><br>4 diagonals</figcaption></figure>'+
+    '<figure>'+connSvg('8')+'<figcaption><b>8-connectivity</b><br>4 + diagonals</figcaption></figure>';
+
+  // ---------- custom image editor ----------
+  var CI={R:5,C:5,vals:null};
+  function clampInt(v,lo,hi){v=parseInt(v,10); if(isNaN(v)) v=lo; return Math.max(lo,Math.min(hi,v));}
+  function makeEditor(R,C,vals){
+    CI.R=R; CI.C=C; var g=$('cgrid'); g.style.gridTemplateColumns='22px repeat('+C+',46px)';
+    var h='<span></span>'; for(var c=0;c<C;c++) h+='<span class="h">'+(c+1)+'</span>';
+    for(var r=0;r<R;r++){ h+='<span class="h">'+(r+1)+'</span>';
+      for(var c2=0;c2<C;c2++){ var v=vals&&vals[r]&&vals[r][c2]!=null?vals[r][c2]:'';
+        h+='<input type="number" inputmode="numeric" min="0" max="255" id="ci_'+r+'_'+c2+'" data-r="'+r+'" data-c="'+c2+'" aria-label="row '+(r+1)+' column '+(c2+1)+'" value="'+v+'">'; } }
+    g.innerHTML=h; $('cR').value=R; $('cC').value=C; $('cSR').max=R; $('cSC').max=C;
+    markSeed();
+  }
+  function readEditor(){
+    var vals=[], bad=0;
+    for(var r=0;r<CI.R;r++){ var row=[]; for(var c=0;c<CI.C;c++){ var el=$('ci_'+r+'_'+c), t=el.value.trim(), v=parseInt(t,10);
+      var ok=t!==''&&!isNaN(v)&&v>=0&&v<=255&&String(v)===String(Number(t)); el.classList.toggle('bad',!ok); if(!ok) bad++; row.push(ok?v:0);} vals.push(row);}
+    return {vals:vals,bad:bad};
+  }
+  function markSeed(){
+    var sr=+$('cSR').value-1, sc=+$('cSC').value-1;
+    document.querySelectorAll('#cgrid input').forEach(function(el){ el.classList.toggle('isseed', +el.dataset.r===sr && +el.dataset.c===sc); });
+  }
+  $('cMake').addEventListener('click',function(){
+    var R=clampInt($('cR').value,1,12), C=clampInt($('cC').value,1,12), old=readEditor().vals;
+    makeEditor(R,C,old); $('cErr').textContent='';
+    var f=$('ci_0_0'); if(f) f.focus();
+  });
+  $('cRand').addEventListener('click',function(){
+    var v=[]; for(var r=0;r<CI.R;r++){var row=[]; for(var c=0;c<CI.C;c++) row.push(Math.floor(Math.random()*10)); v.push(row);} makeEditor(CI.R,CI.C,v); $('cErr').textContent='';
+  });
+  $('cClear').addEventListener('click',function(){ makeEditor(CI.R,CI.C,null); });
+  $('cPaste').addEventListener('click',function(){
+    var lines=$('cText').value.trim().split(/\n+/).map(function(l){return l.trim().split(/[\s,;]+/).filter(Boolean)}).filter(function(l){return l.length});
+    if(!lines.length){ $('cErr').textContent='Nothing to read. Paste one row per line.'; return; }
+    var C=lines[0].length;
+    if(lines.some(function(l){return l.length!==C})){ $('cErr').textContent='Every row needs the same number of values (first row has '+C+').'; return; }
+    if(lines.length>12||C>12){ $('cErr').textContent='Maximum size is 12 × 12.'; return; }
+    makeEditor(lines.length,C,lines.map(function(l){return l.map(function(x){return x})}));
+    var r=readEditor(); $('cErr').textContent=r.bad?r.bad+' value(s) are not whole numbers from 0 to 255 (shown in red).':'Loaded '+lines.length+' × '+C+'. Now set the seed and press Run.';
+  });
+  $('cSR').addEventListener('input',markSeed); $('cSC').addEventListener('input',markSeed);
+  $('cgrid').addEventListener('keydown',function(e){
+    var el=e.target; if(el.tagName!=='INPUT') return; var r=+el.dataset.r, c=+el.dataset.c, n=null;
+    if(e.key==='Enter'||e.key==='ArrowRight'&&el.selectionStart===el.value.length){ c++; if(c>=CI.C){c=0;r++;} n=$('ci_'+r+'_'+c); }
+    else if(e.key==='ArrowDown'){ n=$('ci_'+(r+1)+'_'+c); } else if(e.key==='ArrowUp'){ n=$('ci_'+(r-1)+'_'+c); }
+    else if(e.key==='ArrowLeft'&&el.selectionStart===0){ n=$('ci_'+r+'_'+(c-1)); }
+    if(n){ e.preventDefault(); n.focus(); n.select(); }
+  });
+  $('cRun').addEventListener('click',function(){
+    var r=readEditor();
+    if(r.bad){ $('cErr').textContent=r.bad+' cell(s) are empty or not whole numbers from 0 to 255 (shown in red). Fix them and press Run again.'; return; }
+    var sr=clampInt($('cSR').value,1,CI.R)-1, sc=clampInt($('cSC').value,1,CI.C)-1, T=clampInt($('cT').value,0,255);
+    $('cSR').value=sr+1; $('cSC').value=sc+1; $('cT').value=T; markSeed();
+    PRESETS.custom={img:r.vals,T:T,seeds:[[sr,sc]]};
+    $('cErr').textContent='';
+    load('custom');
+    var mx=Math.max.apply(null,r.vals.map(function(x){return Math.max.apply(null,x)}));
+    $('tIn').max=Math.max(6,mx,T); $('tIn').value=T; reset();
+    document.querySelector('.lab').scrollIntoView({behavior:'smooth',block:'start'});
+  });
+  makeEditor(5,5,[[5,6,6,7,7],[6,7,6,5,4],[6,4,3,2,5],[2,3,2,3,4],[0,1,0,2,3]]);
+
+  load('notes');
+})();
+</script>
+
+</body>
+</html>

@@ -151,6 +151,28 @@ def add_footer(slide, n: int, total: int, theme, brand: str = "Learnova") -> Non
         _text(slide, W - MX - w, L.FOOTER_Y, w, L.FOOTER_H, label, 10, theme.subtext_rgb, align=PP_ALIGN.RIGHT)
 
 
+def add_lab_button(slide, theme, name: str, url: str) -> None:
+    """A clickable "open the interactive lab" pill in the footer row (PowerPoint cannot run a web page inside a slide)."""
+    W = L.SLIDE_W
+    label = f"▶ Open the interactive lab: {name}"
+    bw = min(7.0, 0.7 + len(label) * 0.088)
+    shp = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches((W - bw) / 2), Inches(L.FOOTER_Y - 0.02), Inches(bw), Inches(L.FOOTER_H + 0.04))
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = theme.accent_rgb
+    shp.line.fill.background()
+    shp.click_action.hyperlink.address = url
+    tf = shp.text_frame
+    tf.margin_left = tf.margin_right = Inches(0.1)
+    tf.margin_top = tf.margin_bottom = Inches(0)
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.CENTER
+    r = p.add_run()
+    r.text = label
+    r.font.size = Pt(10)
+    r.font.bold = True
+    r.font.color.rgb = _readable(theme.accent_rgb, prefer=theme.text_rgb)
+
+
 # ── title slide ───────────────────────────────────────────────────────────────
 def _decor(slide, theme, kind: str, on_dark: bool) -> None:
     """Background ornaments, drawn first so they sit behind the title."""

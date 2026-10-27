@@ -1007,6 +1007,43 @@ def download_deck_explainer(deck_id: str, slide: int, user_id: str = Depends(cur
                     headers={"Content-Disposition": f'attachment; filename="{stem}_explainer.html"'})
 
 
+# ── Interactive labs ──────────────────────────────────────────────────────────
+class LabIn(BaseModel):
+    id: str
+    topics: List[str]
+    html: str
+
+
+@app.get("/api/labs")
+def list_labs() -> dict:
+    """Interactive labs and the topics that bring each one into a deck."""
+    from learnova import labs
+
+    return {"labs": labs.catalog()}
+
+
+@app.get("/api/labs/{lab_id}")
+def open_lab(lab_id: str) -> Response:
+    """A lab page, public so a PowerPoint button can open it without signing in."""
+    from learnova import labs
+
+    page = labs.lab_html(lab_id)
+    if page is None:
+        raise HTTPException(status_code=404, detail="no such lab")
+    return Response(content=page.encode("utf-8"), media_type="text/html; charset=utf-8", headers={"X-Robots-Tag": "noindex"})
+
+
+@app.post("/api/labs", status_code=201)
+def add_lab(body: LabIn, user_id: str = Depends(current_user)) -> dict:
+    """Add your own interactive lab (one self-contained HTML page) and the topics it explains."""
+    from learnova import labs
+
+    try:
+        return labs.save_lab(body.id.strip().lower(), body.html, body.topics)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 # ── Share links ───────────────────────────────────────────────────────────────
 class ShareIn(BaseModel):
     days: Optional[int] = 30
