@@ -157,9 +157,11 @@ export default function Preview() {
   useEffect(() => {
     let tries = 0;
     const tick = () => {
-      const R = iframeRef.current?.contentWindow?.Reveal;
-      if (R && typeof R.slide === "function") {
+      const win = iframeRef.current?.contentWindow;
+      const R = win?.Reveal;
+      if (R && typeof R.slide === "function" && (!R.isReady || R.isReady())) {
         try {
+          win.__disableBuilds?.();          // the preview shows the whole slide, not the first click of it
           R.slide(selected + 1);
           return true;
         } catch {
@@ -170,7 +172,7 @@ export default function Preview() {
     };
     if (tick()) return;
     const id = setInterval(() => {
-      if (tick() || ++tries > 50) clearInterval(id);
+      if (tick() || ++tries > 150) clearInterval(id);
     }, 100);
     return () => clearInterval(id);
   }, [selected, htmlUrl]);
@@ -483,7 +485,9 @@ export default function Preview() {
                 className="h-full w-full"
                 onLoad={() => {
                   try {
-                    iframeRef.current?.contentWindow?.Reveal?.slide?.(selected + 1);
+                    const w = iframeRef.current?.contentWindow;
+                    w?.__disableBuilds?.();
+                    w?.Reveal?.slide?.(selected + 1);
                   } catch {
                     /* ignore */
                   }

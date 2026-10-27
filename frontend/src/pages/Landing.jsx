@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { useAuth } from "@/auth";
 import Cursor from "@/components/fx/Cursor";
+import MobileLanding from "@/landing/MobileLanding";
 import markup from "../landing/landing.html?raw";
 import "../landing/landing.css";
 import "../landing/landing-extra.css";
@@ -84,7 +85,7 @@ function seenLoader() {
   }
 }
 
-export default function Landing() {
+function DesktopLanding() {
   const rootRef = useRef(null);
   const navigate = useNavigate();
   const { isSignedIn } = useAuth();
@@ -425,4 +426,19 @@ export default function Landing() {
       <Cursor />
     </div>
   );
+}
+
+
+const NARROW = "(max-width: 820px)";
+
+/** Phones and small tablets get a layout written for them; the scroll-scene board is composed for wide screens. */
+export default function Landing() {
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(NARROW).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow ? <MobileLanding /> : <DesktopLanding />;
 }
