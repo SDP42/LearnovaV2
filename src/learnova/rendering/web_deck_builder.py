@@ -1044,6 +1044,12 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         function lvExplain(uid) {{
             var t = document.getElementById(uid + '-doc');
             if (!t) return;
+            // Inside a small frame (the editor preview): open full size in a new tab instead of squeezing it into the slide.
+            if (window.self !== window.top && Math.min(window.innerWidth, window.innerHeight) < 600) {{
+                var page = t.textContent.split('<\\\\/script>').join('<' + '/script>');
+                var url = URL.createObjectURL(new Blob([page], {{type: 'text/html'}}));
+                if (window.open(url, '_blank')) return;
+            }}
             var o = document.createElement('div');
             o.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,14,10,.78);display:flex;align-items:center;justify-content:center;padding:2vh 2vw;';
             var f = document.createElement('iframe');

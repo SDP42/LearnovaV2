@@ -209,14 +209,22 @@ def enrich_slides(items: List[Dict[str, str]], max_slides: int = 15) -> Dict[int
 
 _AI_POLISH_SYSTEM = (
     "You improve lecture slides for students, using ONLY each slide's own content. For every slide return:\n"
-    "- title: an assertion title, 6 to 14 words, sentence case, no trailing period, that states the slide's main point "
-    "(e.g. 'The Viterbi algorithm keeps only the best path into each state', not 'Viterbi algorithm'). Keep technical terms.\n"
+    "- title: an assertion title — a full sentence WITH A VERB, 6 to 14 words, sentence case, no trailing period, that states the "
+    "slide's main point so a student learns it from the title alone. Good: 'Dijkstra's algorithm finalises the closest unvisited node "
+    "at each step', 'Bellman-Ford handles negative weights but runs slower than Dijkstra'. Bad (topic labels): 'Dijkstra's algorithm', "
+    "'Shortest paths in a weighted graph', 'Applications of shortest paths'. Also bad (instructions): 'Identify the shortest route', "
+    "'Compare Dijkstra and Bellman-Ford'. Write a STATEMENT whose subject is the topic, never a command. Keep technical terms.\n"
     "- explain: ONLY if the slide has fewer than 45 words: 2 or 3 plain sentences (max 60 words) that unpack the slide's own idea "
     "for a beginner; otherwise an empty string. Never add facts that contradict or go beyond the slide's topic.\n"
     "- example: one concrete example or analogy (max 30 words) consistent with the slide, or an empty string.\n"
     "- terms: up to 2 technical terms from the slide with plain definitions (max 18 words each).\n"
     "Reply ONLY with a JSON array [{\"id\":0,\"title\":\"...\",\"explain\":\"...\",\"example\":\"...\",\"terms\":[{\"term\":\"...\",\"definition\":\"...\"}]}]."
 )
+
+
+_IMPERATIVE = {"identify", "compare", "apply", "set", "guarantee", "use", "learn", "understand", "explore", "find", "calculate", "discover",
+               "define", "explain", "describe", "review", "consider", "examine", "analyse", "analyze", "determine", "recognize", "recognise",
+               "implement", "build", "create", "choose", "select", "remember", "note", "know", "see", "look", "let's", "lets", "discuss"}
 
 
 def _content_words(text: str) -> set:
@@ -251,8 +259,10 @@ def ai_polish(slides: List[Dict[str, str]], batch: int = 10, max_slides: int = 8
             words = _content_words(src["title"] + " " + src["text"])
             res: Dict[str, Any] = {}
             title = re.sub(r"[.\s]+$", "", str(item.get("title") or "").strip())
-            if 4 <= len(title.split()) <= 16 and len(_content_words(title) & words) >= 1:
-                res["title"] = title[:120]
+            first = title.split()[0].lower() if title else ""
+            if (4 <= len(title.split()) <= 15 and len(title) <= 100 and len(_content_words(title) & words) >= 1
+                    and first not in _IMPERATIVE):                  # a command, or a title too long for two lines, keeps the source heading
+                res["title"] = title
             ex = str(item.get("explain") or "").strip()
             if ex and len(ex.split()) <= 75 and len(_content_words(ex) & words) >= 2:
                 res["explain"] = ex

@@ -58,3 +58,7 @@ logs/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# frontend deps kept out of iCloud sync (node_modules is a link to node_modules.nosync)
+node_modules
+*.nosync/
