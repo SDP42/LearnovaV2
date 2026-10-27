@@ -430,6 +430,9 @@ def generate(
             _target = round(_pages * {"compact": 1.0, "balanced": 1.5, "detailed": 2.2}.get(config.slide_detail, 1.5)) if _pages >= 4 else None
             plan_to_budget(result.improved, _cap, _target)
             stats = _enrich_deck(result.improved)
+            from learnova.pipeline.polish import polish_deck
+
+            stats.update(polish_deck(result.improved))
             try:
                 from learnova.ai import assist
 

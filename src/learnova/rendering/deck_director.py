@@ -250,6 +250,15 @@ def build_speaker_notes(imp: Dict[str, Any], animation: Dict[str, Any],
             sent = sent.strip()
             if sent:
                 lines.append(f"  {sent}")
+    kt = imp.get("key_terms") or []
+    if kt:
+        lines.append("")
+        lines.append("Say what these mean, in your own words:")
+        for t in kt[:3]:
+            lines.append(f"  - {t['term']}: {t['definition']}")
+    if not (src and len(src) > len(bullets_join) * 1.25 and len(src) > 120) and str(imp.get("title", "")):
+        lines.append("")
+        lines.append(f"Pause: ask the class what they already know about “{re.sub(r'\s*\(\d+/\d+\)$', '', str(imp['title']))}” before revealing the slide.")
     hint = {
         "PRESERVE": "Wording matters here — slow down, keep it precise.",
         "COMPRESS": "Dense slide — talk to it, don't read every word.",
