@@ -287,6 +287,8 @@ def footer_rows(imp: Dict[str, Any], takeaway: str) -> List[List[str]]:
         rows.append(["Key terms", "  ·  ".join(f"{t['term']} — {t['definition']}" for t in kt[:3])])
     if imp.get("example"):
         rows.append(["Example", str(imp["example"])])
+    for sent in (imp.get("context") or [])[:2]:
+        rows.append(["Also in this lecture", str(sent)])
     return rows
 
 

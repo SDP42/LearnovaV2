@@ -109,6 +109,74 @@ def merge_thin_parts(entries: List[dict]) -> int:
     return merged
 
 
+_STOPW = {"with", "from", "that", "this", "what", "which", "their", "there", "these", "those", "about", "into", "over", "under", "part",
+          "slide", "lecture", "module", "introduction", "overview", "example", "examples", "types", "type", "using", "based"}
+
+
+def _keywords(title: str) -> List[str]:
+    return [w.lower() for w in re.findall(r"[A-Za-z][A-Za-z\-]{3,}", _PART.sub("", title)) if w.lower() not in _STOPW]
+
+
+def _clean_sentence(sent: str) -> bool:
+    """A sentence worth showing: prose, not OCR debris, code, a list of terms or a table row."""
+    if not (9 <= _words(sent) <= 32) or not re.match(r"^[A-Z“\"(]", sent) or not re.search(r"[a-z][.!?]$", sent):
+        return False
+    if re.search(r"[⇒→←<>|{}=_]|--|\s/\s|\b(?:wf|pos|lemma|lexsn)\b", sent):
+        return False
+    letters = sum(ch.isalpha() for ch in sent)
+    if letters < 0.75 * len(sent.replace(" ", "")):
+        return False
+    return bool(re.search(r"\b(?:is|are|was|were|has|have|can|will|uses?|means?|gives?|makes?|helps?|depends?|refers?|shows?|takes?|works?|needs?|allows?|produces?)\b", sent))
+
+
+def _sig(sent: str) -> str:
+    return re.sub(r"[^a-z]", "", sent.lower())[:70]
+
+
+def add_context(entries: List[dict], max_words: int = 25) -> int:
+    """A thin slide gets ONE sentence from elsewhere in the same source that explains its topic further.
+
+    Nothing is invented: the sentence is the document's own, it names the slide's topic, it is clean prose, and it is not
+    already on the slide. It is shown as an "Also in this lecture" callout — more substance, not bigger type."""
+    pool: List[tuple] = []
+    for i, e in enumerate(entries):
+        imp = e.get("improved") or {}
+        if str(imp.get("layout_type", "")).upper() == "QUIZ":
+            continue
+        text = " ".join(map(str, imp.get("bullets") or []))
+        for sent in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", text)):
+            sent = sent.strip()
+            if _clean_sentence(sent):
+                pool.append((i, sent))
+    used: set = set()
+    added = 0
+    for i, e in enumerate(entries):
+        imp, orig = e.get("improved") or {}, e.get("original") or {}
+        if (str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_agenda") or imp.get("is_summary") or imp.get("is_glossary")
+                or imp.get("is_activity") or orig.get("image") or orig.get("slide_kind") in {"title", "section", "figure"}):
+            continue
+        on_slide = " ".join(map(str, imp.get("bullets") or []))
+        if _words(on_slide) >= max_words:
+            continue
+        keys = _keywords(str(imp.get("title", "")))
+        if not keys:
+            continue
+        need = 2 if len(keys) >= 3 else 1                # a long title must share two of its words, not just one
+        sig_slide = _sig(on_slide)
+        for j, sent in sorted(pool, key=lambda js: abs(js[0] - i)):     # nearest slides first: the same part of the lecture
+            sg = _sig(sent)
+            if j == i or sg in used or sg[:40] in sig_slide:
+                continue
+            low = sent.lower()
+            hits = sum(1 for k in keys if re.search(rf"\b{re.escape(k)}", low))
+            if hits >= need and (len(keys[0]) >= 5 or hits >= 2):
+                imp["context"] = [sent]
+                used.add(sg)
+                added += 1
+                break
+    return added
+
+
 def polish_deck(entries: List[dict]) -> Dict[str, int]:
     merged = merge_thin_parts(entries)
-    return {"retitled": retitle(entries), "merged_thin": merged}
+    return {"retitled": retitle(entries), "merged_thin": merged, "context_added": add_context(entries)}

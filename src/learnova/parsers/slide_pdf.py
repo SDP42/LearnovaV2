@@ -470,6 +470,19 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
         fs = figs_by_page[pi]
         if ocr and fs and fs[0]["area"] >= 0.45 and sum(len(l.text.split()) for l in lines if not l.glyph) <= 12:
             ocr_jobs.append(fs[0]["bytes"])
+    # The same picture on three or more near-empty pages is a section cover (a word cloud, a banner), not a figure to teach from.
+    import hashlib as _hl
+
+    covers: set = set()
+
+    _seen: Counter = Counter(_hl.md5(f["bytes"]).hexdigest() for fs_ in figs_by_page.values() for f in fs_[:1])
+    for pi, lines in enumerate(pages_lines):
+        fs_ = figs_by_page.get(pi) or []
+        if fs_ and _seen[_hl.md5(fs_[0]["bytes"]).hexdigest()] >= 3 and sum(len(l.text.split()) for l in lines if not l.glyph) <= 12:
+            if fs_[0]["bytes"] in ocr_jobs:
+                ocr_jobs.remove(fs_[0]["bytes"])
+            figs_by_page[pi] = fs_[1:]
+            covers.add(pi)
     if ocr_jobs:
         from concurrent.futures import ThreadPoolExecutor
 
@@ -539,6 +552,9 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
             labels = []
         kind = "content"
         words = sum(len(i["text"].split()) for i in items)
+        if pi in covers and words <= 6 and not tables:          # a section cover: its few words name the section
+            title = " ".join(i["text"] for i in items).strip() or title
+            items, words = [], 0
         if pi == 0 and not items and not tables:
             kind = "title"
         elif pi == 0 and len(items) <= 4 and words <= 18 and not tables:

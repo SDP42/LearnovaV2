@@ -99,15 +99,19 @@ class P(NamedTuple):
     color: Optional[RGBColor] = None
     before: float = 0.0
     bullet: bool = False
+    level: int = 0                 # 0 = main point, 1 = sub-point (never deeper: research says two levels at most)
 
 
-def _bullet(p, color: RGBColor, indent_in: float = 0.3) -> None:
+def _bullet(p, color: RGBColor, indent_in: float = 0.28, level: int = 0) -> None:
+    """Hanging-indent bullet: wrapped lines align under the text, not under the glyph. Sub-points step in 0.32in with an en dash."""
     pPr = p._p.get_or_add_pPr()
-    pPr.set("marL", str(int(Inches(indent_in))))
-    pPr.set("indent", str(-int(Inches(indent_in))))
+    hang = indent_in if level == 0 else 0.24
+    pPr.set("marL", str(int(Inches(indent_in + 0.32 * min(level, 1) + (hang - indent_in if level else 0)))))
+    pPr.set("indent", str(-int(Inches(hang))))
+    pPr.set("lvl", str(min(level, 1)))
     pPr.append(parse_xml(f'<a:buClr xmlns:a="{_A}"><a:srgbClr val="{_hex(color)}"/></a:buClr>'))
     pPr.append(parse_xml(f'<a:buFont xmlns:a="{_A}" typeface="Arial"/>'))
-    pPr.append(parse_xml(f'<a:buChar xmlns:a="{_A}" char="•"/>'))
+    pPr.append(parse_xml(f'<a:buChar xmlns:a="{_A}" char="{"•" if level == 0 else "–"}"/>'))
 
 
 class _Canvas:
@@ -179,7 +183,7 @@ class _Canvas:
             first = False
             p.alignment = align
             if para.bullet:
-                _bullet(p, bullet_color or self.t.accent_rgb)
+                _bullet(p, bullet_color or self.t.accent_rgb, level=para.level)
             r = p.add_run()
             r.text = str(para.text)
             r.font.size = Pt(round(para.size * shrink, 1))
@@ -1183,7 +1187,7 @@ def _outline(c: _Canvas, data) -> bool:
         ps = [P(str(g["heading"]), b * 1.25, True, c.t.primary_rgb)]
         for it in g.get("items") or []:
             sub = str(it).startswith("– ")
-            ps.append(P(str(it)[2:] if sub else str(it), b * (0.92 if sub else 1.0), False, c.t.subtext_rgb if sub else c.t.text_rgb, 4, True))
+            ps.append(P(str(it)[2:] if sub else str(it), b * (0.9 if sub else 1.0), False, c.t.subtext_rgb if sub else c.t.text_rgb, 3 if sub else 7, True, 1 if sub else 0))
         return ps
 
     fits = [c.fit_paras(lambda b, g_=g: make(b, g_), cw - 2 * PAD, chh - 2 * PAD, 20, 10) for g in groups]
