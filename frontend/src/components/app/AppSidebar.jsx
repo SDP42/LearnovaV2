@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Plus,
   Presentation,
+  Calculator,
   Settings,
   Sparkles,
 } from "lucide-react";
@@ -32,6 +33,7 @@ export const NAV = [
   { title: "My Decks", to: "/app/presentations", icon: Presentation, match: (p) => p.startsWith("/app/presentations") },
   { title: "Templates", to: "/app/gallery", icon: LayoutGrid, match: (p) => p.startsWith("/app/gallery") },
   { title: "Quizzes", to: "/app/quizzes", icon: BrainCircuit, match: (p) => p.startsWith("/app/quizzes") },
+  { title: "Solve", to: "/app/explain", icon: Calculator, match: (p) => p.startsWith("/app/explain") },
   { title: "Insights", to: "/app/analytics", icon: BarChart3, match: (p) => p.startsWith("/app/analytics") },
   { title: "Help", to: "/app/docs", icon: BookOpen, match: (p) => p.startsWith("/app/docs") },
 ];

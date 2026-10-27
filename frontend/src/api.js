@@ -486,3 +486,14 @@ export async function tutorChat(deckId, message, persona, history = []) {
     })
   );
 }
+
+// ── Step-by-step explainer ────────────────────────────────────────────────
+export async function explainProblem(problem) {
+  return json(
+    await fetch(`${BASE}/api/explain`, {
+      method: "POST",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ problem }),
+    })
+  );
+}

@@ -25,6 +25,7 @@ import Preview from "./pages/Preview.jsx";
 import Generate from "./pages/Generate.jsx";
 import AppShell from "./components/app/AppShell.jsx";
 import Quizzes from "./pages/Quizzes.jsx";
+import Explain from "./pages/Explain.jsx";
 import Settings from "./pages/Settings.jsx";
 import Studio from "./pages/Studio.jsx";
 
@@ -118,6 +119,7 @@ export default function App() {
           <Route path="/app/gallery" element={<Templates />} />
           <Route path="/app/library" element={<Navigate to="/app/gallery?tab=lessons" replace />} />
           <Route path="/app/quizzes" element={<Quizzes />} />
+          <Route path="/app/explain" element={<Explain />} />
           <Route path="/app/analytics" element={<Analytics />} />
           <Route path="/app/docs" element={<Docs />} />
           <Route path="/app/settings" element={<Settings />} />
