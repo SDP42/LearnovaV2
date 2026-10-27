@@ -55,7 +55,7 @@ def catalog() -> List[Dict[str, object]]:
 def lab_html(lab_id: str) -> Optional[str]:
     if not _SAFE_ID.match(lab_id or ""):
         return None
-    for d in (USER_DIR, BUILTIN):
+    for d in (USER_DIR / "auto", USER_DIR, BUILTIN):
         p = d / f"{lab_id}.html"
         if p.is_file():
             return p.read_text(encoding="utf-8", errors="ignore")
@@ -97,3 +97,58 @@ def save_lab(lab_id: str, html_text: str, topics: List[str]) -> Dict[str, object
     USER_DIR.mkdir(parents=True, exist_ok=True)
     (USER_DIR / f"{lab_id}.html").write_text(html_text, encoding="utf-8")
     return {"id": lab_id, **_meta(html_text)}
+
+
+MAX_AUTO_PER_DECK = 10
+MAX_SAME_LAB = 2
+_SKIP_FLAGS = ("is_summary", "is_agenda", "is_glossary", "is_activity")
+_WEAK_TITLE = re.compile(r"^(?:module|unit|chapter|lecture|part|section)\b|^(?:agenda|contents?|outline|overview|introduction|intro|summary|"
+                         r"terminology|applications?|examples?|notes?|references|questions|discussion|recap|review)$", re.I)
+
+
+def _readable_title(base: str) -> bool:
+    """A title that names a topic, not OCR debris ("t tty y", "possible classes)", "features | weight")."""
+    letters = sum(ch.isalpha() for ch in base)
+    return (letters >= 0.7 * len(base.replace(" ", "")) and "|" not in base and base.count("(") == base.count(")")
+            and any(len(w) >= 4 and w.isalpha() for w in base.split()))
+
+
+def new_deck_state() -> Dict[str, object]:
+    return {"auto": 0, "per_lab": {}, "topics": set()}
+
+
+def _base(title: str) -> str:
+    return re.sub(r"\s*\(\d+/\d+\)\s*$", "", title).strip().lower()
+
+
+def slide_lab(imp: dict, family: str, data: dict, state: Dict[str, object]) -> Optional[Dict[str, object]]:
+    """The lab a slide gets, if any: a built-in or teacher lab for its topic, else one generated now from the slide.
+
+    One lab per topic (continuation slides share it), the same lab at most twice per deck, and generated labs only for
+    real topics with enough structure, up to a cap. Both deck builders call this in slide order, so they agree."""
+    if str(imp.get("layout_type", "")).upper() == "QUIZ" or any(imp.get(f) for f in _SKIP_FLAGS):
+        return None
+    title = str(imp.get("title", ""))
+    base = _base(title)
+    if not base or base in state["topics"]:
+        return None
+    bullets = [str(b) for b in (imp.get("bullets") or [])]
+    lab = find_lab(title, " ".join(bullets))
+    if lab:
+        if state["per_lab"].get(lab["id"], 0) >= MAX_SAME_LAB:
+            return None
+        state["per_lab"][lab["id"]] = state["per_lab"].get(lab["id"], 0) + 1
+        state["topics"].add(base)
+        return {"id": lab["id"], "name": lab["name"], "auto": False}
+    from learnova.labs import auto
+
+    words = base.split()
+    if (family not in auto.AUTO_FAMILIES or state["auto"] >= MAX_AUTO_PER_DECK or _WEAK_TITLE.search(base)
+            or not (1 <= len(words) <= 8) or re.search(r"\b(?:following|below|above|incorrectly)\b", base) or not _readable_title(base)):
+        return None
+    made = auto.lab_for_slide(title, " ".join(bullets), family, data or {}, bullets)
+    if not made:
+        return None
+    state["auto"] += 1
+    state["topics"].add(base)
+    return {"id": made["id"], "name": made["name"], "auto": True}

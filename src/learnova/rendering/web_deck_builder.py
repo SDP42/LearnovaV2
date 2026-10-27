@@ -383,7 +383,9 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
     _prior = _deck_prior([f"{(d.get('improved') or {}).get('title', '')} {' '.join(map(str, (d.get('improved') or {}).get('bullets') or []))}" for d in slides_data])
     _scenes_used: list = []
-    from learnova.labs import find_lab as _find_lab, lab_html as _lab_html
+    from learnova.labs import lab_html as _lab_html, new_deck_state as _new_lab_state, slide_lab as _slide_lab
+
+    _lab_state = _new_lab_state()
 
     _lab_docs: dict = {}            # lab id → its page, embedded once per deck as an inert text holder
     # Wide visuals keep the full width; their illustration sits in the header instead of a side panel.
@@ -691,8 +693,8 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                     )
         # An interactive lab for this topic (e.g. Region Growing): a button that opens the simulation over the slide.
         _lab_btn = ""
-        if layout_type != "QUIZ" and not (imp.get("is_summary") or imp.get("is_agenda") or imp.get("is_glossary")):
-            _lab = _find_lab(str(imp.get("title", "")), " ".join(map(str, imp.get("bullets") or [])))
+        if True:
+            _lab = _slide_lab(imp, str(getattr(sp, "family", "") or "") if sp else "", (getattr(sp, "data", None) or {}) if sp else {}, _lab_state)
             if _lab:
                 if _lab["id"] not in _lab_docs:
                     _lab_docs[_lab["id"]] = (_lab_html(_lab["id"]) or "").replace("</script>", "<\\/script>")

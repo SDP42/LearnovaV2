@@ -394,6 +394,9 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
     _prior = _deck_prior([f"{(d.get('improved') or {}).get('title', '')} {' '.join(map(str, (d.get('improved') or {}).get('bullets') or []))}" for d in slides_data])
     _spot_scenes: list = []
+    from learnova.labs import new_deck_state as _new_lab_state
+
+    _lab_state = _new_lab_state()
     for idx, data in enumerate(slides_data):
         orig = data.get("original", {})
         imp = data.get("improved", {})
@@ -452,10 +455,10 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                 _spot = None
         _add_header_bar(slide, title_text, theme, _spot)
         _add_footer(slide, idx + 1, len(slides_data), theme)
-        if layout_type != "QUIZ" and not (imp.get("is_summary") or imp.get("is_agenda") or imp.get("is_glossary")):
-            from learnova.labs import find_lab, lab_url
+        if True:
+            from learnova.labs import lab_url, slide_lab
 
-            _lab = find_lab(str(title_text), " ".join(map(str, imp.get("bullets") or [])))
+            _lab = slide_lab(imp, str(getattr(_sp, "family", "") or "") if _sp is not None else "", (getattr(_sp, "data", None) or {}) if _sp is not None else {}, _lab_state)
             if _lab:
                 from learnova.rendering.pptx_chrome import add_lab_button
 
