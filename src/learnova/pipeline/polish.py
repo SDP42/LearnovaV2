@@ -177,6 +177,41 @@ def add_context(entries: List[dict], max_words: int = 25) -> int:
     return added
 
 
+def _part_name(imp: dict, base: str) -> str:
+    """What this part of a split topic is about, from its own first point: "Hypothesis" → "Hypothesis: hypothesis space (H)"."""
+    from learnova.visuals.engine import heading_for
+
+    for b in (imp.get("bullets") or [])[:3]:
+        b = re.sub(r"^\W+", "", str(b)).strip()
+        if not b:
+            continue
+        lead = b.split(":", 1)[0].strip() if ":" in b[:60] else ""
+        sub = lead if lead and 1 <= len(lead.split()) <= 6 else heading_for(b)
+        sub = re.sub(r"[\s,;:.-]+$", "", sub or "")
+        if sub and len(sub) >= 4 and sub.lower() not in base.lower() and base.lower() not in sub.lower():
+            return f"{base}: {sub[:1].upper() + sub[1:]}" if len(base) + len(sub) <= 70 else sub[:1].upper() + sub[1:]
+    return ""
+
+
+def name_parts(entries: List[dict]) -> int:
+    """No "Topic (2/5)" titles: each part of a split topic is named after what it covers; the first keeps the topic name."""
+    named = 0
+    for e in entries:
+        imp = e.get("improved") or {}
+        title = str(imp.get("title", ""))
+        m = _PART.search(title)
+        if not m or str(imp.get("layout_type", "")).upper() == "QUIZ":
+            continue
+        base = _PART.sub("", title).strip()
+        imp.setdefault("topic", base)
+        new = _part_name(imp, base) if m.group(1) != "1" else base
+        imp["title"] = new or (base if m.group(1) == "1" else f"{base} (continued)")
+        named += 1
+    return named
+
+
 def polish_deck(entries: List[dict]) -> Dict[str, int]:
     merged = merge_thin_parts(entries)
-    return {"retitled": retitle(entries), "merged_thin": merged, "context_added": add_context(entries)}
+    stats = {"retitled": retitle(entries), "merged_thin": merged, "context_added": add_context(entries)}
+    stats["parts_named"] = name_parts(entries)
+    return stats

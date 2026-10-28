@@ -214,8 +214,9 @@ _AI_POLISH_SYSTEM = (
     "at each step', 'Bellman-Ford handles negative weights but runs slower than Dijkstra'. Bad (topic labels): 'Dijkstra's algorithm', "
     "'Shortest paths in a weighted graph', 'Applications of shortest paths'. Also bad (instructions): 'Identify the shortest route', "
     "'Compare Dijkstra and Bellman-Ford'. Write a STATEMENT whose subject is the topic, never a command. Keep technical terms.\n"
-    "- explain: ONLY if the slide has fewer than 45 words: 2 or 3 plain sentences (max 60 words) that unpack the slide's own idea "
-    "for a beginner; otherwise an empty string. Never add facts that contradict or go beyond the slide's topic.\n"
+    "- explain: ONLY if the slide has fewer than 60 words: 3 or 4 plain sentences (max 85 words) that unpack the slide's own idea "
+    "for a beginner (what it is, why it matters, how it works); otherwise an empty string. Never add facts that contradict or go "
+    "beyond the slide's topic.\n"
     "- example: one concrete example or analogy (max 30 words) consistent with the slide, or an empty string.\n"
     "- terms: up to 2 technical terms from the slide with plain definitions (max 18 words each).\n"
     "Reply ONLY with a JSON array [{\"id\":0,\"title\":\"...\",\"explain\":\"...\",\"example\":\"...\",\"terms\":[{\"term\":\"...\",\"definition\":\"...\"}]}]."
@@ -264,7 +265,7 @@ def ai_polish(slides: List[Dict[str, str]], batch: int = 10, max_slides: int = 8
                     and first not in _IMPERATIVE):                  # a command, or a title too long for two lines, keeps the source heading
                 res["title"] = title
             ex = str(item.get("explain") or "").strip()
-            if ex and len(ex.split()) <= 75 and len(_content_words(ex) & words) >= 2:
+            if ex and len(ex.split()) <= 100 and len(_content_words(ex) & words) >= 2:
                 res["explain"] = ex
             eg = str(item.get("example") or "").strip()
             if eg and len(eg.split()) <= 40:

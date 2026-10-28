@@ -1022,6 +1022,17 @@ def list_labs() -> dict:
     return {"labs": labs.catalog()}
 
 
+@app.get("/api/art/{art_id}")
+def open_art(art_id: str) -> Response:
+    """One slide illustration as a page, public so the picture in a PowerPoint can link to it."""
+    from learnova.ai.topic_art import art_page
+
+    page = art_page(art_id)
+    if page is None:
+        raise HTTPException(status_code=404, detail="no such illustration")
+    return Response(content=page.encode("utf-8"), media_type="text/html; charset=utf-8", headers={"X-Robots-Tag": "noindex"})
+
+
 @app.get("/api/labs/{lab_id}")
 def open_lab(lab_id: str) -> Response:
     """A lab page, public so a PowerPoint button can open it without signing in."""

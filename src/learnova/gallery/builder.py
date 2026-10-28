@@ -22,7 +22,7 @@ from typing import Iterable, List
 
 
 _LLM_ENV = ("GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "NVIDIA_API_KEY",
-            "NVIDIA_NIM_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEYS")
+            "NVIDIA_NIM_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEYS", "GEMINI_API_KEYS")
 
 
 def _force_deterministic() -> None:

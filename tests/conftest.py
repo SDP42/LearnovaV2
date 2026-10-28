@@ -37,7 +37,7 @@ def _no_live_ai(request, monkeypatch):
     if request.node.get_closest_marker("live"):
         yield
         return
-    for var in ("GEMINI_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "GEMINI_IMAGE_API_KEY", "GOOGLE_API_KEY"):
+    for var in ("GEMINI_API_KEY", "GEMINI_API_KEYS", "GROQ_API_KEY", "NVIDIA_API_KEY", "GEMINI_IMAGE_API_KEY", "GOOGLE_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     try:
         from learnova.providers import router

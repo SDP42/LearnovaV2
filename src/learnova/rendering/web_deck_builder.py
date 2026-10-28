@@ -655,7 +655,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
                 f'background:{theme.card_bg_hex};border-radius:8px;font-size:0.85rem;line-height:1.45;color:{theme.text_hex};">'
                 + "<br>".join(html.escape(str(n)) for n in _notes) + "</div>"
             )
-        _illo = imp.get("illustration") if _family_used else None
+        _illo = imp.get("illustration") if (layout_type != "QUIZ" and not _is_figure and not image_block) else None
         if _illo and _illo.get("bytes"):
             import base64 as _b64
 

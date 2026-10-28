@@ -26,28 +26,53 @@ from learnova.providers.base import LLMProvider
 # pipeline run stays under the cap instead of tripping the router's circuit
 # breaker mid-deck. Override with GEMINI_MIN_INTERVAL (seconds); 0 disables.
 _MIN_INTERVAL = float(os.getenv("GEMINI_MIN_INTERVAL", "4.2"))
-_pace_lock = threading.Lock()
-_last_call = [0.0]
+_pace_locks: Dict[str, threading.Lock] = {}
+_last_call: Dict[str, float] = {}
+_locks_guard = threading.Lock()
 
 
-def _pace() -> None:
+def _pace(key: str = "") -> None:
+    """Each key has its own free-tier budget, so each is spaced on its own."""
     if _MIN_INTERVAL <= 0:
         return
-    with _pace_lock:
-        wait = _MIN_INTERVAL - (time.monotonic() - _last_call[0])
+    with _locks_guard:
+        lock = _pace_locks.setdefault(key, threading.Lock())
+    with lock:
+        wait = _MIN_INTERVAL - (time.monotonic() - _last_call.get(key, 0.0))
         if wait > 0:
             time.sleep(wait)
-        _last_call[0] = time.monotonic()
+        _last_call[key] = time.monotonic()
+
+
+def gemini_keys() -> List[str]:
+    """Every configured Gemini key, in order: ``GEMINI_API_KEYS`` (comma-separated pool) then ``GEMINI_API_KEY``."""
+    keys: List[str] = []
+    for k in (os.getenv("GEMINI_API_KEYS", "").split(",") + [os.getenv("GEMINI_API_KEY", "")]):
+        k = k.strip()
+        if k and k not in keys:
+            keys.append(k)
+    return keys
+
+
+# Keys found dead (rejected, or daily quota used up) → when; they get another chance after _KEY_RETRY_S.
+_dead_keys: Dict[str, float] = {}
+_KEY_RETRY_S = 900.0
+
+
+def _key_is_dead(exc: Exception) -> bool:
+    t = f"{type(exc).__name__} {exc}".lower()
+    return any(n in t for n in ("401", "403", "429", "unauthorized", "permission denied", "api key not valid", "api_key_invalid",
+                                "invalid api key", "resource_exhausted", "resource exhausted", "quota", "per day", "daily limit"))
 
 
 class GeminiProvider(LLMProvider):
-    """Concrete ``LLMProvider`` backed by the Gemini API."""
+    """Concrete ``LLMProvider`` backed by the Gemini API, rotating through a pool of keys."""
 
     def __init__(self, api_key: Optional[str] = None, timeout: float = 45.0):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
+        self._keys = [api_key] if api_key else gemini_keys()
+        if not self._keys:
             raise ValueError("GEMINI_API_KEY not found in environment variables.")
-
+        self._timeout = timeout
         from google import genai as _genai
 
         self._genai = _genai
@@ -55,11 +80,23 @@ class GeminiProvider(LLMProvider):
             from google.genai import types as _types
 
             self._types = _types
-            http_opts = _types.HttpOptions(timeout=int(timeout * 1000))  # ms
-            self.client = _genai.Client(api_key=self.api_key, http_options=http_opts)
         except Exception:
             self._types = None
-            self.client = _genai.Client(api_key=self.api_key)
+        self._clients: Dict[str, Any] = {}
+        self._use(self._live_keys()[0] if self._live_keys() else self._keys[0])
+
+    def _live_keys(self) -> List[str]:
+        now = time.time()
+        return [k for k in self._keys if now - _dead_keys.get(k, -1e18) > _KEY_RETRY_S]
+
+    def _use(self, key: str) -> None:
+        if key not in self._clients:
+            if self._types is not None:
+                http_opts = self._types.HttpOptions(timeout=int(self._timeout * 1000))  # ms
+                self._clients[key] = self._genai.Client(api_key=key, http_options=http_opts)
+            else:
+                self._clients[key] = self._genai.Client(api_key=key)
+        self.api_key, self.client = key, self._clients[key]
 
     # ── helpers ──────────────────────────────────────────────────────────────
     def _model(self, kwargs: Dict[str, Any]) -> str:
@@ -99,7 +136,7 @@ class GeminiProvider(LLMProvider):
 
     def _generate_once(self, prompt: str, system_prompt: Optional[str],
                        kwargs: Dict[str, Any], *, minimal: bool) -> str:
-        _pace()
+        _pace(self.api_key)
         cfg = self._config(system_prompt, kwargs, minimal=minimal)
         contents = prompt
         if minimal and system_prompt:
@@ -115,6 +152,20 @@ class GeminiProvider(LLMProvider):
     def generate(
         self, prompt: str, system_prompt: Optional[str] = None, **kwargs: Any
     ) -> str:
+        last: Optional[Exception] = None
+        for key in (self._live_keys() or [self.api_key]):
+            self._use(key)
+            try:
+                return self._generate_key(prompt, system_prompt, kwargs)
+            except Exception as exc:
+                if not _key_is_dead(exc) or len(self._keys) == 1:
+                    raise
+                _dead_keys[key] = time.time()
+                last = exc
+                logger.warning("Gemini key …%s is used up or rejected — switching to the next key", key[-4:])
+        raise last or RuntimeError("no Gemini key left")
+
+    def _generate_key(self, prompt: str, system_prompt: Optional[str], kwargs: Dict[str, Any]) -> str:
         try:
             return self._generate_once(prompt, system_prompt, kwargs, minimal=False)
         except Exception as exc:

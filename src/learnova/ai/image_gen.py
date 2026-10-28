@@ -229,4 +229,15 @@ def illustrate_deck(final_deck: List[dict], theme, mode: str = "auto") -> int:
             scenes_used.append(imp["illustration"]["scene"])
         ai_used += imp["illustration"].get("provider") not in {"vector", "cache"}
         drawn += 1
+    # With a language-model key, every topic slide gets a diagram of its own idea (written as SVG by the model),
+    # replacing the generic scene; slides without one keep the offline scene the builders draw.
+    if mode != "vector" and os.getenv("LEARNOVA_AI_DIAGRAMS", "1") != "0":
+        try:
+            from learnova.ai import topic_art
+
+            if topic_art.available():
+                drawn += topic_art.illustrate(final_deck, [str(getattr(sp, "family", "") or "") for sp in plan.slides], theme.primary_hex,
+                                              theme.accent_hex, limit=int(os.getenv("LEARNOVA_AI_DIAGRAM_MAX", "40")))
+        except Exception:
+            logger.warning("AI diagrams failed — offline illustrations are used", exc_info=True)
     return drawn

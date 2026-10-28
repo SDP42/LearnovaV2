@@ -64,7 +64,8 @@ def ensure_dirs() -> None:
 
 # ── API keys ──────────────────────────────────────────────────────────────────
 def get_gemini_key() -> Optional[str]:
-    return os.getenv("GEMINI_API_KEY") or None
+    pool = [k.strip() for k in os.getenv("GEMINI_API_KEYS", "").split(",") if k.strip()]
+    return os.getenv("GEMINI_API_KEY") or (pool[0] if pool else None)
 
 
 def get_groq_key() -> Optional[str]:

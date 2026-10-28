@@ -33,11 +33,13 @@ _paused_until: Dict[str, float] = {}
 
 
 def _key() -> str:
-    return (os.getenv("GEMINI_IMAGE_API_KEY") or os.getenv("GEMINI_API_KEY") or "").strip()
+    pool = [k.strip() for k in os.getenv("GEMINI_API_KEYS", "").split(",") if k.strip()]
+    return (os.getenv("GEMINI_IMAGE_API_KEY") or os.getenv("GEMINI_API_KEY") or (pool[0] if pool else "")).strip()
 
 
 def provider_name() -> str:
-    if os.getenv("LEARNOVA_IMAGE_AI", "1").lower() in {"0", "false", "off", "no"}:
+    # Photo-style image generation is opt-in (LEARNOVA_IMAGE_AI=1): keys are spent on written diagrams (ai/topic_art.py) instead.
+    if os.getenv("LEARNOVA_IMAGE_AI", "0").lower() in {"0", "false", "off", "no"}:
         return ""
     wanted = os.getenv("LEARNOVA_IMAGE_PROVIDER", "").strip().lower()
     if wanted == "pollinations":

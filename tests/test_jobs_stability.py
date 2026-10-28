@@ -139,11 +139,12 @@ def test_provider_keys_and_image_generation(tmp_path, monkeypatch):
     from learnova.ai import image_providers as ip
 
     monkeypatch.setattr(ip, "_env_path", lambda: tmp_path / ".env")
-    for v in ("GEMINI_API_KEY", "GEMINI_IMAGE_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "LEARNOVA_IMAGE_PROVIDER"):
+    for v in ("GEMINI_API_KEY", "GEMINI_API_KEYS", "GEMINI_IMAGE_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "LEARNOVA_IMAGE_PROVIDER"):
         monkeypatch.delenv(v, raising=False)
     ip.reset()
     assert ip.provider_name() == "" and ip.generate("x") is None            # no key: callers fall back to the vector illustrator
 
+    monkeypatch.setenv("LEARNOVA_IMAGE_AI", "1")                           # photo generation is opt-in
     ip.save_key("gemini", "AIza" + "x" * 30)
     assert "GEMINI_API_KEY" in (tmp_path / ".env").read_text() and ip.provider_name() == "gemini"
     buf = io.BytesIO()

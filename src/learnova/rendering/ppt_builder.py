@@ -7,6 +7,8 @@ and embeds PowerPoint OpenXML slide transition animations.
 import io
 import os
 import re
+
+from learnova.logging_config import logger
 from pptx import Presentation
 from pptx.util import Emu, Inches, Pt
 from pptx.dml.color import RGBColor
@@ -464,6 +466,34 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
                 add_lab_button(slide, theme, str(_lab["name"]), lab_url(str(_lab["id"])))
 
+        # The slide's own diagram (AI-written with a key, or the planned scene) stands in a right-hand panel on every
+        # kind of slide; the content takes the rest of the width, so a thin slide is never one stretched box.
+        # Picture order: the source's own figure, then the slide's diagram (AI-written or planned scene).
+        _side_done = False
+        _src_img = (orig.get("image") or {}).get("bytes")
+        _is_fig = _sp is not None and getattr(_sp, "family", "") == "FIGURE"
+        _side_png = _src_img if (_src_img and _image_decision(orig)[0]) else (None if _src_img else (imp.get("illustration") or {}).get("bytes"))
+        if _side_png and layout_type != "QUIZ" and not _is_fig:
+            try:
+                from PIL import Image as _PILImage
+
+                _iw, _ih = _PILImage.open(io.BytesIO(_side_png)).size
+                _pw = band.width * (0.36 if _src_img else 0.3)
+                _ph = min(band.height, _pw * _ih / max(1, _iw))           # whole picture, never cropped
+                _pw = _ph * _iw / max(1, _ih)
+                with vis_group(slide):
+                    _pic = slide.shapes.add_picture(io.BytesIO(_side_png), Inches(band.left + band.width - _pw), Inches(band.top + (band.height - _ph) / 2),
+                                                    Inches(_pw), Inches(_ph))
+                _art_id = (imp.get("illustration") or {}).get("art_id")
+                if _art_id and not _src_img:                    # click the diagram to open it full size in the browser
+                    from learnova.ai.topic_art import art_url
+
+                    _pic.click_action.hyperlink.address = art_url(str(_art_id))
+                band = L.Box(band.left, band.top, band.width - _pw - L.GUTTER, band.height)
+                _side_done = True
+            except Exception:
+                logger.warning("side picture failed", exc_info=True)
+
         # ── 0a. FIGURE — the slide is a picture (diagram / table image from the source): large, framed, with its caption
         _family_drawn = False
         if _sp is not None and getattr(_sp, "family", "") == "FIGURE" and (orig.get("image") or {}).get("bytes"):
@@ -475,7 +505,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                 and not (layout_type == "TABLE" and imp.get("table_rows"))):
             from learnova.rendering.pptx_visuals import draw_family
 
-            _illo = imp.get("illustration") or None
+            _illo = None if _side_done else (imp.get("illustration") or None)
             _draw_band = band
             if _illo and _illo.get("bytes"):
                 _pw = band.width * 0.26
@@ -606,7 +636,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
             from learnova.rendering.pptx_visuals import _Canvas, draw_bullets
 
             _show_img, _img_caption = _image_decision(orig)
-            has_img = _show_img
+            has_img = _show_img and not _side_done
             text_area, image_area = L.split_text_image(band, has_img)
 
             bullets = [str(b).replace("▪", "").strip()
@@ -631,7 +661,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         # A figure anchored to a non-MINIMAL layout gets its own slide, placed
         # immediately after so it stays with the content it belongs to.
         image = orig.get("image") if isinstance(orig, dict) else None
-        if layout_type != "MINIMAL_TEXT" and image and image.get("bytes"):
+        if layout_type != "MINIMAL_TEXT" and image and image.get("bytes") and not _side_done and not _family_drawn:
             _fig_show, _fig_caption = _image_decision(orig)
             if _fig_show:
                 if _add_figure_slide(

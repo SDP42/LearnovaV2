@@ -461,6 +461,13 @@ def generate(
                             imp["example"] = extra["example"]
                         for t in extra.get("terms", []):
                             imp.setdefault("key_terms", []).append(t)
+                    # A thin slide carries its explanation and example in the body as real points, not as small print.
+                    for e in result.improved:
+                        imp = e.get("improved") or {}
+                        body = [str(b) for b in (imp.get("bullets") or [])]
+                        if imp.get("explain") and len(" ".join(body).split()) < 45 and str(imp.get("layout_type", "")).upper() != "QUIZ":
+                            sents = [x.strip() for x in re.split(r"(?<=[.!?])\s+", str(imp.pop("explain"))) if len(x.split()) >= 4]
+                            imp["bullets"] = body + sents[:4] + ([f"Example: {imp.pop('example')}"] if imp.get("example") else [])
                     stats["ai_polished"] = sum(1 for e in result.improved if (e.get("improved") or {}).get("source_title"))
             except Exception:
                 logger.exception("LLM enrichment failed")
