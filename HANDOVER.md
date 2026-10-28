@@ -1,6 +1,6 @@
 # Learnova V2 — Project Memory / Handover
 
-_Last updated: 28 Oct 2026. Read this first when continuing on a new account or machine._
+_Last updated: 28 Oct 2026 (evening). Read this first when continuing on a new account or machine._
 
 ## 1. What the project is
 Learnova turns lecture notes, PDFs (especially boring lecture-slide PDFs) and PPTs into designed, interactive decks:
@@ -85,7 +85,40 @@ Timings: M4 with keys ≈74 s (labs 28 s, vision OCR 19 s); without keys ≈9 s;
 no exam periods, research-paper work added Aug–Oct. Rebuild: `build_diary.py` (entries) + `build_docx.py` (Word/PDF) + `orig.json`.
 Two stale Word lock files `~$D Diary - *.docx` may remain in that folder (close the docs in Word).
 
-## 6. What is LEFT (next steps)
+
+## 5b. Done on 28 Oct 2026 (afternoon/evening)
+- **PPTX uploads** go LibreOffice → PDF → slide reader (`parsers/markdown_converter.py::pptx_to_pdf`): picture-only and untitled
+  slides kept; images counted only where drawn; overlapping wrapped titles/lines rejoined; split words merged; chart ticks and OCR
+  equation debris kept as pictures; exported-deck chrome stripped; split topics named instead of "(2/5)".
+- **Illustrations on every slide** (`ai/topic_art.py`): Gemini writes an SVG diagram per topic slide, sanitised (not rejected) —
+  acceptance went from 34.5% to 10/10; cached in `.data/art`, public page `/api/art/{id}`, PPT picture links to it. Order: source
+  figure → AI diagram → offline scene (also saved + linked). Wide visuals keep full width (header picture). Photo image generation
+  is opt-in (`LEARNOVA_IMAGE_AI=1`).
+- **Gemini key pool**: `GEMINI_API_KEYS` in `.env` (5 keys), per-key pacing, rotation on quota/auth errors, 2 requests in flight per key.
+- **Thin slides** get the AI explanation/example in the body. **Refresh endpoint** `POST /api/decks/{id}/refresh` rebuilds a
+  saved deck with current builders + illustrations (new version).
+- **Region Splitting & Merging lab** (`labs/builtin/region_split_merge.html`, built by `scripts/build_labs.py`).
+- **IPD diary** rebuilt from Sept 2025 (formal, project-only): `LearnovaIPDV2/IPD Diary/` + Downloads (`build_diary.py`, `build_docx.py`).
+- **Review decks**: `docs/review/Learnova_SIH_Review.pptx` (built on the team's SAIL SIH deck design by
+  `scripts/research/build_sail_style_review.py`; the user prefers this one) and `docs/review/Learnova_Review.pptx` (IPD template).
+- **Papers**: `docs/research/papers/ieee` (expanded: PSF, CLASS, reader rules, 9 tables, 5 algorithms, figures) and `springer`
+  (authors fixed, no image-processing content). Authors: Swayam Panchal, Kawaljeet Singh Bharaj, Jeevesh Bharat Bodhani,
+  Rishit Pankajkumar Lahoti, Dr. Pratik Kanani (HoD, AI & DS, DJSCE). Data/figures: `scripts/research/paper_data.py`,
+  `before_after.py`, `eval_explainers.py` → `docs/research/papers/figs`.
+- Tests: **755 passed, 6 skipped**; tests blank AI keys (setenv "", not delenv, so `load_dotenv` cannot restore them).
+
+## 6a. LEFT after 28 Oct
+1. **Springer LNCS paper**: expand like the IEEE one (own algorithms only: explainer detection/acceptance, grounding checks,
+   lab policy + generated-lab validation, key-pool scheduler; 7 tables with explanations; figures `fig_steps`, `fig_modes`).
+2. **Project report 25–30+ pages**, TNR 12 justified, .docx + .pdf: draft in `docs/report/Learnova_Project_Report.md`
+   (+ `reference.docx` style); expand every chapter, add figures, then pandoc → docx and xelatex → pdf.
+3. **Per-topic step-by-step HTML via Gemini**: for equation/problem slides without a rule solver, call `explain/llm.py` in the
+   pipeline; widen AI labs (cap 10/deck) so more topics get a lab-style page.
+4. **Deployment**: frontend on Vercel; backend needs Docker (LibreOffice + Tesseract) on Render/Railway/Cloud Run with a volume.
+   Render free tier: works for a small-PPT demo but sleeps, 512 MB RAM, no persistent disk. Add Dockerfile + render.yaml + guide.
+5. Rotate the API keys after the demo (they were pasted in chat).
+
+## 6. Older list of what was LEFT (27 Oct)
 1. **Research papers (requested, not started):** one **IEEE** conference format paper and one **Springer LNCS** format paper on
    Learnova's novel parts — Content Decision Engine (visual-family selection with reasons + gold-set accuracy), glyph-measured
    layout fitting / layout audit, slide-PDF reconstruction (OCR, nesting, colour DNA), computed step-by-step explainers,
