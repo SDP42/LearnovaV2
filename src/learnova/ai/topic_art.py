@@ -143,6 +143,25 @@ def art_url(art_id: str) -> str:
     return f"{os.getenv('LEARNOVA_PUBLIC_URL', 'http://localhost:8000').rstrip('/')}/api/art/{art_id}"
 
 
+def save_svg(svg: str, title: str) -> Optional[str]:
+    """Keep any illustration (an offline scene included) as a page of its own; returns its id for ``art_url``."""
+    import html as _html
+
+    if not svg:
+        return None
+    key = hashlib.sha1(svg.encode("utf-8")).hexdigest()[:20]
+    cp = _cache(key)
+    if not cp.is_file():
+        if "<title>" not in svg:
+            svg = re.sub(r"(<svg\b[^>]*>)", lambda m: m.group(1) + f"<title>{_html.escape(title)}</title>", svg, count=1)
+        try:
+            ART_DIR.mkdir(parents=True, exist_ok=True)
+            cp.write_text(svg, encoding="utf-8")
+        except OSError:
+            return None
+    return key
+
+
 def art_page(art_id: str) -> Optional[str]:
     """A small standalone HTML page showing one cached diagram, or None."""
     import html as _html

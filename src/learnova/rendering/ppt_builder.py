@@ -80,8 +80,12 @@ def _add_slide_transition(slide, name: str = "none"):
         pass
 
 
+_WIDE_FAMS = {"COMPARE_TABLE", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
+              "FUNNEL", "LAYERS", "OUTLINE", "COMPARE_VISUAL", "ALGORITHM_TRACE", "DATA_STRUCTURE", "FUNCTION_PLOT", "FIGURE"}
+
+
 def _add_header_bar(slide, title_text: str, theme: ColorPalette, spot_png=None):
-    add_header(slide, title_text, theme, spot_png)
+    return add_header(slide, title_text, theme, spot_png)
 
 
 def _add_footer(slide, n: int, total: int, theme: ColorPalette):
@@ -445,17 +449,28 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
 
         # Every topic slide gets an illustration: the planned side picture where there is one, otherwise a compact
         # scene in the header drawn from the slide's own words (quizzes and picture slides are left alone).
-        _spot = None
+        from learnova.ai.topic_art import art_url as _art_url, save_svg as _save_svg
+
+        _fam0 = str(getattr(_sp, "family", "") or "") if _sp is not None else ""
+        _wide0 = _fam0 in _WIDE_FAMS or _fam0.startswith("CHART_")
+        _spot, _spot_id, _panel_scene = None, None, None
         if (layout_type != "QUIZ" and not (orig.get("image") or {}).get("bytes") and not (imp.get("illustration") or {}).get("bytes")
-                and not (_sp is not None and getattr(_sp, "family", "") == "FIGURE")):
+                and _fam0 != "FIGURE"):
+            # no source figure and no AI diagram: the offline illustrator draws one — a side panel where there is room,
+            # a header picture on wide visuals — and it is kept as a page of its own, linked from the picture
             try:
                 _d = _scene_ill(str(title_text), " ".join(map(str, imp.get("bullets") or [])), theme.primary_hex, theme.accent_hex, str(title_text),
-                                kind="banner", width=240, avoid=_spot_scenes, prior=_prior)
-                _spot = _d["png"] or None
+                                kind="banner" if _wide0 else "panel", width=240 if _wide0 else 480, avoid=_spot_scenes, prior=_prior)
                 _spot_scenes.append(_d["scene"])
+                if _wide0:
+                    _spot, _spot_id = _d["png"] or None, _save_svg(_d["svg"], str(title_text))
+                else:
+                    _panel_scene = {"bytes": _d["png"], "svg": _d["svg"], "art_id": _save_svg(_d["svg"], str(title_text))}
             except Exception:
                 _spot = None
-        _add_header_bar(slide, title_text, theme, _spot)
+        _spot_pic = _add_header_bar(slide, title_text, theme, _spot)
+        if _spot_pic is not None and _spot_id:
+            _spot_pic.click_action.hyperlink.address = _art_url(_spot_id)
         _add_footer(slide, idx + 1, len(slides_data), theme)
         if True:
             from learnova.labs import lab_url, slide_lab
@@ -472,7 +487,8 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         _side_done = False
         _src_img = (orig.get("image") or {}).get("bytes")
         _is_fig = _sp is not None and getattr(_sp, "family", "") == "FIGURE"
-        _side_png = _src_img if (_src_img and _image_decision(orig)[0]) else (None if _src_img else (imp.get("illustration") or {}).get("bytes"))
+        _side_ill = imp.get("illustration") or _panel_scene or {}
+        _side_png = _src_img if (_src_img and _image_decision(orig)[0]) else (None if _src_img else _side_ill.get("bytes"))
         if _side_png and layout_type != "QUIZ" and not _is_fig:
             try:
                 from PIL import Image as _PILImage
@@ -484,11 +500,9 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                 with vis_group(slide):
                     _pic = slide.shapes.add_picture(io.BytesIO(_side_png), Inches(band.left + band.width - _pw), Inches(band.top + (band.height - _ph) / 2),
                                                     Inches(_pw), Inches(_ph))
-                _art_id = (imp.get("illustration") or {}).get("art_id")
-                if _art_id and not _src_img:                    # click the diagram to open it full size in the browser
-                    from learnova.ai.topic_art import art_url
-
-                    _pic.click_action.hyperlink.address = art_url(str(_art_id))
+                _art_id = _side_ill.get("art_id") or (_save_svg(_side_ill.get("svg", ""), str(title_text)) if _side_ill.get("svg") else None)
+                if _art_id and not _src_img:                    # click the picture to open it as a page in the browser
+                    _pic.click_action.hyperlink.address = _art_url(str(_art_id))
                 band = L.Box(band.left, band.top, band.width - _pw - L.GUTTER, band.height)
                 _side_done = True
             except Exception:
