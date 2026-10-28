@@ -214,9 +214,10 @@ unbreakable pieces after hyphens and slashes, where PowerPoint itself may wrap.
 The number of lines is estimated by greedy wrapping, and the height of
 a block of $n$ lines is $n\cdot 1.26\,s/72$. The font size chosen for a box of size $W\times H$ is
 \begin{equation}
-s^{*} = \max\{\, s \in \{s_{\max}, s_{\max}-0.5, \dots, s_{\min}\} : H(t,s,W) \le H \,\},
+s^{*} = \max\bigl\{\, s \in \mathcal{G} : H(t,s,W) \le H \,\bigr\},
 \end{equation}
-with $s_{\min}=11$\,pt for body text; content that does not fit at $s_{\min}$ is moved to a continuation slide instead of
+where $\mathcal{G} = \{s_{\max}, s_{\max}-0.5, \dots, s_{\min}\}$ is the half-point grid,
+and $s_{\min}=11$\,pt for body text. Content that does not fit at $s_{\min}$ is moved to a continuation slide instead of
 being shrunk further. Separately, every paragraph is scaled by
 \begin{equation}
 \sigma = \max\Bigl(0.62,\ \min\bigl(1,\ \min_{u} \tfrac{W}{w(u,s)}\bigr)\Bigr),
