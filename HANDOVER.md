@@ -125,13 +125,26 @@ Two stale Word lock files `~$D Diary - *.docx` may remain in that folder (close 
   `topic_art._ask` remembers spent keys (all-keys-dead fallback 166 s → 22 s). Tests: 756 passed, 7 skipped.
 - Localhost: `.claude/launch.json` uses `/opt/anaconda3/bin/python`; web on :5190, API on :8000.
 
+## 5d. Done on 28 Oct 2026 (late night) — backend round after inspecting real decks
+- Figure OCR kept beside the slide (never in its text); build-up slides collapsed; OCR captions only if readable and short.
+- `ALGORITHM` visual: pseudocode in one numbered, indented panel (indent recovered by a depth counter); equation runs and
+  markup examples in one panel. Equations parsed by `visuals/mathfmt.py` → native Office Math in PPTX (`put_equation`) and MathML
+  on the web, Unicode fallback (LibreOffice shows the fallback; PowerPoint shows the real equation — check in PowerPoint).
+- "In plain words" panel in the slide body (11–14 pt) instead of the footer; quiz every 4 slides (max 20).
+- Illustrations: `topic_art.art_kind` (FLOW/PLOT/ANATOMY/COMPARE/SCENE/none), numbered parts with titles, interactive art page,
+  resvg rendering (`resvg-py`). Haber process gallery deck (`the-haber-process`).
+- **Offline first** (`ai/escalation.py`, `LEARNOVA_AI_MODE=auto|always|off`): model only when the offline result is weak; per-deck
+  counts logged. Measured on 8 inputs: `docs/research/papers/figs/escalation.json`.
+- Groq key pool `GROQ_API_KEYS` (keys from one Groq account share its daily limit — use different accounts).
+- Word files read natively (`docx_to_markdown`) when AnyDoc is missing; deck title from first heading for generic file names.
+- Deploy: Dockerfile, render.yaml, frontend/vercel.json, docs/DEPLOY.md (Hugging Face Spaces = best free option).
+- Report 41 pp (`docs/report/build.py`), IEEE + LNCS updated, diary week 57 + October updated. Tests: 767 passed.
+
 ## 6a. LEFT after 28 Oct
-1. **Per-topic step-by-step HTML via Gemini**: for equation/problem slides without a rule solver, call `explain/llm.py` in the
-   pipeline; widen AI labs (cap 10/deck) so more topics get a lab-style page.
-2. **Deployment**: frontend on Vercel; backend needs Docker (LibreOffice + Tesseract) on Render/Railway/Cloud Run with a volume.
-   Render free tier: works for a small-PPT demo but sleeps, 512 MB RAM, no persistent disk. Add Dockerfile + render.yaml + guide.
-3. Rotate the API keys after the demo (they were pasted in chat).
-4. Report certificate: mentor name still blank; Rishit's roll number in `docs/report/meta.yaml` reads 6001840101 (one digit short?).
+1. Open an equation slide in real PowerPoint to confirm Office Math renders (LibreOffice only shows the fallback).
+2. Rotate all API keys after the review (they were pasted in chat); get Groq keys from different accounts.
+3. Quiz distractor quality on dictionary-style slides; stat-tile overlap seen on one Module 4 slide.
+4. Report certificate: mentor name blank; Rishit's roll number may be one digit short.
 
 ## 6. Older list of what was LEFT (27 Oct)
 1. **Research papers (requested, not started):** one **IEEE** conference format paper and one **Springer LNCS** format paper on
