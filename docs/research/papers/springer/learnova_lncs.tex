@@ -128,6 +128,38 @@ The order matters. A computed answer is always preferred, because it is both cor
 nothing can be computed, and only through a check. The offline path guarantees that a deck is always finished, even with no
 network at all.
 
+\subsection{Escalating only on a weak offline result}
+The college uses free-tier keys only, so every request has a cost in quota even when it has no cost in money. We therefore
+compute the offline result first in every case and ask the model only when a test $W_\kappa$ says that result is weak:
+\begin{equation}
+\label{eq:escalate}
+\text{call } M_\kappa(x) \iff \text{mode}=\textsf{always} \;\vee\; \bigl(\text{mode}=\textsf{auto} \wedge W_\kappa(F_\kappa(x))=1\bigr),
+\end{equation}
+with a third mode, \textsf{off}, that never calls a model. Table~\ref{tab:weak} lists the tests. Each is cheap and does not use a
+model: a readability test on Tesseract's output, a test of whether a title states a point, the figure kind a slide needs, and
+the amount of structure available for an offline lab. Two places were already of this form before: a visual is refined by the
+model only when the decision engine's confidence is below $0.7$, and an explainer is written by the model only when no exact
+solver applies.
+
+\begin{table}[H]
+\centering
+\caption{When the offline result is judged weak and the model is asked}
+\label{tab:weak}
+\begin{tabular}{p{2.6cm}p{4.5cm}p{4.4cm}}
+\toprule
+Place & Offline result & Weak when \\
+\midrule
+Reading a picture & Tesseract OCR & fewer than 70\% of words of three or more letters are dictionary words \\
+Titles, explanations & source heading and text & title is a label, counter or generic heading (fewer than five words or no verb), or the slide has under 60 words \\
+Takeaways & rule-based takeaway & the slide title is a label \\
+Topic diagram & offline scene & the slide needs a flow, plot, anatomy or comparison drawing \\
+Lab & offline step-through & fewer than three structured items \\
+Visual choice & decision engine & confidence below 0.7 \\
+Explainer & exact solvers & no solver recognises the problem \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=0.45cm and 0.5cm, every node/.style={font=\scriptsize, align=center},

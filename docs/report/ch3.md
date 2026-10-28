@@ -66,8 +66,19 @@ test where possible, and pushed to the repository as a separate change. The tabl
 | Equations appeared as plain text ("x^2", "(1/2m)") | the slide text was copied as typed | equations parsed into fractions, powers, sums and roots and written as native Office Math (PPTX) and MathML (web) | equations look as they do in Word |
 | Pseudocode lost its indentation | export flattens bullet levels | a depth counter re-indents after for/while/if/repeat and dedents at end/until/else | loops and branches read correctly |
 | Long decks had a quiz only every nine slides | spacing grew with deck length | a checkpoint every four content slides, at most twenty per deck | students answer something every few minutes |
+| Word (.docx) notes failed to convert | the Word converter package was missing and the fallback assumed a PDF | a native Word reader keeps headings as sections, list levels and tables | Word notes always convert |
+| "Advantages / Trade-offs" boxes on slides that weigh nothing up | the AI's visual choice was accepted as given | a pros-and-cons layout needs the words that justify it, else plain cards | no misleading labels |
+| XML examples drawn as "equations" | lines containing "=" | markup lines are shown verbatim in a code panel | examples read as written |
 
 Table: Problems found on real decks and how they were fixed.
+
+**Offline first, free keys only when needed.** The college uses only free-tier API keys, so the system now computes the
+rule-based result in every case and calls a model only when a cheap check finds that result weak: Tesseract's text that does
+not read as language, a title that is only a topic label or a slide under sixty words, a slide whose idea needs a real drawing
+(a process, a graph, labelled parts or a comparison), or too little structure for an offline laboratory. Visual choice and
+explanations already followed this rule. A switch (`auto`, `always`, `off`) sets the policy, and every deck records how many
+decisions went to a model and how many stayed offline. Several free keys are pooled for each provider; a key that reaches its
+daily limit is set aside for fifteen minutes and the next one is used.
 
 The illustrations were also redesigned. Each slide is first classified into the kind of figure that would teach it — a
 *flow* for processes and apparatus, a *plot* for quantitative relations, an *anatomy* for parts and types, a *comparison*, or a
