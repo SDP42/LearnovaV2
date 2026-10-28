@@ -22,7 +22,7 @@ app with the API on Spaces/Render (option B).
 2. In the Space's README front matter set `app_port: 8000` (our container listens there).
 3. Push this repository to the Space (`git remote add space https://huggingface.co/spaces/<user>/learnova` then
    `git push space main`), or link the GitHub repository.
-4. In **Settings → Variables and secrets** add `GEMINI_API_KEYS` (and optionally `GROQ_API_KEY`, `NVIDIA_API_KEY`),
+4. In **Settings → Variables and secrets** add `GEMINI_API_KEYS` (and optionally `GROQ_API_KEYS` as a comma-separated pool, `NVIDIA_API_KEY`),
    plus `OTP_DEV_MODE=1` so the sign-in code is shown on screen.
 5. The Space builds the Dockerfile (about 10 minutes) and opens at `https://<user>-learnova.hf.space`.
 

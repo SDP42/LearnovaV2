@@ -12,6 +12,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_API_KEYS
+        sync: false
       - key: NVIDIA_API_KEY
         sync: false
       - key: OTP_SECRET
