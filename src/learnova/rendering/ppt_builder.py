@@ -65,7 +65,8 @@ def _image_decision(orig: dict):
         action = decide_image_action(meta)
         if action.action == "DROP" and not _IMAGE_KEEP_ALL:
             return False, ""
-        return True, (action.caption or str(img.get("description", ""))[:200])
+        desc = str(img.get("description", "") or "")
+        return True, (action.caption or (desc if len(desc) <= 110 else ""))
     except Exception:
         # Policy must never cost us a figure — when in doubt, show it.
         return True, str(img.get("description", ""))[:200]
@@ -680,7 +681,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
             if _fig_show:
                 if _add_figure_slide(
                     prs, theme, title_text, image["bytes"],
-                    caption=(_fig_caption or image.get("description") or "")[:300],
+                    caption=(_fig_caption or "")[:300],
                 ):
                     slide_meta.append({"slide": prs.slides[len(prs.slides) - 1], "idx": None, "layout": "FIGURE",
                                        "transition": "fade"})

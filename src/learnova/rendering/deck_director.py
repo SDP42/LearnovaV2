@@ -538,12 +538,19 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             from learnova.textutils import is_readable
 
             desc = re.sub(r"\s+", " ", str(_img.get("description") or "")).strip()
-            desc = desc if is_readable(desc) else ""                     # OCR noise is never shown as a caption
+            desc = desc if is_readable(desc) and len(desc) <= 110 else ""  # a caption is one short line, not OCR of the picture
             treatment, family, variant = "FIGURE", "FIGURE", "full"
             data = {"caption": desc[:150], "figure": True}
             visual_reason, visual_alts, engine_conf = "the slide is a figure — shown large with zoom instead of being redrawn", [], 0.9
             params = {"notes": [], "takeaway": "", "footer": []}
         data = _dedupe_items(_delatex_all(data))           # whatever path built it: no stray LaTeX, no step said twice
+        if (family == "COMPARE_VISUAL" and isinstance(data, dict) and (data.get("pros") or data.get("cons"))
+                and not re.search(r"advantage|disadvantage|benefit|drawback|downside|upside|\bpros?\b|\bcons?\b|strengths?|weakness|"
+                                  r"trade-?off|merits?|limitations?|demerits?", f"{title} {vms_source}", re.I)):
+            # "Advantages / Trade-offs" boxes on a slide that never weighs anything up: plain cards instead
+            items = [str(x) for x in (data.get("pros") or []) + (data.get("cons") or []) if str(x).strip()]
+            family, variant, treatment = "KEY_POINTS", "grid", _FAMILY_TO_TREATMENT.get("KEY_POINTS", "KEY_POINTS")
+            data = {"cards": [{"heading": x if len(x) <= 60 else x[:57].rsplit(" ", 1)[0] + "…", "body": x if len(x) > 60 else ""} for x in items[:6]]}
         animation = plan_animation_steps(
             bullets, treatment, family, takeaway=str(imp.get("takeaway", ""))
         )

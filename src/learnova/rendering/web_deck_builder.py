@@ -194,7 +194,8 @@ def _image_html(orig: dict, theme, big: bool = False) -> str:
         if action.action == "DROP" and not _IMAGE_KEEP_ALL:
             return ""
         b64 = base64.b64encode(raw).decode("ascii")
-        cap = html.escape(action.caption or str(img.get("description", ""))[:120])
+        _d = str(img.get("description", "") or "")
+        cap = html.escape(action.caption or (_d if len(_d) <= 110 else ""))
         cap_html = (f'<figcaption style="font-size:0.72rem;color:{theme.subtext_hex};'
                     f'margin-top:6px;text-align:center;">{cap}</figcaption>') if cap else ""
         badge = ' · low-res, flagged for cleanup' if action.action == "ENHANCE" else ""
