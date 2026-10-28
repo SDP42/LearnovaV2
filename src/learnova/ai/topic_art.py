@@ -259,7 +259,7 @@ def diagram(title: str, text: str, primary: str, accent: str, family: str = "") 
     return {"svg": svg, "png": png, "alt": f"Diagram: {title}", "provider": "ai-diagram", "id": key}
 
 
-def illustrate(entries: List[dict], families: List[str], primary: str, accent: str, limit: int = 40, workers: int = 5) -> int:
+def illustrate(entries: List[dict], families: List[str], primary: str, accent: str, limit: int = 40, workers: int = 0) -> int:
     """AI diagrams for the topic slides of a deck, in parallel. Sets ``improved["illustration"]``; returns how many."""
     from concurrent.futures import ThreadPoolExecutor
 
@@ -285,6 +285,13 @@ def illustrate(entries: List[dict], families: List[str], primary: str, accent: s
     if not todo:
         return 0
     t0 = time.time()
+    if not workers:                          # two requests in flight per key: one is being written while the next waits its pace
+        try:
+            from learnova.providers.gemini_provider import gemini_keys
+
+            workers = max(4, min(12, 2 * len(gemini_keys())))
+        except Exception:
+            workers = 4
     with ThreadPoolExecutor(max_workers=workers) as pool:
         done = list(pool.map(lambda a: diagram(a[1], a[2], primary, accent, a[3]), todo))
     n = 0
