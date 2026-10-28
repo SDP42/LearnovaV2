@@ -147,6 +147,20 @@ def _page_lines(page) -> List[_Line]:
             bold = any(s["flags"] & 16 or "bold" in s["font"].lower() for s in spans)
             x0, y0, x1, y1 = l["bbox"]
             out.append(_Line(x0, y0, x1, y1, size, bold, text, s0["font"], _is_glyph(text, s0["font"])))
+    return _merge_split_words(out)
+
+
+def _merge_split_words(lines: List[_Line]) -> List[_Line]:
+    """Some exporters (LibreOffice on justified text) write each word as its own line: put one baseline back together."""
+    out: List[_Line] = []
+    for l in sorted(lines, key=lambda l: (round(l.y0), l.x0)):
+        prev = out[-1] if out else None
+        if (prev is not None and not l.glyph and not prev.glyph and abs(l.size - prev.size) < 0.6
+                and abs((l.y0 + l.y1) / 2 - (prev.y0 + prev.y1) / 2) <= l.size * 0.3 and 0 <= l.x0 - prev.x1 <= l.size * 1.2):
+            out[-1] = _Line(prev.x0, min(prev.y0, l.y0), l.x1, max(prev.y1, l.y1), prev.size, prev.bold and l.bold,
+                            f"{prev.text} {l.text}", prev.font, False)
+        else:
+            out.append(l)
     return out
 
 
@@ -316,7 +330,7 @@ def _title_of(lines: List[_Line], H: float, body_size: float) -> Tuple[str, List
         return "", []
     parts = [big]
     for l in sorted(top, key=lambda l: l.y0):                       # a title that wraps onto a second line
-        if l is not big and abs(l.size - big.size) < 0.8 and 0 < l.y0 - parts[-1].y1 < big.size * 0.9 and abs(l.x0 - big.x0) < 60:
+        if l is not big and abs(l.size - big.size) < 0.8 and -big.size * 0.5 < l.y0 - parts[-1].y1 < big.size * 0.9 and l.y0 > parts[-1].y0 + big.size * 0.5 and abs(l.x0 - big.x0) < 60:
             parts.append(l)
     parts.sort(key=lambda l: l.y0)
     text = " ".join(p.text for p in parts).strip()
@@ -385,6 +399,53 @@ def _is_vector_diagram(page, lines: List[_Line], H: float) -> bool:
     return len(shapes) >= 10 and sum(1 for l in lines if l.glyph) <= 2
 
 
+# Chrome of a deck exported from a slide tool (Learnova's own included): page counters, lab buttons, quiz badges.
+_CHROME_LINE = re.compile(r"^\s*\d{1,3}\s*/\s*\d{1,3}\s*$|^\W*open the interactive lab\b|\bmade with learnova\b|^\s*learnova\s*$|"
+                          r"^\s*question\s*[·•.\-]\s*(?:recall|apply|understand|analy[sz]e|evaluate|create)\s*$", re.I)
+_CHROME_LEAD = re.compile(r"^\s*(?:also in this lecture|key takeaway|key terms?)\s*:\s*", re.I)
+_TITLE_GLYPH = re.compile(r"^[\s\uf000-\uf8ff•●▪◦‣➢➤►▶■□◆❖➔→-]+")
+_CONT_VERB = re.compile(r"^(?:means|mean|is|are|refers to|implies|indicates|represents|occurs|happens|describes|denotes)\b")
+
+
+def _tidy_items(items: List[Dict[str, Any]], title: str) -> List[Dict[str, Any]]:
+    """A bullet that continues the title ("Low variance:" / "means that the model…") becomes the full sentence;
+    the same bullet twice on one slide (diagram labels drawn twice) is kept once."""
+    out, seen = [], set()
+    for it in items:
+        text = it["text"]
+        if _CONT_VERB.match(text):
+            if out and out[-1]["text"].rstrip().endswith(":") and len(out[-1]["text"].split()) <= 5:   # "High Bias:" + "means more…"
+                out[-1] = dict(out[-1], text=f"{out[-1]['text'].rstrip().rstrip(':').strip()} {text}")
+                seen.add(_norm(out[-1]["text"]))
+                continue
+            if title and not out:
+                text = f"{title} {text}"
+        key = _norm(text)
+        if key and key in seen:
+            continue
+        seen.add(key)
+        out.append(dict(it, text=text))
+    return out
+
+
+def _chart_debris(items: List[Dict[str, Any]]) -> bool:
+    """Bullets that are really axis ticks and legend labels ("50000 45000", "Series1; 20000", "d1")."""
+    if len(items) < 4:
+        return False
+    toks = [t for i in items for t in i["text"].split()]
+    if not toks or sum(len(i["text"].split()) for i in items) / len(items) > 3.5:
+        return False
+    numeric = sum(1 for t in toks if re.search(r"\d", t))
+    return numeric >= 0.5 * len(toks)
+
+
+def _has_drawing(page) -> bool:
+    try:
+        return len(page.get_drawings()) >= 4
+    except Exception:
+        return False
+
+
 def _items(body: List[_Line]) -> List[Dict[str, Any]]:
     """Bullet items with levels, from glyph positions; wrapped lines are re-joined."""
     glyphs = [l for l in body if l.glyph]
@@ -406,10 +467,10 @@ def _items(body: List[_Line]) -> List[Dict[str, Any]]:
         elif inline:
             cur = {"key": l.x0, "text": text, "text_x": l.x0 + l.size * 1.2, "y1": l.y1, "size": l.size, "bullet": True}
             items.append(cur)
-        elif (cur and ((abs(l.x0 - cur["text_x"]) <= 12 and 0 <= l.y0 - cur["y1"] <= l.size * 1.1
+        elif (cur and ((abs(l.x0 - cur["text_x"]) <= 12 and -l.size * 0.45 <= l.y0 - cur["y1"] <= l.size * 1.1 and l.y0 > cur["y1"] - l.size
                         and not (_SENT_END.search(cur["text"]) and l.text[:1].isupper() and len(cur["text"].split()) > 12))
                        # a lower-case line straight under an unfinished one continues it, even when the indent drifts a little
-                       or (abs(l.x0 - cur["text_x"]) <= 48 and 0 <= l.y0 - cur["y1"] <= l.size * 1.5 and l.text[:1].islower()
+                       or (abs(l.x0 - cur["text_x"]) <= 48 and -l.size * 0.45 <= l.y0 - cur["y1"] <= l.size * 1.5 and l.text[:1].islower()
                            and not _SENT_END.search(cur["text"])))):
             cur["text"] = f"{cur['text']} {l.text}"
             cur["y1"] = l.y1
@@ -458,7 +519,12 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
     # a picture that repeats on many pages (a logo, a watermark, a background) is decoration
     xref_pages: Counter = Counter()
     for page in doc:
-        for xr in {i[0] for i in page.get_images()}:
+        # pictures actually drawn on the page — exporters such as LibreOffice list every image in a shared resource dict
+        try:
+            drawn = {i.get("xref") for i in page.get_image_info(xrefs=True) if i.get("xref")}
+        except Exception:
+            drawn = {i[0] for i in page.get_images()}
+        for xr in drawn:
             xref_pages[xr] += 1
     decor = {xr for xr, c in xref_pages.items() if c >= max(3, int(0.2 * n))}
 
@@ -495,7 +561,9 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
     for pi, (page, lines) in enumerate(zip(doc, pages_lines)):
         H, W = page.rect.height, page.rect.width
         lines = [l for l in lines if not (_norm(l.text) and (("top" if l.y1 < H * 0.12 else "bottom" if l.y0 > H * 0.86 else ""), _norm(l.text)) in furn)
-                 and not re.fullmatch(r"\s*\d{1,3}\s*", l.text)]
+                 and not re.fullmatch(r"\s*\d{1,3}\s*", l.text) and not _CHROME_LINE.search(l.text)]
+        for l in lines:
+            l.text = _CHROME_LEAD.sub("", l.text)
         tables = _tables(page)
         in_tbl = lambda l: any(t["bbox"][0] - 3 <= l.x0 and l.x1 <= t["bbox"][2] + 3 and t["bbox"][1] - 3 <= l.y0 and l.y1 <= t["bbox"][3] + 3 for t in tables)  # noqa: E731
         lines = [l for l in lines if not in_tbl(l)]
@@ -518,7 +586,9 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
             codey = sum(1 for t in toks if len(t) <= 4 and (t.isupper() or any(ch.isdigit() for ch in t) or re.search(r"[^\w\s]", t)))
             tabular = bool(toks) and codey / len(toks) >= 0.28 and len(good) >= 6       # a table / tag list photographed: keep the picture
             figure_text = " ".join(l.text for l in sorted(good, key=lambda l: (l.y0, l.x0)))[:1200] if len(good) >= 2 else ""
-            if len(good) >= 3 and conf >= 62 and sum(len(l.text.split()) for l in good) >= 12 and alpha >= 0.7 * len(good) and graphic <= 0.42 and not tabular:
+            # an equation photographed reads as debris (") = o where o, is unknown", "&"): keep the picture instead
+            debris = sum(1 for l in good if len(re.sub(r"[^A-Za-z]", "", l.text)) < 0.6 * max(1, len(l.text.replace(" ", ""))) or re.match(r"^[^\w(\"“]", l.text))
+            if len(good) >= 3 and conf >= 62 and sum(len(l.text.split()) for l in good) >= 12 and alpha >= 0.7 * len(good) and graphic <= 0.42 and not tabular and debris <= 0.15 * len(good):
                 lines = ol
                 ocr_used = True
                 local_body = Counter()
@@ -541,6 +611,18 @@ def read_slide_pdf(path: str, ocr: bool = True, previews: Optional[bool] = None)
             if figure:
                 figure["area"] = 0.7
         items = [] if diagram else _items(body)
+        if figure is not None or _has_drawing(page):              # bare numbers next to a chart are its axis ticks
+            items = [i for i in items if not re.fullmatch(r"[\d\s.,%$()+\-–]+", i["text"])]
+        title = _TITLE_GLYPH.sub("", title or "").strip()
+        title = re.sub(r"\s*:\s*$", "", title)
+        items = _tidy_items(items, title)
+        if not diagram and not figs and not tables and _chart_debris(items) and _has_drawing(page):
+            # the "bullets" are axis ticks and series labels of a drawn chart: show the chart itself
+            top = max([l.y1 for l in title_lines] + [H * 0.10]) + 4
+            figure_clip = _render_clip(page, (0, top, W, H * 0.97))
+            if figure_clip:
+                figure = dict(figure_clip, area=0.7)
+                items = []
         if ocr_used:                                    # formula / table-cell debris read as text is worse than nothing
             def _texty(t: str) -> bool:
                 core = t.replace(" ", "")

@@ -76,21 +76,30 @@ def _perturb_formula(f: str) -> List[str]:
     return [o for o in outs if o != f]
 
 
+def _clean_step(label: str) -> bool:
+    """A step worth asking about: real words, not an example sentence, a question or symbol debris ("Class 1 h '")."""
+    t = label.strip()
+    words = t.split()
+    letters = len(re.sub(r"[^A-Za-z]", "", t))
+    return (bool(words) and len(words) <= 6 and "?" not in t and t[:1] not in "\"“'‘" and letters >= 0.7 * len(t.replace(" ", ""))
+            and sum(1 for w in words if len(w) >= 3 and w.isalpha()) >= 1)
+
+
 def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: List[str], pool_titles: List[str]) -> Optional[Dict[str, Any]]:
     d, fam, seed = dec.data, dec.family, f"{idx}:{title}"
     r = _rng(seed)
     if fam == "TIMELINE":
         ev = d.get("events") or []
-        if len(ev) >= 3:
+        if len(ev) >= 3 and all(len(re.sub(r"[^A-Za-z]", "", str(x.get("title", "")))) >= 4 for x in ev):     # events need words, not bare numbers
             e = ev[len(ev) // 2]
             return _make(seed, f"When did this happen: “{_clip(e['title'], 14)}”?", e["date"], [x["date"] for x in ev if x is not e] + [str(int(re.search(r"\d{4}", e["date"]).group(0)) + d) for d in (-12, 15, 31) if re.search(r"\d{4}", e["date"])] + ["1900", "2010"],
                          f"{e['date']}: {e['title']}.")
     if fam in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT"} and not d.get("agenda"):
         st = d.get("stages") or d.get("nodes") or []
-        if len(st) >= 3 and not any("?" in str(s.get("label", "")) or str(s.get("label", "")).lstrip()[:1] in "\"“'‘" or len(str(s.get("label", "")).split()) > 6 for s in st):         # example sentences and questions are not an order to learn
+        if len(st) >= 3 and all(_clean_step(str(s.get("label", ""))) for s in st):         # example sentences, questions and symbol debris are not an order to learn
             i = min(1, len(st) - 2)
             lab = [s["label"] for s in st]
-            return _make(seed, f"What comes right after “{lab[i]}”?", lab[i + 1], [l for j, l in enumerate(lab) if j not in (i, i + 1)] + [t for t in pool_titles if t.lower() != short_label(title, 4).lower() and not re.match(r"(?:agenda|key takeaways|glossary|key terms|checkpoint|overview|thank you)", t, re.I)],
+            return _make(seed, f"What comes right after “{lab[i]}”?", lab[i + 1], [l for j, l in enumerate(lab) if j not in (i, i + 1)] + [t for t in pool_titles if t.lower() != short_label(title, 4).lower() and not re.search(r"\(\s*\d*\s*/\s*\d*\s*\)", t) and not re.match(r"(?:agenda|key takeaways|glossary|key terms|checkpoint|overview|thank you)", t, re.I)],
                          f"The order is: " + " → ".join(lab) + ".", "apply")
     if fam == "COMPARE_TABLE" and d.get("rows") and len(d.get("headers", [])) >= 2:
         a, b = d["headers"][:2]
@@ -116,7 +125,8 @@ def _from_decision(idx: int, title: str, dec, pool_defs: List[str], pool_words: 
                      f"{d['formula']}", "apply")
     if fam == "STAT_TILES" and d.get("tiles"):
         t = d["tiles"][0]
-        if len(str(t["label"]).split()) > 5 or str(t["label"]).rstrip().endswith(".") or len(re.sub(r"[^A-Za-z]", "", str(t["label"]))) < 3:      # a sentence or a stray mark is not a measure
+        if (len(str(t["label"]).split()) > 5 or str(t["label"]).rstrip().endswith(".") or len(re.sub(r"[^A-Za-z]", "", str(t["label"]))) < 3
+                or re.search(r"\(\s*\d*\s*/\s*\d*\s*\)", f"{t['label']} {t.get('detail') or ''}")):                 # a part counter "(2/8)" is not a measure      # a sentence or a stray mark is not a measure
             return None
         return _make(seed, f"What was the figure for “{_clip(t['label'], 8)}”?", t["value"], _perturb_num(t["value"], r), t.get("detail") or t["label"])
     if fam.startswith("CHART_") and d.get("points"):

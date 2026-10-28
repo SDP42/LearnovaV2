@@ -72,6 +72,8 @@ def extract_equation(text: str) -> Optional[str]:
         return None
     left, right = t.split("=")
     left = re.sub(r"^(?:\s*[A-Za-z]{2,}[:,]?\s+)+(?=[-+(\d]|[a-zA-Z]\s*[-+*/=^]|[a-zA-Z]$)", "", left)
+    # "Find x if 4x + 9 = …", "Solve for y given 2y = …"
+    left = re.sub(r"^\s*(?:[A-Za-z]{2,}\s+)*[a-zA-Z]\s+(?:if|when|where|given(?:\s+that)?|such\s+that)\s+", "", left, flags=re.I)
     left = re.sub(r"^[^\d(a-zA-Z-+]+", "", left).strip()
     right = re.split(r"[.;,?]|\s+(?=[A-Za-z]{3,}\b)", right.strip(), 1)[0].strip()
     if not left or not right or re.search(r"[A-Za-z]{2,}", left.replace("sqrt", "").replace("pi", "")) or re.search(r"[A-Za-z]{2,}", right.replace("sqrt", "").replace("pi", "")):

@@ -752,6 +752,48 @@ def _native_to_markdown(path: str, ext: str, textbook_mode: bool = False):
     return _clean_markdown("\n".join(lines).strip()), document
 
 
+def pptx_to_pdf(path: str, file_bytes: Optional[bytes] = None, timeout: float = 180.0) -> Optional[str]:
+    """The deck rendered to PDF by LibreOffice (cached by content hash), or None when it is not installed or fails.
+
+    Set ``LEARNOVA_PPTX_VIA_PDF=0`` to always use the shape-by-shape PPTX parser instead."""
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    if os.environ.get("LEARNOVA_PPTX_VIA_PDF", "1") == "0":
+        return None
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    for cand in ("/Applications/LibreOffice.app/Contents/MacOS/soffice", "/opt/homebrew/bin/soffice", "/usr/bin/soffice"):
+        if not soffice and pathlib.Path(cand).is_file():
+            soffice = cand
+    if not soffice:
+        return None
+    data = file_bytes if file_bytes is not None else pathlib.Path(path).read_bytes()
+    out = CACHE_DIR / f"pptx_{hashlib.sha256(data).hexdigest()[:20]}.pdf"
+    if out.is_file() and out.stat().st_size > 0:
+        return str(out)
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            src = pathlib.Path(tmp) / "deck.pptx"
+            src.write_bytes(data)
+            # a private profile, so a LibreOffice window the user has open does not block the conversion
+            profile = pathlib.Path(tmp) / "profile"
+            subprocess.run([soffice, f"-env:UserInstallation=file://{profile}", "--headless", "--norestore",
+                            "--convert-to", "pdf", "--outdir", tmp, str(src)],
+                           capture_output=True, timeout=timeout, check=False)
+            made = pathlib.Path(tmp) / "deck.pdf"
+            if not made.is_file() or made.stat().st_size == 0:
+                logger.warning("LibreOffice did not convert %s — using the PPTX parser", pathlib.Path(path).name)
+                return None
+            shutil.copyfile(made, out)
+    except Exception as exc:
+        logger.warning("PPTX → PDF failed (%s) — using the PPTX parser", exc)
+        return None
+    return str(out)
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 def _convert_to_markdown_impl(
     path: str,
@@ -782,12 +824,18 @@ def _convert_to_markdown_impl(
         cached_markdown = cache_file.read_text(encoding="utf-8")
         logger.info("markdown cache hit for %s", name)
 
-    # A slide deck exported to PDF is read page by page with its structure (bullet nesting, tables, figures) intact.
+    # A PowerPoint is a slide deck too: rendered to PDF (LibreOffice) it goes through the same page-per-slide reader,
+    # which keeps picture-only slides, untitled slides and drawn diagrams that the shape-by-shape parser loses.
+    slide_pdf_path = None
     if ext == ".pdf" and not textbook_mode and is_slide_style_pdf(str(file_path)):
+        slide_pdf_path = str(file_path)
+    elif ext == ".pptx" and not textbook_mode:
+        slide_pdf_path = pptx_to_pdf(str(file_path), file_bytes)
+    if slide_pdf_path:
         try:
             from learnova.parsers.slide_pdf import pages_to_markdown, read_slide_pdf
 
-            deck = read_slide_pdf(str(file_path))
+            deck = read_slide_pdf(slide_pdf_path)
             if deck and sum(1 for p in deck["pages"] if p["items"] or p["tables"] or p["figure"]) >= 3:
                 md = pages_to_markdown(deck["pages"])
                 if md.strip():
@@ -795,11 +843,12 @@ def _convert_to_markdown_impl(
                     try:
                         from learnova.analysis.source_dna import from_pdf as _dna
 
-                        dna = _dna(str(file_path))
+                        dna = _dna(slide_pdf_path)
                     except Exception:
                         dna = None
                     return MarkdownDocument(
-                        markdown=md, source_name=(deck["title"] or name)[:90], source_type="pdf", converter="slide-pdf", assets=[],
+                        markdown=md, source_name=(deck["title"] or name)[:90], source_type=ext.lstrip("."),
+                        converter="slide-pdf" if ext == ".pdf" else "slide-pdf (from pptx)", assets=[],
                         meta={"slide_pages": deck["pages"], "deck_title": deck["title"], "deck_subtitle": deck["subtitle"],
                               "pages": len(deck["pages"]), "dna": dna, "file_name": name, "md_sha": __import__("learnova.pipeline.slide_chunks", fromlist=["x"]).md_fingerprint(md)},
                     )

@@ -8,6 +8,8 @@ CASES = [
     ("Solve 3x + 5 = 20", "linear equation", "x = 5"),
     ("If 7x - 4 = 3x + 12, find x.", "linear equation", "x = 4"),
     ("Solve 2(x - 3) = 4x + 6", "linear equation", "x = -6"),
+    ("Find x if 4x + 9 = x + 21", "linear equation", "x = 4"),
+    ("Solve for y given 2y + 3 = 11", "linear equation", "y = 4"),
     ("Solve x^2 - 5x + 6 = 0", "quadratic equation", "x = 2 or x = 3"),
     ("2x + 3y = 12 and x - y = 1", "pair of linear equations", "x = 3, y = 2"),
     ("What is 15% of 240?", "percentage", "36"),

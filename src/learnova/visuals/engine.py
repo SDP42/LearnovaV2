@@ -109,7 +109,12 @@ def heading_for(sentence: str) -> str:
     while words and words[0].lower() in _STOP:
         words.pop(0)
     out = words[:3]
-    while out and (out[-1].lower() in _STOP or out[-1].lower() in _DANGLE):
+    for k, w in enumerate(out):                      # "Inductive bias (also" → "Inductive bias"
+        if w.count("(") > w.count(")"):
+            out = out[:k]
+            break
+    while out and (out[-1].lower() in _STOP or out[-1].lower() in _DANGLE or out[-1].lower() in {"not", "also", "only", "very"}
+                   or (out[-1].lower().endswith("ly") and len(out) > 1)):
         out.pop()
     return _cap(" ".join(out)) or short_label(sentence, 3)
 
@@ -277,7 +282,9 @@ def det_timeline(title: str, sents: List[str]) -> Det:
         rest = re.sub(r"^\s*(?:in|on|by|since|during|from|until|around|circa|c\.)\s*,?\s*", "", rest, flags=re.I)
         rest = re.sub(r"\b(?:in|on|by|since)\s*$", "", _strip_end(rest), flags=re.I)
         rest = _strip_end(re.sub(r"\s{2,}", " ", rest).strip(" ,"))
-        events.append({"date": date, "title": _cap(rest) or _cap(_strip_end(s))})
+        if len(re.sub(r"[^A-Za-z]", "", rest)) < 4:          # "1500" alone is an axis tick or a count, not an event
+            continue
+        events.append({"date": date, "title": _cap(rest)})
     if len(events) < 3:
         return None
     return "TIMELINE", "dated", 0.9, {"events": events[:8]}, f"{len(events)} dated events"
