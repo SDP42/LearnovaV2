@@ -241,8 +241,8 @@ def figures(through, bench):
     ks = [r["keys"] for r in through]
     fig, ax = plt.subplots(figsize=(4.2, 2.6))
     ax.plot(ks, [r["real_s"] for r in through], "o-", color="#1E40AF", label="measured (simulated run)")
-    ax.plot(ks, [max(40 * 4.2 / k, 40 * (9 + 4.2 / k) / r["workers"]) for k, r in zip(ks, through)], "s--", color="#F97316",
-            label="bound, Eq. (12)")
+    ax.plot(ks, [40 * max(4.2 / k, 9 / r["workers"]) for k, r in zip(ks, through)], "s--", color="#F97316",
+            label=r"bound $N\max(\tau/k,\,L/w)$")
     ax.set_xlabel("number of keys $k$")
     ax.set_ylabel("seconds for 40 diagrams")
     ax.set_xticks(ks)

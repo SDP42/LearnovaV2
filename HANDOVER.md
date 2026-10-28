@@ -107,17 +107,31 @@ Two stale Word lock files `~$D Diary - *.docx` may remain in that folder (close 
   `before_after.py`, `eval_explainers.py` → `docs/research/papers/figs`.
 - Tests: **755 passed, 6 skipped**; tests blank AI keys (setenv "", not delenv, so `load_dotenv` cannot restore them).
 
+## 5c. Done on 28 Oct 2026 (night)
+- **Review deck** now 10 slides (`build_sail_style_review.py`, then `add_speaker_notes.py`): Title, Idea, Technical approach
+  (architecture with the tech in every block + labelled tech icons; no methodology there), **Methodology** (6 stages, own formulas,
+  how we built it), Feasibility (fuller text + risk register with likelihood/impact), Impact (bigger text, stat band), **Literature
+  review** (6 papers: method, finding, gap, how Learnova addresses it), References, **Conclusions obtained**, **Thank you**.
+  Build: `python scripts/research/build_sail_style_review.py ~/Downloads/sail.pptx <assets dir with paper_data.json>
+  docs/review/assets/before_after.json docs/review/Learnova_SIH_Review.pptx`.
+- **Speaker script** `docs/review/speaker_script.md` (+ `Learnova_Speaker_Script.{pdf,docx}`): Swayam 1–3, Kawaljeet 4–5,
+  Jeevesh 6–7, Rishit 8–10, Q&A table; also copied into the PPT speaker notes.
+- **Report on letterhead**: `python docs/report/build.py` (needs `docs/report/letterhead.jpeg`, git-ignored; copy of the image in
+  `Desktop/aidsletterhead.docx`). 69 pp PDF, ~52 pp DOCX.
+- **IEEE**: floats pinned with `[H]` so figures sit beside their text.
+- **Springer LNCS** rewritten (18 pp, 10 tables, 3 algorithms, 3 graphs): checked generation — solvers, lab gate, SVG sanitiser,
+  grounding filter, paced key pool. Data: `scripts/research/lncs_data.py` → `figs/lncs_*`.
+- **Fixes found by those experiments**: lab gate now refuses `import(`; SVG label fitting uses the diagram's own viewBox width;
+  `topic_art._ask` remembers spent keys (all-keys-dead fallback 166 s → 22 s). Tests: 756 passed, 7 skipped.
+- Localhost: `.claude/launch.json` uses `/opt/anaconda3/bin/python`; web on :5190, API on :8000.
+
 ## 6a. LEFT after 28 Oct
-1. **Springer LNCS paper**: expand like the IEEE one (own algorithms only: explainer detection/acceptance, grounding checks,
-   lab policy + generated-lab validation, key-pool scheduler; 7 tables with explanations; figures `fig_steps`, `fig_modes`).
-2. ~~Project report~~ DONE 28 Oct: `docs/report/Learnova_Project_Report.{pdf,docx}` (62 pp PDF, ~46 pp DOCX). Sources
-   `docs/report/ch1-3.md` + `meta.yaml` + `reference.docx`; rebuild: `pandoc meta.yaml ch1.md ch2.md ch3.md -o X.pdf
-   --pdf-engine=xelatex --top-level-division=chapter` and `-o X.docx --reference-doc=reference.docx --toc --number-sections`.
-3. **Per-topic step-by-step HTML via Gemini**: for equation/problem slides without a rule solver, call `explain/llm.py` in the
+1. **Per-topic step-by-step HTML via Gemini**: for equation/problem slides without a rule solver, call `explain/llm.py` in the
    pipeline; widen AI labs (cap 10/deck) so more topics get a lab-style page.
-4. **Deployment**: frontend on Vercel; backend needs Docker (LibreOffice + Tesseract) on Render/Railway/Cloud Run with a volume.
+2. **Deployment**: frontend on Vercel; backend needs Docker (LibreOffice + Tesseract) on Render/Railway/Cloud Run with a volume.
    Render free tier: works for a small-PPT demo but sleeps, 512 MB RAM, no persistent disk. Add Dockerfile + render.yaml + guide.
-5. Rotate the API keys after the demo (they were pasted in chat).
+3. Rotate the API keys after the demo (they were pasted in chat).
+4. Report certificate: mentor name still blank; Rishit's roll number in `docs/report/meta.yaml` reads 6001840101 (one digit short?).
 
 ## 6. Older list of what was LEFT (27 Oct)
 1. **Research papers (requested, not started):** one **IEEE** conference format paper and one **Springer LNCS** format paper on
