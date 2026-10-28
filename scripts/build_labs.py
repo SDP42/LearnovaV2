@@ -203,6 +203,73 @@ function build(inp){
  return F.concat(vf)}
 """
 
+
+SPLIT_JS = r"""
+const PRESETS=[
+ {tag:'Example 1 · two objects',name:'Bright square on dark ground',desc:'One bright block: the quadtree splits around it, then merging joins the background pieces.',input:{img:`1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 1
+1 1 8 8 8 8 1 1
+1 1 8 8 8 8 1 1
+1 1 8 8 8 8 1 1
+1 1 8 8 8 8 1 1
+1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 1`,t:1}},
+ {tag:'Example 2 · three regions',name:'Sky, field and a barn',desc:'Three flat areas of different brightness; small noise stays inside the threshold.',input:{img:`9 9 9 9 9 9 9 9
+9 9 9 8 9 9 9 9
+9 9 9 9 9 9 9 9
+9 9 9 9 2 2 2 2
+5 5 5 5 2 2 2 2
+5 5 4 5 2 2 2 2
+5 5 5 5 5 5 5 5
+5 5 5 5 5 5 4 5`,t:1}},
+ {tag:'Example 3 · threshold matters',name:'A soft gradient',desc:'With a large threshold the whole gradient merges into one region; try T = 1 to see it stay apart.',input:{img:`1 1 2 2 3 3 4 4
+1 1 2 2 3 3 4 4
+1 1 2 2 3 3 4 4
+1 1 2 2 3 3 4 4`,t:3}}];
+function fill(i){$('#img').value=i.img;$('#t').value=i.t}
+function readInputs(){return {img:$('#img').value,t:$('#t').value}}
+function build(inp){
+ const G=inp.img.trim().split('\n').map(r=>r.trim().split(/[\s,]+/).filter(Boolean).map(Number));
+ const H=G.length,W=H?G[0].length:0,T=Number(inp.t);
+ if(!H||G.some(r=>r.length!==W||r.some(v=>!Number.isFinite(v))))throw new Error('Give a grid of numbers, the same count in every row.');
+ const pow=n=>n>=1&&(n&(n-1))===0;if(!pow(H)||!pow(W)||H>16||W>16)throw new Error('Rows and columns must each be 1, 2, 4, 8 or 16 (the quadtree halves them).');
+ if(!(T>=0))throw new Error('The threshold T must be a number ≥ 0.');
+ const lab=Array.from({length:H},()=>Array(W).fill(0));let nid=0;const regs={};
+ const stats=(r0,c0,h,w)=>{let mn=Infinity,mx=-Infinity;for(let r=r0;r<r0+h;r++)for(let c=c0;c<c0+w;c++){mn=Math.min(mn,G[r][c]);mx=Math.max(mx,G[r][c])}return [mn,mx]};
+ const col=id=>`hsl(${(id*67)%360} 70% 86%)`;
+ const view=(cur=[],note='')=>{const cs=new Set(cur.map(x=>x.join(',')));let h='<table class="t">';
+  for(let r=0;r<H;r++){h+='<tr>';for(let c=0;c<W;c++){const id=lab[r][c];const b=[];
+   if(r===0||lab[r-1][c]!==id)b.push('border-top:3px solid #172131');if(c===0||lab[r][c-1]!==id)b.push('border-left:3px solid #172131');
+   if(r===H-1||lab[r+1][c]!==id)b.push('border-bottom:3px solid #172131');if(c===W-1||lab[r][c+1]!==id)b.push('border-right:3px solid #172131');
+   h+=`<td class="${cs.has(r+','+c)?'cur':''}" style="background:${col(id)};${b.join(';')};min-width:34px">${G[r][c]}</td>`}h+='</tr>'}
+  return h+`</table><p class="small">Thick lines are region borders; each colour is one region.${note?' '+note:''}</p>`};
+ const F=[];const leaves=[];
+ F.push({k:'Set up',title:'The image and the rule',view:view(),explain:`<p>The image is ${H}×${W} pixels. A region is <b>homogeneous</b> when its brightest and darkest pixels differ by at most <b>T = ${T}</b>:</p><div class="formula">P(R) = TRUE  ⇔  max(R) − min(R) ≤ ${T}</div><p>Start with the whole image as one region, split what fails P, then merge neighbours whose union passes P.</p>`});
+ const cells=(r0,c0,h,w)=>{const o=[];for(let r=r0;r<r0+h;r++)for(let c=c0;c<c0+w;c++)o.push([r,c]);return o};
+ function split(r0,c0,h,w){const id=nid++;for(let r=r0;r<r0+h;r++)for(let c=c0;c<c0+w;c++)lab[r][c]=id;const [mn,mx]=stats(r0,c0,h,w);
+  const ok=mx-mn<=T||(h===1&&w===1);
+  F.push({k:'Split',title:ok?`Region ${h}×${w} at (${r0},${c0}) is homogeneous`:`Region ${h}×${w} at (${r0},${c0}) must be split`,view:view(cells(r0,c0,h,w)),
+   explain:`<div class="formula">max − min = ${mx} − ${mn} = ${mx-mn} ${mx-mn<=T?'≤':'>'} ${T}</div><p>${ok?'P(R) is TRUE, so this region stays as one leaf of the quadtree.':'P(R) is FALSE: divide it into four equal quadrants and test each one.'}</p>`});
+  if(ok){regs[id]={cells:cells(r0,c0,h,w),mn,mx};leaves.push(id);return}
+  const h2=Math.max(1,h/2),w2=Math.max(1,w/2);
+  for(const [dr,dc] of [[0,0],[0,w2],[h2,0],[h2,w2]])if(dr<h&&dc<w)split(r0+dr,c0+dc,h===1?1:h2,w===1?1:w2)}
+ split(0,0,H,W);
+ F.push({k:'Split done',title:`${leaves.length} homogeneous leaves`,view:view(),explain:`<p>Splitting alone leaves <b>${leaves.length}</b> square regions. Many neighbours look the same — the quadtree cut them only because of where the square boundaries fall.</p><p>Now <b>merge</b>: join two adjacent regions when their union still satisfies P.</p>`});
+ let changed=true,merges=0;
+ const adj=(a,b)=>regs[a].cells.some(([r,c])=>[[1,0],[-1,0],[0,1],[0,-1]].some(([dr,dc])=>{const rr=r+dr,cc=c+dc;return rr>=0&&cc>=0&&rr<H&&cc<W&&lab[rr][cc]===b}));
+ while(changed&&merges<60){changed=false;const ids=Object.keys(regs).map(Number);
+  outer:for(const a of ids)for(const b of ids){if(a>=b||!regs[a]||!regs[b]||!adj(a,b))continue;
+   const mn=Math.min(regs[a].mn,regs[b].mn),mx=Math.max(regs[a].mx,regs[b].mx);
+   if(mx-mn<=T){const before=view([...regs[a].cells,...regs[b].cells]);
+    regs[b].cells.forEach(([r,c])=>lab[r][c]=a);regs[a]={cells:[...regs[a].cells,...regs[b].cells],mn,mx};delete regs[b];merges++;changed=true;
+    F.push({k:'Merge',title:`Merge two neighbouring regions`,view:before,explain:`<div class="formula">max(R₁ ∪ R₂) − min(R₁ ∪ R₂) = ${mx} − ${mn} = ${mx-mn} ≤ ${T}</div><p>The highlighted regions touch and their union is still homogeneous, so they become one region.</p>`});
+    break outer}}}
+ const n=Object.keys(regs).length;
+ F.push({k:'Result',title:`${n} region${n>1?'s':''} after merging`,view:view(),explain:`<p>Split produced ${leaves.length} leaves; ${merges} merge${merges===1?'':'s'} reduced them to <b>${n}</b>.</p><p>Split handles <b>where</b> the image changes; merge removes the artificial square borders the quadtree introduced.</p>`});
+ return F}
+"""
+
+
 LABS = [
     dict(id="cyk_parsing", title="CYK Parsing Lab", h1="CYK parsing, cell by cell",
          topics="cyk, cyk algorithm, cyk parsing, cocke-younger-kasami, cky, chomsky normal form, cnf, triangular table, constituency parsing",
@@ -234,6 +301,12 @@ LABS = [
          cond="t̂ = argmax_t Π P(t_i | t_{i-1}) · P(w_i | t_i)", view="Tables and trellis", js=POS_JS,
          inputs='<div class="row"><div><label for="corpus">Tagged corpus (word/TAG, one sentence per line)</label><textarea id="corpus"></textarea></div><div><label for="sent">Sentence to tag</label><input id="sent" type="text"></div></div>',
          ideas=["Transition a(t→u) = count(t u) / count(t), including from the start <s>.", "Emission b(t, w) = count(w tagged t) / count(t).", "The same word can carry different tags (will/M vs Will/N); the context decides.", "Viterbi over tags gives the most likely tag sequence."]),
+    dict(id="region_split_merge", title="Region Splitting and Merging Lab", h1="Region splitting and merging",
+         topics="region splitting and merging, region split and merge, split and merge, splitting and merging, quadtree segmentation, quad tree, region splitting, region merging, region-based segmentation, region based segmentation, image segmentation",
+         lead="<b>Split and merge</b> segments an image without seeds: the image is split into quadrants until every region is <b>homogeneous</b>, then adjacent regions are <b>merged</b> when their union is still homogeneous.",
+         cond="P(R) = TRUE  ⇔  max(R) − min(R) ≤ T", view="Image and regions", js=SPLIT_JS,
+         inputs='<div class="row"><div><label for="img">Image (grey levels, rows on separate lines)</label><textarea id="img"></textarea></div><div><label for="t">Threshold T</label><input id="t" type="number" min="0" step="1"></div></div>',
+         ideas=["Split: test P on a region; if it fails, divide it into four quadrants (a quadtree).", "Merge: join two adjacent regions when P holds for their union.", "A small T gives many regions; a large T merges real objects together.", "Unlike region growing, no seed pixels are needed."]),
 ]
 
 
