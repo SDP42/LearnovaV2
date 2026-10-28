@@ -313,47 +313,77 @@ text(s, 0.45, 6.14, 12.5, 0.95, [
       "None of them redesigns the deck a teacher already uses — which is exactly the gap Learnova targets.", {"size": 11})]])
 
 # ── 4. Architecture & technology stack ───────────────────────────────────────
-s = frame("TECHNICAL APPROACH — ARCHITECTURE", "Six layers, each replaceable; every AI step has an offline fallback", 4)
-layers = [("1  User & client layer", BLUE, [("laptop", "Web app", "React · Vite · Tailwind"), ("presentation", "Web deck", "Reveal.js, click reveals"),
-                                             ("file-text", "PowerPoint", "editable native shapes"), ("smartphone", "Mobile PWA", "installable, offline"),
-                                             ("users", "Share link", "view-only, no login")]),
-          ("2  API & service layer (FastAPI)", TEAL, [("shield-check", "Auth", "phone OTP, tokens, rate limit"), ("refresh-cw", "Jobs", "upload · generate · progress"),
-                                                     ("library", "Deck library", "versions · refresh"), ("sigma", "Explain / labs / art", "public pages"),
-                                                     ("message-circle", "Tutor", "answers from the deck")]),
-          ("3  Processing pipeline", ORANGE, [("search", "Reader + OCR", "PDF/PPTX/DOCX, Tesseract"), ("list-checks", "Planner", "split · merge · agenda · quiz"),
-                                               ("brain", "Decision engine", "27 detectors, reasons"), ("ruler", "Layout engine", "glyph-measured fitting"),
-                                               ("gauge", "Audit", "overflow · breaks · facts")]),
-          ("4  AI layer (optional)", PURPLE, [("bot", "LLM router", "Gemini ×5 → Groq → NVIDIA"), ("pencil", "AI polish", "titles · explanations"),
-                                               ("palette", "Topic diagrams", "validated SVG"), ("flask-conical", "AI labs", "Node-checked JS"),
-                                               ("cpu", "Offline rules", "always available")]),
-          ("5  Output & data layer", GREEN, [("presentation", "PPTX builder", "python-pptx"), ("globe", "Web builder", "self-contained HTML"),
-                                              ("notebook-pen", "Study pack", "cards · Anki · quiz bank"), ("database", "SQLite + files", "users · jobs · decks"),
-                                              ("layers", "Caches", "LLM · art · OCR · labs")])]
-for i, (name, col, comps) in enumerate(layers):
-    y = 1.0 + i * 1.21
-    rect(s, 0.3, y, 8.75, 1.12, TINT[col], line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.06)
-    text(s, 0.4, y + 0.02, 4, 0.28, [(name, {"bold": True, "size": 11, "color": col, "font": HEAD})])
+s = frame("TECHNICAL APPROACH — ARCHITECTURE", "Input → processing workflow → output; every AI step has an offline fallback", 4)
+rect(s, 0.3, 0.98, 8.95, 0.32, GREEN, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.4)
+text(s, 0.3, 0.98, 8.95, 0.32, [("System architecture and data flow", {"bold": True, "size": 12, "color": WHITE, "align": PP_ALIGN.CENTER})], anchor=MSO_ANCHOR.MIDDLE)
+flow = [("INPUT", BLUE, [("upload", "PowerPoint (.pptx)", "teacher's existing deck"), ("file-text", "Slide PDF", "exported lecture slides"),
+                         ("notebook-pen", "Word / notes", ".docx, markdown, text"), ("pencil", "Typed topic", "a prompt or syllabus line"),
+                         ("flask-conical", "Teacher labs", "own HTML labs via API")]),
+        ("INGEST", TEAL, [("refresh-cw", "LibreOffice convert", "PPTX → PDF, cached by hash"), ("search", "Slide reader", "titles · bullet levels · tables"),
+                          ("eye", "OCR decision", "Tesseract when text is reliable"), ("wrench", "Repair", "furniture, glued titles, split words"),
+                          ("palette", "Colour DNA", "source palette → theme")]),
+        ("ENGINES", ORANGE, [("list-checks", "Planner", "split · merge · agenda · glossary"), ("brain", "Decision engine", "27 detectors, reason + score"),
+                             ("ruler", "Layout engine", "glyph-measured, no broken words"), ("sigma", "Explainer solvers", "exact step-by-step (SymPy)"),
+                             ("puzzle", "Quiz + lab selector", "checkpoints, one lab per topic")]),
+        ("AI SERVICE", PURPLE, [("bot", "LLM router", "Gemini ×5 → Groq → NVIDIA"), ("pencil", "AI polish", "assertion titles, explanations"),
+                                ("palette", "Topic diagrams", "validated SVG + HTML page"), ("code", "AI labs", "JS checked with node --check"),
+                                ("cpu", "Offline fallback", "rules, scenes, structure labs")]),
+        ("OUTPUT", GREEN, [("presentation", "Editable PPTX", "native shapes, linked pictures"), ("globe", "Web deck", "Reveal.js, reveals, overlays"),
+                           ("book-open", "Study pack", "flashcards · Anki · quiz bank"), ("users", "Share link", "view-only, no login"),
+                           ("message-circle", "Deck tutor", "answers from the deck only")])]
+labels = ["IR", "plan", "calls", "assets"]
+for i, (name, col, comps) in enumerate(flow):
+    x = 0.3 + i * 1.82
+    rect(s, x, 1.38, 1.62, 4.27, TINT[col], line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.05)
+    rect(s, x + 0.12, 1.32, 1.38, 0.24, col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.5)
+    text(s, x + 0.12, 1.32, 1.38, 0.24, [(name, {"bold": True, "size": 9, "color": WHITE, "align": PP_ALIGN.CENTER})], anchor=MSO_ANCHOR.MIDDLE)
     for j, (ic, h, sub) in enumerate(comps):
-        x = 0.42 + j * 1.72
-        rect(s, x, y + 0.32, 1.62, 0.72, WHITE, line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.12, lw=0.75)
-        badge(s, ic, x + 0.06, y + 0.45, 0.46, col)
-        text(s, x + 0.55, y + 0.34, 1.06, 0.68, [(h, {"bold": True, "size": 9.5}), (sub, {"size": 8, "color": MUTED})], anchor=MSO_ANCHOR.MIDDLE, spacing=0)
-    if i < len(layers) - 1:
-        arrow(s, 4.67, y + 1.12, 4.67, y + 1.21, col, 2)
-panel(s, 9.25, 1.0, 3.8, 6.08, "Technologies used", BLUE, "code")
-stack = [("Front end", "React 18, Vite, Tailwind CSS, Reveal.js, PWA (manifest + service worker)"),
-         ("Back end", "Python 3.12, FastAPI, Pydantic, background job queue, SQLite"),
-         ("Documents", "python-pptx, PyMuPDF, LibreOffice (headless PPTX→PDF), python-docx, Tesseract OCR"),
-         ("AI / NLP", "Google Gemini (5-key pool, per-key pacing), Groq, NVIDIA NIM via failover router"),
-         ("Maths & labs", "SymPy exact solvers; JavaScript lab engine; SVG + MuPDF rasterising"),
-         ("Quality", "pytest — 755 tests; layout audit; gold-set evaluation; e2e API check"),
-         ("DevOps", "GitHub (SDP42/LearnovaV2), launch configs, deploy: static front end + Docker back end")]
-text(s, 9.37, 1.45, 3.6, 4.1, bullets(stack, 9.8), spacing=6)
-rect(s, 9.37, 5.6, 3.56, 1.38, WHITE, line=BLUE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.08)
-text(s, 9.45, 5.63, 3.42, 1.33, [("Data flow", {"bold": True, "size": 10.5, "color": BLUE}),
-                                  ("Input (deck / notes / topic) → Processing (read → plan → decide → illustrate → build → audit) → Output (PPTX, web deck, "
-                                   "study pack, share link). Jobs run in the background with live stage progress; results are cached by content hash.", {"size": 9.3})],
-     spacing=1)
+        y = 1.64 + j * 0.8
+        rect(s, x + 0.07, y, 1.48, 0.72, WHITE, line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.12, lw=0.75)
+        badge(s, ic, x + 0.11, y + 0.06, 0.32, col)
+        text(s, x + 0.46, y + 0.02, 1.08, 0.36, [(h, {"bold": True, "size": 8.4})], anchor=MSO_ANCHOR.MIDDLE)
+        text(s, x + 0.1, y + 0.38, 1.42, 0.33, [(sub, {"size": 7.6, "color": MUTED})], spacing=0)
+    if i < len(flow) - 1:
+        arrow(s, x + 1.63, 3.5, x + 1.81, 3.5, INK, 2.25)
+        text(s, x + 1.5, 3.2, 0.44, 0.26, [(labels[i], {"size": 6.8, "color": INK, "align": PP_ALIGN.CENTER, "italic": True})])
+rect(s, 0.3, 5.75, 8.95, 0.72, RGBColor(0xF4, 0xF6, 0xFA), line=RGBColor(0xC9, 0xD0, 0xDA), shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.08)
+text(s, 0.38, 5.76, 3, 0.22, [("DEPLOYMENT AND OPERATIONS · open-source / free tier", {"bold": True, "size": 8.5, "color": MUTED})])
+dep = [("git-branch", "GitHub", "source · 755 tests"), ("globe", "Vercel / Netlify", "React static build"), ("ship", "Docker on Render", "FastAPI + LibreOffice + OCR"),
+       ("database", "SQLite volume", "users · decks · caches"), ("gauge", "Monitoring", "health · audit · logs")]
+for i, (ic, h, sub) in enumerate(dep):
+    x = 0.42 + i * 1.77
+    rect(s, x, 6.0, 1.58, 0.42, WHITE, line=RGBColor(0xC9, 0xD0, 0xDA), shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.2, lw=0.75)
+    badge(s, ic, x + 0.05, 6.04, 0.34, INK)
+    text(s, x + 0.42, 6.0, 1.15, 0.42, [(h, {"bold": True, "size": 8.2}), (sub, {"size": 7, "color": MUTED})], anchor=MSO_ANCHOR.MIDDLE, spacing=0)
+    if i < len(dep) - 1:
+        arrow(s, x + 1.59, 6.21, x + 1.76, 6.21, MUTED, 1.5)
+steps4 = [("1 · Read faithfully", "every page, every figure kept", TEAL), ("2 · Decide with rules", "explainable visual per slide", BLUE),
+          ("3 · Enrich with AI", "checked titles, diagrams, labs", ORANGE), ("4 · Build and audit", "PPTX + web deck, no breaks", INK)]
+for i, (h, b, col) in enumerate(steps4):
+    x = 0.3 + i * 2.25
+    rect(s, x, 6.55, 2.18, 0.58, col, shape=MSO_SHAPE.PENTAGON)
+    text(s, x + 0.08, 6.55, 1.95, 0.58, [(h, {"bold": True, "size": 9.5, "color": WHITE}), (b, {"size": 8, "color": WHITE})], anchor=MSO_ANCHOR.MIDDLE, spacing=0)
+rect(s, 9.4, 0.98, 3.65, 0.32, BLUE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.4)
+text(s, 9.4, 0.98, 3.65, 0.32, [("Technologies to be used", {"bold": True, "size": 12, "color": WHITE, "align": PP_ALIGN.CENTER})], anchor=MSO_ANCHOR.MIDDLE)
+techs = [("atom", "React", RGBColor(0x14, 0x9E, 0xCA)), ("zap", "Vite", RGBColor(0x8B, 0x5C, 0xF6)), ("waves", "Tailwind", RGBColor(0x06, 0xB6, 0xD4)),
+         ("presentation", "Reveal.js", RGBColor(0xE0, 0x9F, 0x1F)), ("code", "Python", RGBColor(0x30, 0x6F, 0xA8)), ("zap", "FastAPI", RGBColor(0x00, 0x96, 0x88)),
+         ("database", "SQLite", RGBColor(0x0F, 0x5F, 0x8C)), ("file-text", "PyMuPDF", RGBColor(0xC0, 0x30, 0x30)), ("refresh-cw", "LibreOffice", RGBColor(0x18, 0xA3, 0x03)),
+         ("eye", "Tesseract", RGBColor(0x55, 0x5F, 0x6D)), ("sparkles", "Gemini", RGBColor(0x42, 0x85, 0xF4)), ("cpu", "Groq", RGBColor(0xF5, 0x50, 0x36)),
+         ("sigma", "SymPy", RGBColor(0x3B, 0x7A, 0x3B)), ("test-tube-diagonal", "pytest", RGBColor(0xC8, 0x9B, 0x10)), ("git-branch", "GitHub", INK),
+         ("ship", "Docker", RGBColor(0x1D, 0x63, 0xED))]
+for i, (ic, nm, col) in enumerate(techs):
+    x = 9.45 + (i % 4) * 0.9
+    y = 1.4 + (i // 4) * 0.78
+    rect(s, x + 0.17, y, 0.5, 0.5, col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.25)
+    icon(s, ic, x + 0.27, y + 0.1, 0.3)
+    text(s, x - 0.05, y + 0.5, 0.95, 0.24, [(nm, {"size": 7.8, "bold": True, "align": PP_ALIGN.CENTER})])
+stack = [("Frontend:", "React 18 · Vite · Tailwind CSS · Reveal.js web deck · PWA (manifest + service worker)"),
+         ("Backend:", "Python 3.12 · FastAPI · Pydantic · background job queue · SQLite · OTP auth"),
+         ("Documents:", "python-pptx · PyMuPDF · LibreOffice headless · python-docx · Tesseract OCR"),
+         ("AI / NLP:", "Gemini (pool of 5 keys, per-key pacing) · Groq · NVIDIA NIM · failover router"),
+         ("Maths & labs:", "SymPy exact solvers · JavaScript lab engine · SVG via MuPDF"),
+         ("Quality & DevOps:", "pytest (755) · layout audit · gold sets · GitHub · Docker")]
+text(s, 9.42, 4.55, 3.65, 2.6, bullets(stack, 8.9), spacing=3)
 
 # ── 5. Methodology & prototype ───────────────────────────────────────────────
 s = frame("TECHNICAL APPROACH — METHODOLOGY", "Nine stages from upload to audited deck, with the algorithm behind each", 5)
@@ -488,7 +518,7 @@ benefits = [("Students", BLUE, "graduation-cap", ["One clear idea per slide with
 for i, (h, col, ic, items) in enumerate(benefits):
     x = 0.3 + i * 3.2
     panel(s, x, 4.08, 3.08, 2.15, h, col, ic)
-    text(s, x + 0.08, 4.5, 2.95, 1.7, bullets(items, 9.8, mark="✔"), spacing=3)
+    text(s, x + 0.08, 4.47, 2.95, 1.75, bullets(items, 10.4, mark="✔"), spacing=4)
 rect(s, 0.3, 6.32, 12.75, 0.78, TINT[BLUE], line=BLUE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.1)
 text(s, 0.45, 6.34, 12.5, 0.75, [
     [("Use cases:  ", {"bold": True, "color": BLUE, "size": 10.5}),
@@ -554,7 +584,7 @@ for i, (h, col, ic, refs) in enumerate(cards):
     rect(s, x, y, 3.08, 2.45, TINT[col], line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.06)
     badge(s, ic, x + 0.1, y + 0.1, 0.5, col)
     text(s, x + 0.68, y + 0.12, 2.35, 0.45, [(h, {"bold": True, "size": 11, "color": col, "font": HEAD})], anchor=MSO_ANCHOR.MIDDLE)
-    text(s, x + 0.12, y + 0.7, 2.88, 1.72, [[("▸ ", {"color": col, "bold": True, "size": 9.4}), (r, {"size": 9.4})] for r in refs], spacing=5)
+    text(s, x + 0.12, y + 0.66, 2.88, 1.76, [[("▸ ", {"color": col, "bold": True, "size": 10}), (r, {"size": 10})] for r in refs], spacing=7)
 rect(s, 0.3, 6.14, 12.75, 0.95, TINT[BLUE], line=BLUE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.1)
 qr(s, REPO, 0.38, 6.19, 0.85)
 qr(s, REPO + "/tree/main/docs/research/papers", 1.32, 6.19, 0.85)
