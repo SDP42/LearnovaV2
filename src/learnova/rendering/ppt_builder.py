@@ -454,8 +454,8 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         _fam0 = str(getattr(_sp, "family", "") or "") if _sp is not None else ""
         _wide0 = _fam0 in _WIDE_FAMS or _fam0.startswith("CHART_")
         _spot, _spot_id, _panel_scene = None, None, None
-        if (layout_type != "QUIZ" and not (orig.get("image") or {}).get("bytes") and not (imp.get("illustration") or {}).get("bytes")
-                and _fam0 != "FIGURE"):
+        if (layout_type != "QUIZ" and _fam0 != "FIGURE"
+                and (_wide0 or (not (orig.get("image") or {}).get("bytes") and not (imp.get("illustration") or {}).get("bytes")))):
             # no source figure and no AI diagram: the offline illustrator draws one — a side panel where there is room,
             # a header picture on wide visuals — and it is kept as a page of its own, linked from the picture
             try:
@@ -489,7 +489,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         _is_fig = _sp is not None and getattr(_sp, "family", "") == "FIGURE"
         _side_ill = imp.get("illustration") or _panel_scene or {}
         _side_png = _src_img if (_src_img and _image_decision(orig)[0]) else (None if _src_img else _side_ill.get("bytes"))
-        if _side_png and layout_type != "QUIZ" and not _is_fig:
+        if _side_png and layout_type != "QUIZ" and not _is_fig and not _wide0:     # wide visuals keep the full width
             try:
                 from PIL import Image as _PILImage
 
@@ -675,7 +675,7 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
         # A figure anchored to a non-MINIMAL layout gets its own slide, placed
         # immediately after so it stays with the content it belongs to.
         image = orig.get("image") if isinstance(orig, dict) else None
-        if layout_type != "MINIMAL_TEXT" and image and image.get("bytes") and not _side_done and not _family_drawn:
+        if layout_type != "MINIMAL_TEXT" and image and image.get("bytes") and not _side_done:
             _fig_show, _fig_caption = _image_decision(orig)
             if _fig_show:
                 if _add_figure_slide(

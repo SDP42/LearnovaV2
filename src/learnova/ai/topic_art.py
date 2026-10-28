@@ -50,6 +50,10 @@ Reply with the SVG only."""
 _ALLOWED = {"svg", "g", "rect", "circle", "ellipse", "line", "polyline", "polygon", "path", "text", "tspan", "defs", "marker", "title", "desc"}
 _BAD_ATTR = re.compile(r"^(?:on\w+|href|xlink:href|style|filter|class)$", re.I)
 
+# Visuals that need the slide's full width: they get the header picture, not a side diagram (so no diagram is requested).
+_WIDE = {"COMPARE_TABLE", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
+         "FUNNEL", "LAYERS", "OUTLINE", "COMPARE_VISUAL", "ALGORITHM_TRACE", "DATA_STRUCTURE", "FUNCTION_PLOT", "FIGURE"}
+
 _lock = threading.Lock()
 _rr = itertools.count()
 
@@ -263,7 +267,7 @@ def illustrate(entries: List[dict], families: List[str], primary: str, accent: s
     seen = set()
     for entry, fam in zip(entries, families):
         imp = entry.get("improved") if isinstance(entry.get("improved"), dict) else None
-        if imp is None or str(imp.get("layout_type", "")).upper() == "QUIZ" or fam == "FIGURE":
+        if imp is None or str(imp.get("layout_type", "")).upper() == "QUIZ" or fam in _WIDE or fam.startswith("CHART_"):
             continue
         if (entry.get("original") or {}).get("image") or any(imp.get(f) for f in ("is_agenda", "is_summary", "is_glossary", "is_activity")):
             continue
