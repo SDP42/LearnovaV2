@@ -1,0 +1,22 @@
+# Render blueprint: one Docker web service (API + web app). Free plan sleeps when idle and has no persistent disk,
+# so it suits a short demo with a small deck; use a paid plan with a disk for real use.
+services:
+  - type: web
+    name: learnova
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEYS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: OTP_SECRET
+        generateValue: true
+      - key: OTP_DEV_MODE
+        value: "1"
+      - key: LEARNOVA_AI_DIAGRAM_MAX
+        value: "12"

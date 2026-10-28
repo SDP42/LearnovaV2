@@ -1369,3 +1369,23 @@ def gallery_use(slug: str, user_id: str = Depends(current_user)) -> dict:
     if new_id is None:
         raise HTTPException(status_code=404, detail="no pre-built deck for this topic yet")
     return {"deck_id": new_id}
+
+
+# ── Production: the built web app is served by the API itself (one container, no CORS) ──
+_WEB_DIST = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if _WEB_DIST.is_dir() and os.getenv("LEARNOVA_SERVE_WEB", "1") == "1":
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    if (_WEB_DIST / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=_WEB_DIST / "assets"), name="web-assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def web_app(path: str):
+        """Any non-API path: a real file from the build, else the single-page app's index.html."""
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="not found")
+        target = (_WEB_DIST / path).resolve()
+        if path and target.is_file() and _WEB_DIST in target.parents:
+            return FileResponse(target)
+        return FileResponse(_WEB_DIST / "index.html")
