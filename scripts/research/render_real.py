@@ -15,13 +15,15 @@ from learnova.config import apply_runtime_env  # noqa: E402
 apply_runtime_env()
 import fitz  # noqa: E402
 
-from learnova.pipeline.orchestrator import PipelineConfig, run_all  # noqa: E402
+from learnova.parsers.markdown_converter import from_typed_text  # noqa: E402
+from learnova.pipeline.orchestrator import PipelineConfig, generate, run_all  # noqa: E402
 
 src, out = pathlib.Path(sys.argv[1]).expanduser(), pathlib.Path(sys.argv[2])
 a, b = (sys.argv[3] if len(sys.argv) > 3 else "1-12").split("-")
 out.mkdir(parents=True, exist_ok=True)
 t0 = time.time()
-res = run_all(str(src), source_name=src.stem, config=PipelineConfig())
+res = (generate(from_typed_text(src.read_text(), src.stem), PipelineConfig()) if src.suffix in {'.md', '.txt'}
+       else run_all(str(src), source_name=src.stem, config=PipelineConfig()))
 print(f"built in {time.time() - t0:.0f}s, slides={len(res.final_deck) if hasattr(res, 'final_deck') else '?'}")
 pp = out / "deck.pptx"
 pp.write_bytes(res.pptx_bytes)

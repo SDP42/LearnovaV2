@@ -649,7 +649,7 @@ def _formula_callout(data: Dict[str, Any], theme) -> Optional[str]:
         + f'<div data-el="el.9" data-build="0" style="background:{theme.primary_hex};color:{_on(theme)};border-radius:20px;'
         f'padding:30px 24px;text-align:center;font-size:2.6rem;font-weight:800;'
         f'font-family:Georgia,\'Times New Roman\',serif;letter-spacing:.01em;box-shadow:0 14px 34px {_tint(theme, "40")};">'
-        f'{_subs_html(formula)}</div>'
+        f'{_math_html(formula)}</div>'
         + (f'<ul style="margin:0;padding-left:20px;font-size:0.95rem;line-height:1.5;color:{theme.text_hex};">{lis}</ul>' if lis else "")
         + "</div>"
     )
@@ -657,6 +657,18 @@ def _formula_callout(data: Dict[str, Any], theme) -> Optional[str]:
 
 _KW_HTML = re.compile(r"^(step\s*\d+|input|output|begin|end|for each|foreach|for|while|repeat|until|do|if|else|elif|then|return|"
                       r"initiali[sz]e|init|set|update|compute|calculate|let|loop|break|continue|print|def|function|procedure|call|stop|exit)\b:?", re.I)
+
+
+def _math_html(text: str) -> str:
+    """An equation as MathML (drawn natively by the browser, like Word's equations); plain text if it is not maths."""
+    from learnova.visuals.mathfmt import looks_like_equation, to_mathml
+
+    if looks_like_equation(text) and not re.search(r"[A-Z][a-z]?\d*\s*(?:\+|⇌|→|<->|->)", text):
+        try:
+            return to_mathml(text)
+        except Exception:
+            pass
+    return _subs_html(text)
 
 
 def _algorithm_block(data: Dict[str, Any], theme) -> Optional[str]:
@@ -668,7 +680,7 @@ def _algorithm_block(data: Dict[str, Any], theme) -> Optional[str]:
     for i, (t, d) in enumerate(lines):
         m = None if math else _KW_HTML.match(t)
         body = (f'<b style="color:{theme.primary_hex}">{_esc(t[:m.end()])}</b>{_esc(t[m.end():])}' if m else
-                (_subs_html(t) if math else _esc(t)))
+                (_math_html(t) if math else _esc(t)))
         num = "" if math else f'<span style="display:inline-block;width:2.2em;color:{theme.subtext_hex};font-size:.8em;">{i + 1}</span>'
         rows += (f'<div data-el="el.{i}" data-build="{i}" style="padding:4px 0;padding-left:{d * 1.4}em;'
                  f'{"text-align:center;font-size:1.35rem;" if math else ""}">{num}{body}</div>')

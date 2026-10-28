@@ -690,7 +690,8 @@ def generate(
 
     # 9. Quiz generation + interleaving
     def _quiz():
-        _freq = max(config.quiz_frequency, -(-len(result.improved) // 8))  # never more than ~1 checkpoint per 8 slides
+        # a checkpoint every 3–4 content slides keeps students active; only very long decks space them out (at most 20 checkpoints)
+        _freq = max(config.quiz_frequency, -(-len(result.improved) // 20))
         result.quizzes = generate_quizzes(result.improved, frequency=_freq, positions=config.quiz_positions or None)
         result.final_deck = interleave_quizzes_into_slides(
             result.improved, result.quizzes,

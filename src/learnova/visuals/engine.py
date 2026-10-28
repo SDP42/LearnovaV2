@@ -1229,10 +1229,32 @@ def _raw_lines(text: str) -> List[Tuple[int, str]]:
     return out
 
 
+_OPENS = re.compile(r"^(?:for|for each|foreach|while|repeat|if|else|elif|else if|loop|do|begin|function|procedure|def)\b|:\s*$|\bthen\s*$|\bdo\s*$|\{\s*$", re.I)
+_CLOSES = re.compile(r"^(?:end\b|endif|endfor|endwhile|until\b|else\b|elif\b|else if\b|\})", re.I)
+
+
+def _auto_indent(lines: List[str]) -> List[Tuple[int, str]]:
+    """Indentation for pseudocode that lost it: a line after for/while/if/repeat… goes one level in, end/until/else come back out."""
+    out, depth = [], 0
+    for l in lines:
+        if _CLOSES.match(l):
+            depth = max(0, depth - 1)
+        out.append((min(depth, 4), l))
+        if _OPENS.search(l) and not re.search(r"\bend\b", l, re.I):
+            depth += 1
+    return out
+
+
 def det_algorithm(title: str, text: str) -> Det:
     """Pseudocode or a run of equations is one artefact: it is shown whole, in a single panel, line by line with its indentation —
     never split into separate cards or numbered points, which breaks the reading of loops, branches and derivations."""
-    lines = _raw_lines(text)
+    seen: set = set()
+    lines = []
+    for d, l in _raw_lines(text):                      # the same line can arrive twice (slide text and its bullets)
+        k = re.sub(r"\W+", "", l.lower())
+        if k and k not in seen:
+            seen.add(k)
+            lines.append((d, l))
     if len(lines) < 3:
         return None
     n = len(lines)
@@ -1240,12 +1262,15 @@ def det_algorithm(title: str, text: str) -> Det:
     eq = sum(1 for _, l in lines if _EQ_LINE.match(l) and len(_MATHCH.findall(l)) >= 2 and len(l.split()) <= 14)
     titled = bool(_ALGO_TITLE.search(title or ""))
     if code >= 3 and (code >= 0.5 * n or (titled and code >= 0.34 * n)):
+        if not any(d for d, _ in lines):
+            lines = _auto_indent([l for _, l in lines])
         return ("ALGORITHM", "code", 0.93 if titled else 0.88,
                 {"label": "Algorithm", "lines": [{"text": l, "indent": d} for d, l in lines[:18]]},
                 f"{code} of {n} lines read as pseudocode — kept together as one algorithm")
     if eq >= 3 and eq >= 0.6 * n:
+        eqs = [l for _, l in lines if _EQ_LINE.match(l) and len(_MATHCH.findall(l)) >= 2 and len(l.split()) <= 14]
         return ("ALGORITHM", "math", 0.9,
-                {"label": "Equations", "lines": [{"text": l, "indent": 0} for _, l in lines[:12]]},
+                {"label": "Equations", "lines": [{"text": l, "indent": 0} for l in eqs[:10]]},       # prose stays as notes
                 f"{eq} of {n} lines are equations — shown together as one derivation")
     return None
 

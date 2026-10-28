@@ -814,6 +814,27 @@ def _subscript_runs(shape) -> None:
                 prev = node
 
 
+_CHEM = re.compile(r"[A-Z][a-z]?\d*\s*(?:\+|⇌|→|<->|->)")
+
+
+def put_equation(shape, text: str, size: float, color: RGBColor, align: str = "ctr") -> bool:
+    """Replace a shape's text by a native PowerPoint equation (Office Math, as in Word); False leaves it untouched.
+    Chemical equations keep their text form (their subscripts are handled by _subscript_runs)."""
+    from learnova.visuals.mathfmt import looks_like_equation, pretty, to_omml_paragraph
+
+    if not looks_like_equation(text) or _CHEM.search(text):
+        return False
+    try:
+        para = parse_xml(to_omml_paragraph(text, size, _hex(color), fallback=pretty(text), align=align))
+    except Exception:
+        return False
+    body = shape.text_frame._txBody
+    for p_ in body.findall(f"{{{_A}}}p"):
+        body.remove(p_)
+    body.append(para)
+    return True
+
+
 def _formula(c: _Canvas, data) -> bool:
     f = str(data.get("formula", "")).strip()
     if not f:
@@ -849,7 +870,8 @@ def _formula(c: _Canvas, data) -> bool:
         box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, y, c.w, box_h, c.t.primary_rgb, radius=0.25 / max(0.5, box_h) * 0.6)
         fsz = c.fit([f], c.w - 2 * PAD - 0.4, box_h - 0.3, 48, 20, bold=True)
         c.tb(0, 0, 0, 0, [P(f, fsz, True, _on(c.t.primary_rgb))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=box, inset=(PAD, 0.1, PAD, 0.1))
-        _subscript_runs(box)
+        if not put_equation(box, f, min(fsz, 40), _on(c.t.primary_rgb)):
+            _subscript_runs(box)
     y += box_h + gap
     if notes:
         with c.group():
@@ -1390,6 +1412,9 @@ def _algorithm(c: _Canvas, data) -> bool:
             p_ = tf.paragraphs[0]
             if math:
                 p_.alignment = PP_ALIGN.CENTER
+            if math and put_equation(box, t, size, c.t.text_rgb):
+                y += h
+                continue
             m = None if math else _KW.match(t)
             parts = [(t[:m.end()], True), (t[m.end():], False)] if m else [(t, False)]
             for txt, kw in parts:
