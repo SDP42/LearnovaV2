@@ -50,6 +50,10 @@ _STUB_THEME = SimpleNamespace(primary_hex="#2563EB", accent_hex="#FFC93C", card_
 
 
 def llm_available() -> bool:
+    from learnova.ai.escalation import mode
+
+    if mode() == "off":                     # LEARNOVA_AI_MODE=off: never call a model
+        return False
     try:
         return bool(get_router().available)
     except Exception:

@@ -127,6 +127,15 @@ def describe_images(images: list[dict]) -> list[dict]:
             continue
 
         description: Optional[str] = None
+        from learnova.ai.escalation import mode, ocr_is_weak, should_escalate
+
+        if mode() != "always":                 # offline first: Tesseract, and Gemini only if its text is not readable
+            description = local_tesseract_ocr(image_bytes)
+            if not should_escalate("picture", ocr_is_weak(description or "")):
+                if description:
+                    described_images.append({"index": image.get("index", idx), "description": description, "bytes": image_bytes})
+                continue
+            description = None
 
         # ── 1. Gemini Vision (synchronous, SDK has 4s HTTP timeout) ──────────
         if provider and not _gemini_quota_exceeded:

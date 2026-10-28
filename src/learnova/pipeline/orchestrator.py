@@ -222,6 +222,9 @@ def generate(
     been edited by the user since ``build_markdown`` produced it.
     """
     config = config or PipelineConfig()
+    from learnova.ai.escalation import STATS as _esc_stats
+
+    _esc_stats.clear()                                   # per-deck count of what went to the model and what stayed offline
     _dna = (getattr(markdown_doc, "meta", None) or {}).get("dna")
     if _dna and config.theme_id == "auto" and not config.theme_spec:
         # a converted slide deck keeps the colours of the deck it came from (text and headings re-checked for contrast)
@@ -453,7 +456,9 @@ def generate(
                                 or imp.get("is_activity") or orig.get("slide_kind") in {"title", "section"} or "[TABLE DATA]" in str(orig.get("text") or "")):
                             continue
                         text = " ".join(map(str, imp.get("bullets") or [])) or str(orig.get("text") or "")
-                        if len(text.split()) >= 4:
+                        from learnova.ai.escalation import polish_needed, should_escalate
+
+                        if len(text.split()) >= 4 and should_escalate("titles", polish_needed(str(imp.get("title") or ""), text)):
                             todo.append({"id": i, "title": str(imp.get("title") or ""), "text": text})
                     for sid, extra in assist.ai_polish(todo).items():
                         imp = result.improved[sid]["improved"]
@@ -736,7 +741,11 @@ def generate(
         from learnova.rendering.theme_engine import resolve_theme
 
         theme = resolve_theme(result.source_name, config.theme_id, config.theme_spec)
-        return f"{illustrate_deck(result.final_deck, theme, config.image_mode)} illustration(s)"
+        n_ill = illustrate_deck(result.final_deck, theme, config.image_mode)
+        from learnova.ai.escalation import mode, summary
+
+        logger.info("AI escalation (%s): %s", mode(), summary() or "no model calls needed")
+        return f"{n_ill} illustration(s)"
 
     runner.run("illustrate", _illustrate, skip=(not config.enable_illustrations) or config.image_mode == "off", skip_reason="disabled")
 

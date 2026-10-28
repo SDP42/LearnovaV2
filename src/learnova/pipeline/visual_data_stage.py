@@ -36,7 +36,9 @@ def fill_visual_data(deck: List[dict]) -> int:
         if not text.strip():
             continue
         dec = decide(title, text, bullets, vms=select_visual(text, title))
-        if dec.confidence < ENGINE_SURE and dec.family not in {"COMPARE_TABLE", "REFERENCES"}:
+        from learnova.ai.escalation import should_escalate
+
+        if dec.confidence < ENGINE_SURE and dec.family not in {"COMPARE_TABLE", "REFERENCES"} and should_escalate("visual", True):
             uncertain.append({"id": i, "title": title, "text": text})
     answers = assist.refine_visuals(uncertain)
     for sid, a in answers.items():

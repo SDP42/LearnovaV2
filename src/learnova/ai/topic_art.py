@@ -362,6 +362,10 @@ def illustrate(entries: List[dict], families: List[str], primary: str, accent: s
         text = " ".join(str(b) for b in (imp.get("bullets") or []))
         if art_kind(title, text, fam) is None:     # nothing worth drawing here: the slide keeps its own visual
             continue
+        from learnova.ai.escalation import diagram_needed, should_escalate
+
+        if not should_escalate("diagram", diagram_needed(title, text, fam)):
+            continue                             # a generic scene is enough: the offline scene stays
         base = title.lower()
         if base in seen:                     # continuation slides of one topic share a diagram budget: draw the first only
             continue

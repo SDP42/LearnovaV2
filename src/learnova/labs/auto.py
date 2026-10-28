@@ -175,7 +175,9 @@ def lab_for_slide(title: str, text: str, family: str, data: Dict[str, Any], bull
     try:
         from learnova.ai import assist
 
-        ai_on = bool(use_ai and assist.llm_available())
+        from learnova.ai.escalation import offline_lab_ok, should_escalate
+
+        ai_on = bool(use_ai and assist.llm_available() and should_escalate("lab", not offline_lab_ok(items, kind)))
     except Exception:
         ai_on = False
     key = hashlib.sha1(json.dumps([clean_title, kind, items, cols, ai_on], sort_keys=True).encode()).hexdigest()[:12]

@@ -516,7 +516,9 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
                     _ex = find_and_solve(title, vms_source, data if family == "WORKED_EXAMPLE" and isinstance(data, dict) else None)
                     _strong = re.search(r"\b(solve|calculate|compute|find the|determine the|evaluate|numerical|exercise|problem)\b",
                                         f"{title} {vms_source}", re.I)
-                    if (not _ex and _strong and re.search(r"\d|=", vms_source)
+                    from learnova.ai.escalation import should_escalate
+
+                    if (not _ex and _strong and re.search(r"\d|=", vms_source) and should_escalate("explainer", True)
                             and _LLM_EXPLAINERS["n"] < int(os.getenv("LEARNOVA_LLM_EXPLAINERS", "6"))):
                         from learnova.explain.llm import llm_explain   # no rule solver knows this problem: the model writes the steps,
                                                                       # and the page says so (source "llm")
