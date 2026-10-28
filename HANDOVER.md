@@ -110,8 +110,9 @@ Two stale Word lock files `~$D Diary - *.docx` may remain in that folder (close 
 ## 6a. LEFT after 28 Oct
 1. **Springer LNCS paper**: expand like the IEEE one (own algorithms only: explainer detection/acceptance, grounding checks,
    lab policy + generated-lab validation, key-pool scheduler; 7 tables with explanations; figures `fig_steps`, `fig_modes`).
-2. **Project report 25–30+ pages**, TNR 12 justified, .docx + .pdf: draft in `docs/report/Learnova_Project_Report.md`
-   (+ `reference.docx` style); expand every chapter, add figures, then pandoc → docx and xelatex → pdf.
+2. ~~Project report~~ DONE 28 Oct: `docs/report/Learnova_Project_Report.{pdf,docx}` (62 pp PDF, ~46 pp DOCX). Sources
+   `docs/report/ch1-3.md` + `meta.yaml` + `reference.docx`; rebuild: `pandoc meta.yaml ch1.md ch2.md ch3.md -o X.pdf
+   --pdf-engine=xelatex --top-level-division=chapter` and `-o X.docx --reference-doc=reference.docx --toc --number-sections`.
 3. **Per-topic step-by-step HTML via Gemini**: for equation/problem slides without a rule solver, call `explain/llm.py` in the
    pipeline; widen AI labs (cap 10/deck) so more topics get a lab-style page.
 4. **Deployment**: frontend on Vercel; backend needs Docker (LibreOffice + Tesseract) on Render/Railway/Cloud Run with a volume.
