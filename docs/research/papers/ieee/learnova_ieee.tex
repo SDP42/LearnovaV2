@@ -10,360 +10,580 @@
 \usepackage{xcolor}
 \usepackage{url}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+\usetikzlibrary{arrows.meta,positioning}
+\graphicspath{{../figs/}}
 
 \begin{document}
 
-\title{Learnova: Rebuilding Lecture Slide Decks into\\Visually Structured, Interactive Presentations}
+\title{Learnova: Faithful Reconstruction of Lecture Slide Decks with an Explainable Visual Decision Engine, a Cognitive-Load Fitness Metric and Load-Optimal Segmentation}
 
 \author{
-\IEEEauthorblockN{Kawaljeet Singh Bharaj, Jeevesh Bharat Bodhani, Rishit Pankajkumar Lahoti, Swayam Devendra Panchal}
-\IEEEauthorblockA{Department of Artificial Intelligence and Data Science\\
-Dwarkadas J. Sanghvi College of Engineering, Mumbai, India\\
+\IEEEauthorblockN{Swayam Devendra Panchal\IEEEauthorrefmark{1}, Kawaljeet Singh Bharaj\IEEEauthorrefmark{1}, Jeevesh Bharat Bodhani\IEEEauthorrefmark{1}, Rishit Pankajkumar Lahoti\IEEEauthorrefmark{1} and Pratik Kanani\IEEEauthorrefmark{2}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}Student, \IEEEauthorrefmark{2}Head of Department\\
+Department of Artificial Intelligence and Data Science, Dwarkadas J. Sanghvi College of Engineering, Mumbai, India\\
 panchalswayam35@gmail.com}
 }
 
 \maketitle
 
 \begin{abstract}
-Most lecture slides that students receive are exported PowerPoint files or PDFs made of dense bullet lists, pictures of
-equations and diagrams with no structure a program can use. Tools that generate presentations from a prompt do not help
-much here: they start from scratch, paraphrase the teacher's content and cannot be checked against the source. We describe
-Learnova, a system that takes an existing deck (PPTX, slide PDF, Word document or typed notes) and rebuilds it as an
-editable PowerPoint file and an interactive web deck while keeping every point the teacher wrote. The system has four
-parts: a page-by-page reader that recovers titles, bullet nesting, tables and figures from slide PDFs, including slides
-that are only pictures; a rule-based Content Decision Engine that chooses a visual form for each slide (process, timeline,
-comparison table, definition, chart and others) with a stated reason; a layout stage that measures text glyph by glyph so
-that no word is ever broken across lines; and an illustration stage that draws a diagram for every topic slide, written by
-a language model when an API key is available and drawn by offline rules when it is not. On three held-out gold sets
-(101 slides) the decision engine picked an acceptable visual for 96.8--97.4\% of slides in under one millisecond per
-slide. On six real course decks (36 to 216 pages) the rebuilt decks kept 98--100\% of numeric and named facts, and the
-layout audit flagged at most 4\% of slides, none of them for broken words.
+Teachers rarely build a new slide deck for every lecture; they reuse old ones, and those decks are often hard to learn
+from. Presentation generators based on large language models create new decks from a prompt, but they paraphrase the
+source, drop list items and cannot be checked. We present Learnova, a system that rebuilds an existing deck instead of
+generating a new one and keeps every point of the source. This paper describes the methods we designed for it:
+(i) geometric rules that recover the structure of a deck exported to PDF, including a dynamic program for titles that lost
+their spaces and a graphic-ratio test that decides when optical character recognition may replace a picture; (ii) an
+explainable Content Decision Engine that maps each slide to one of more than twenty visual families with a confidence and
+a reason; (iii) Pedagogical Slide Fitness (PSF), a slide-quality metric of the form $E^{\alpha}(1-L)^{\beta}C^{\gamma}$
+derived from cognitive-load and multimedia-learning theory; (iv) CLASS, a dynamic program that splits an overloaded slide
+into consecutive slides of minimum total load; (v) a glyph-measured layout method that guarantees no word is broken across
+lines; and (vi) an illustration stage in which diagrams written by a language model are sanitised and validated, with
+offline fallbacks and a scheduler for a pool of API keys. On 101 labelled slides the decision engine reached
+96.8--97.4\% accuracy at under 1\,ms per slide; on six real decks (28--216 slides) the system kept 98--100\% of the source
+facts, removed every untitled slide and produced no overflowing or broken text; CLASS never did worse than even splitting
+and was strictly better on 37\% of overloaded sections.
 \end{abstract}
 
 \begin{IEEEkeywords}
-presentation generation, document layout analysis, educational technology, slide redesign, information visualisation,
-large language models
+presentation generation, document structure recovery, explainable AI, cognitive load, slide segmentation, layout,
+educational technology
 \end{IEEEkeywords}
 
 \section{Introduction}
-A typical engineering course in our college is taught from slide decks that have been reused for years. When we collected
-decks from our own semester---natural language processing, machine learning and image processing---we found the same
-pattern in all of them: long bullet lists, equations pasted as screenshots, diagrams copied from textbooks, and many
-slides with no title at all. Students read these decks before examinations, and they are not easy to read.
+The slides a student revises from are usually the slides the teacher has used for several years. In decks we collected
+from our own semester we kept seeing the same problems: titles missing or reduced to ``Slide~9'', long lists of bullets,
+equations and diagrams pasted as pictures, and nothing a student could interact with. Redesigning such a deck by hand
+takes hours, so in practice it is not done.
 
-Recent tools such as Gamma~\cite{gamma}, Copilot in PowerPoint~\cite{copilotppt}, Gemini in Google
-Slides~\cite{geminislides} and Canva Magic Design~\cite{canva} make attractive decks from a short prompt. They are
-designed for creating new presentations rather than repairing old ones. When a lecture deck is pasted into them, the
-content is rewritten, items of a list are silently dropped, and the result cannot be compared with the original. For
-a study aid that is a serious problem: the student cannot tell which point went missing. Abstractive summarisers are known
-to make exactly these errors~\cite{maynez2020,ji2023}.
+AI presentation tools \cite{gamma,copilotppt,geminislides,canva} address a different task. They produce an attractive deck
+from a prompt or a pasted document, but they rewrite the content as they go. Summarisation research has shown why this is
+risky: abstractive models omit and invent content \cite{maynez2020,ji2023}. For a study aid that is not acceptable,
+because the student cannot see what was lost.
 
-Learnova takes the opposite position. The teacher's content is treated as fixed, and the system only changes how it is
-shown. Our contributions are:
-\begin{itemize}
-\item a reader that turns a slide deck exported to PDF (and, through a PDF rendering, a PPTX file) back into structured
-slides, including OCR for picture-only slides and recovery of wrapped titles and split words;
-\item a deterministic Content Decision Engine that maps each slide to one of more than twenty visual families and returns
-the data that visual needs together with a reason;
-\item a glyph-measured text-fitting method and a layout audit that guarantee that words are never split across lines;
-\item a per-slide illustration stage with two fallbacks: a diagram written as SVG by a language model under strict
-validation, and an offline scene illustrator;
-\item an evaluation on gold sets and on six real course decks, with all numbers reproducible from the repository.
-\end{itemize}
+Our position is that the source content should be treated as fixed and only its presentation should change. Every
+structural decision---what a slide says, which visual shows it, how much goes on one slide---is made by an explicit rule
+whose reason can be shown, and a language model is used only where its output can be checked against the slide. The
+contributions of this paper are the methods behind that position:
+\begin{enumerate}
+\item rules for recovering the structure of slide PDFs, including title segmentation by dynamic programming and an OCR
+acceptance test based on a graphic ratio (Section~\ref{sec:reader});
+\item an explainable Content Decision Engine (Section~\ref{sec:engine});
+\item the PSF metric and the CLASS segmentation algorithm (Section~\ref{sec:psf});
+\item glyph-measured text fitting with a no-broken-word guarantee (Section~\ref{sec:layout});
+\item sanitised AI diagrams with offline fallbacks and a key-pool scheduler (Section~\ref{sec:ill});
+\item an evaluation on gold sets and real decks, reproducible from the project repository (Section~\ref{sec:eval}).
+\end{enumerate}
 
 \section{Related Work}
-\textit{Document-to-slide generation.} PPSGen~\cite{hu2015} learned sentence importance to build slides from papers;
-DOC2PPT~\cite{fu2022} and D2S~\cite{sun2021} generate slides from scientific documents with neural summarisation and
-figure selection. These systems target papers, not existing decks, and they summarise rather than preserve content.
-
-\textit{Commercial deck generators.} Gamma, Copilot, Gemini and Canva generate an outline first and then fill a template.
-In our trials they produced good-looking slides but changed wording, merged list items and could not keep the original
-figures of an uploaded lecture.
-
-\textit{Automatic visual design.} Mackinlay's APT~\cite{mackinlay1986} chose graphical encodings from data
-characteristics, and Draco~\cite{moritz2019} encodes visualisation design knowledge as constraints. Our decision engine
-follows the same idea---explicit, inspectable rules---but applies it to sentences rather than data tables.
-
-\textit{Slide design guidance.} Assertion--evidence slides, which use a sentence headline supported by a visual, improve
-comprehension over bullet lists~\cite{alley2006,garner2013}. Mayer's multimedia principles~\cite{mayer2009} and cognitive
-load theory~\cite{sweller1988} motivate keeping related text and pictures together and limiting the number of new items
-on a slide. Tufte's critique of bullet outlines~\cite{tufte2003} is another source of the problem we address.
-
-\textit{Line breaking.} Knuth and Plass~\cite{knuth1981} treated paragraph layout as an optimisation over break points.
-We need a much simpler guarantee---no word wider than its box---but in many small boxes at once.
-
-\section{System Overview}
-Fig.~\ref{fig:arch} shows the pipeline. An upload is converted into a Markdown intermediate representation together with
-per-slide metadata (figures, page previews, OCR text, colour palette of the source). The planner splits overloaded slides
-and merges very short ones; the enrichment stage adds an agenda, checkpoint quizzes, key terms and a glossary; the
-decision engine picks a visual for each slide; the illustration and lab stages prepare pictures and interactive pages; and
-two builders write the PowerPoint file (python-pptx, native editable shapes) and the web deck (Reveal.js~\cite{revealjs}).
-A FastAPI service runs jobs in the background and a React front end shows progress, previews and exports.
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[node distance=3.2mm and 3mm, font=\scriptsize,
-  box/.style={draw, rounded corners=2pt, fill=blue!6, align=center, minimum width=19mm, minimum height=7mm},
-  opt/.style={draw, rounded corners=2pt, fill=orange!12, align=center, minimum width=19mm, minimum height=7mm},
-  arr/.style={-{Latex[length=1.6mm]}, thick}]
-\node[box] (in) {Upload\\PPTX / PDF / DOCX / text};
-\node[box, right=of in] (read) {Slide reader\\(PDF, OCR)};
-\node[box, right=of read] (plan) {Planner +\\enrichment};
-\node[box, below=of plan] (dec) {Content Decision\\Engine};
-\node[opt, left=of dec] (ill) {Illustrations\\(LLM SVG / offline)};
-\node[opt, left=of ill] (lab) {Labs and\\explainers};
-\node[box, below=of lab] (ppt) {PowerPoint\\builder};
-\node[box, right=of ppt] (web) {Web deck\\builder};
-\node[box, right=of web] (aud) {Layout audit,\\fact check};
-\draw[arr] (in) -- (read); \draw[arr] (read) -- (plan); \draw[arr] (plan) -- (dec);
-\draw[arr] (dec) -- (ill); \draw[arr] (ill) -- (lab);
-\draw[arr] (lab) -- (ppt); \draw[arr] (ppt) -- (web); \draw[arr] (web) -- (aud);
-\end{tikzpicture}
-\caption{Learnova pipeline. Orange stages use a language model when a key is set and fall back to offline rules otherwise.}
-\label{fig:arch}
-\end{figure}
-
-\section{Reading Slide Decks}
-\label{sec:reader}
-A slide PDF already contains one slide per page, but its structure is implicit. The reader works on text lines from
-PyMuPDF, each with a bounding box $(x_0,y_0,x_1,y_1)$, a font size $s$ and a font name.
-
-\textit{Furniture removal.} A line in the top 12\% or bottom 14\% of a page is treated as page furniture (course name,
-author, slide number) when the same normalised text appears in that band on at least
-\begin{equation}
-m = \max\bigl(3,\ \lfloor 0.3\,n \rfloor\bigr)
-\end{equation}
-of the $n$ pages. Page counters of the form ``$k/n$'' and the chrome of decks exported by slide tools are removed as well.
-Repeated pictures are handled in the same way, but we count only images actually drawn on a page: exporters such as
-LibreOffice place every image of the deck in one shared resource dictionary, and counting resources made every figure look
-like a logo.
-
-\textit{Titles.} The title is the largest line in the top third of the page if its size is at least $1.18$ times the body
-size $\bar s$ (or it is bold and near the top). A title that wraps is rejoined when the next line has the same size, starts
-at the same $x$ and its vertical gap $g$ satisfies $-0.5\,s < g < 0.9\,s$; the negative lower bound is needed because line
-boxes from some exporters overlap.
-
-\textit{Bullet levels.} Bullet glyphs (including symbol-font characters) are matched to the text line on their baseline.
-The $x$ positions of the glyphs are clustered with tolerance $\tau=9$\,pt into anchors $a_1<a_2<\dots$, and an item's level
-is the index of its nearest anchor:
-\begin{equation}
-\ell(x) = \arg\min_{k}\ \lvert x - a_k \rvert .
-\end{equation}
-A line with no glyph continues the previous item when it starts within 12\,pt of the item's text, follows it vertically and
-the previous item has not ended a sentence; a lower-case line is accepted with a looser 48\,pt tolerance.
-
-\textit{Glued titles.} OCR and some exporters drop spaces in capitalised titles (``CONSTRUCTINGTHETABLE''). We segment such
-a token $t$ of length $L$ by dynamic programming over a vocabulary $V$ built from the deck's own words and a dictionary:
-\begin{equation}
-B(j) = \max_{\substack{i<j,\ j-i\le 18\\ t_{i:j}\in V}} \bigl(B(i) + (j-i)^2\bigr), \qquad B(0)=0,
-\end{equation}
-and keep the segmentation behind $B(L)$ if it has at least two words. Squaring the word length prefers a few long words to
-many short ones.
-
-\textit{Picture-only slides.} When the largest picture covers at least 45\% of the page and the page has at most twelve
-words of real text, the picture is read with Tesseract~\cite{smith2007}. Let $I$ be the set of dark pixels and $M$ the
-union of the OCR word boxes (padded by four pixels). The graphic ratio
-\begin{equation}
-\gamma = \frac{\lvert I \setminus M \rvert}{\lvert I \rvert}
-\end{equation}
-is close to zero for a screenshot of bullet text and large for a diagram. The OCR text replaces the picture only if mean
-confidence is at least 62, there are at least twelve words, $\gamma \le 0.42$, at most 15\% of the lines are symbol debris
-and the text does not look like a photographed table. Otherwise the picture is kept as a figure. This check matters for
-mathematics: an equation read by OCR (``\texttt{) = o where o, is unknown}'') is worse than the picture of the equation.
-
-\textit{Charts and diagrams.} When most ``bullets'' of a slide are numbers with an average of under four words, they are
-axis ticks of a drawn chart; the region below the title is rendered as an image instead. A page with ten or more drawn
-shapes and almost no bullet glyphs is treated as a vector diagram in the same way.
-
-\textit{PPTX input.} A PowerPoint file is first rendered to PDF by LibreOffice in headless mode (cached by file hash) and
-then read as above. Reading shapes one by one with python-pptx lost slides that contained only pictures and produced titles
-such as ``Slide~9''; on our Linear Regression deck the shape parser produced 23 slides from 63, while the PDF route produced
-69 slides covering every source slide.
-
-\section{Content Decision Engine}
-For each slide the engine runs a set of detectors. Each detector $d$ returns either nothing or a tuple
-$(f_d, v_d, c_d, D_d, r_d)$: a visual family, a variant, a confidence $c_d\in[0,1]$, the data the renderer needs and a
-human-readable reason. Examples are a \emph{timeline} (three or more sentences with a date and an event that has words),
-a \emph{process} (ordinal cues such as ``first'', ``then'', numbered steps), a \emph{comparison table} (parallel sentences
-about two or more subjects), a \emph{definition} (``X is a \ldots''), \emph{stat tiles} (numbers with units and labels) and
-charts. Tables and section outlines are checked first because they are unambiguous. The remaining candidates
-$\mathcal{C}$ are filtered by exclusion rules $E$ learned from the gold set (for example, a cycle suppresses a linear
-process, and a definition suppresses stat tiles), and the decision is
-\begin{equation}
-d^{*} = \arg\max_{d \in E(\mathcal{C})} c_d ,
-\end{equation}
-with the next three candidates kept as alternatives for the editor. When nothing structural is found the slide becomes
-\emph{key-point cards}, which carry every sentence in full, so choosing a visual never removes text.
-
-Card headings are generated from the sentence itself. A heading is the first three content words after removing discourse
-cues and pronouns; trailing function words, modal verbs, adverbs ending in ``-ly'' and anything after an unbalanced
-parenthesis are dropped, so a heading never ends mid-phrase (``Inductive bias (also'' becomes ``Inductive bias'').
-
-\section{Layout Without Broken Words}
-Every box is sized from its content, and two width models are used. For counting lines, a box of width $W$ inches holds
-about $\lfloor 72W / (\bar\rho\, s) \rfloor$ characters per line at font size $s$, with an average advance ratio
-$\bar\rho = 0.52$ for regular and $0.575$ for bold text. For single words, which must never be split, the width is measured
-glyph by glyph:
-\begin{equation}
-w(u,s) = \kappa\,\frac{s}{72}\sum_{ch \in u} \rho(ch),
-\end{equation}
-where $\rho(ch)$ is the advance width of each printable character taken from the font metrics (separate tables for regular
-and bold) and $\kappa = 1.06$ is a safety factor for viewers that substitute a slightly wider font. A word is split into
-unbreakable pieces after hyphens and slashes, where PowerPoint itself may wrap.
-The number of lines is estimated by greedy wrapping, and the height of
-a block of $n$ lines is $n\cdot 1.26\,s/72$. The font size chosen for a box of size $W\times H$ is
-\begin{equation}
-s^{*} = \max\bigl\{\, s \in \mathcal{G} : H(t,s,W) \le H \,\bigr\},
-\end{equation}
-where $\mathcal{G} = \{s_{\max}, s_{\max}-0.5, \dots, s_{\min}\}$ is the half-point grid,
-and $s_{\min}=11$\,pt for body text. Content that does not fit at $s_{\min}$ is moved to a continuation slide instead of
-being shrunk further. Separately, every paragraph is scaled by
-\begin{equation}
-\sigma = \max\Bigl(0.62,\ \min\bigl(1,\ \min_{u} \tfrac{W}{w(u,s)}\bigr)\Bigr),
-\end{equation}
-where $u$ ranges over the unbreakable pieces of the text. This guarantees that the longest word fits on one line, which is
-the error students notice first (``Homo-nym'' split across two lines).
-
-The layout audit opens the finished PPTX and flags, for each slide, text that overflows its box, words broken across lines,
-slides whose content covers too little of the area (sparse) and slides with an empty lower half.
-
-\section{Illustrations With Two Fallbacks}
-Every topic slide receives a picture, chosen in this order: (i) the source's own figure, shown beside the content; (ii) a
-diagram written by a language model; (iii) a scene from the offline illustrator. Quiz slides and slides that are already a
-full figure are left alone.
-
-For (ii) the model receives the slide's title and text and is asked for one SVG figure in a $600\times720$ view box that
-shows the mechanism of the idea using the slide's own terms, with three to nine short labels and only the deck's colours.
-The answer is accepted only if it passes all of the following: it parses as XML; every element is one of a small set of
-drawing elements (no script, image, foreign object, link, CSS or filter); it has at least six shapes and at most sixteen text
-elements; and it renders with MuPDF. Labels that would run past the edge are scaled down using the same width estimate as
-in the layout stage. Accepted diagrams are cached by a hash of the slide text, served at a public URL, embedded as live SVG
-in the web deck and rasterised for PowerPoint, where the picture links to the full-size page.
-
-Keys are used in a pool. Each key is paced on its own (one request per 4.2\,s on the free tier) and requests are spread
-round-robin over the keys. A key that returns an authentication or quota error is marked dead for 15 minutes and the next
-key is tried; when all keys fail, the offline illustrator is used. Algorithm~\ref{alg:ill} summarises the stage.
-
-\begin{algorithm}[t]
-\caption{Per-slide illustration with fallbacks}
-\label{alg:ill}
-\begin{algorithmic}[1]
-\Require slides $S$, key pool $K$, cache $C$
-\For{each topic slide $s \in S$ (in parallel, 5 workers)}
-  \If{$s$ has a source figure} \State show it beside the content; \textbf{continue} \EndIf
-  \State $h \gets \mathrm{hash}(\mathit{title}_s, \mathit{text}_s)$
-  \If{$h \in C$} \State $g \gets C[h]$
-  \Else
-    \For{key $k$ in round-robin order of live keys in $K$}
-      \State $a \gets$ \Call{Ask}{$k$, prompt$(s)$}
-      \If{$a$ failed with auth/quota error} \State mark $k$ dead; \textbf{continue} \EndIf
-      \State $g \gets$ \Call{Validate}{$a$}; \textbf{break}
-    \EndFor
-    \State $C[h] \gets g$ \Comment{also caches failures}
-  \EndIf
-  \If{$g \neq \varnothing$} \State attach $g$ as SVG and PNG
-  \Else \State attach offline scene for $s$ \EndIf
-\EndFor
-\end{algorithmic}
-\end{algorithm}
-
-\section{Language-Model Assistance and Failover}
-With a key, slides also receive an assertion-style title (a full sentence with a verb, at most fifteen words), a short
-plain-language explanation for thin slides, one example and up to two key terms~\cite{alley2006}. Each answer is checked
-against the slide: the title must share at least one content word with the slide and must not start with an imperative
-verb, and the explanation must share at least two. On a thin slide (fewer than 45 words) the explanation and example are
-added to the body as normal points. Requests go through a router over Groq, Gemini and NVIDIA endpoints with per-task
-preferences; a provider that fails four times in a row, or once with a dead-key error, is switched off for 15 minutes and
-the rule-based path continues, so a deck is never blocked by an API.
-
-\section{Evaluation}
-\subsection{Visual selection}
-We labelled three gold sets of slide texts with the set of acceptable visual families: a development set (38 slides), a
-held-out set (32) and a blind set (31) written by a team member who had not seen the rules. A case counts as \emph{strict}
-correct when the chosen family is acceptable, renders as a real visual and receives data. Table~\ref{tab:gold} shows the
-results. The single miss in each set was a slide where two families were defensible and the annotator had chosen only one.
-Deciding a slide took a median of 0.48\,ms (95th percentile 0.82\,ms) on a laptop CPU.
+Table~\ref{tab:related} compares Learnova with representative systems. PPSGen \cite{hu2015} learned sentence salience and
+selected sentences for slides; DOC2PPT \cite{fu2022} and D2S \cite{sun2021} generate slides from scientific papers with
+neural summarisation. These systems take a paper as input and produce shorter text; none starts from an existing deck.
+Automatic visualisation design---APT \cite{mackinlay1986} and Draco \cite{moritz2019}---encodes design knowledge as rules
+or constraints; our decision engine applies the same idea to sentences. The assertion--evidence approach
+\cite{alley2006,garner2013}, Mayer's principles \cite{mayer2009} and cognitive load theory \cite{sweller1988,cowan2001} give
+the design targets that PSF formalises. CLASS follows the structure of Knuth--Plass line breaking \cite{knuth1981}, with
+slides in place of lines and cognitive load in place of badness.
 
 \begin{table}[t]
 \centering
-\caption{Visual-family selection on the gold sets}
-\label{tab:gold}
-\begin{tabular}{lcccc}
+\caption{Capabilities of related systems}
+\label{tab:related}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccccc}
 \toprule
-Set & Slides & Strict acc. & Real visual & Families used \\
+System & Input & Keeps & Explains & Quality & Off- & Inter- \\
+ & deck & content & choices & metric & line & active \\
 \midrule
-Development & 38 & 97.4\% & 100\% & 24 \\
-Held-out    & 32 & 96.9\% & 100\% & 21 \\
-Blind       & 31 & 96.8\% & 100\% & 21 \\
+PPSGen \cite{hu2015} & -- & -- & -- & -- & \checkmark & -- \\
+DOC2PPT \cite{fu2022} & -- & -- & -- & -- & \checkmark & -- \\
+D2S \cite{sun2021} & -- & -- & -- & -- & \checkmark & -- \\
+Gamma, Copilot, Canva & part. & -- & -- & -- & -- & -- \\
+\textbf{Learnova} & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Real course decks}
-We ran the system without any API key on six decks from our courses: three NLP slide PDFs (Module~4, 36 pages; Module~5,
-95 pages; Syntax analysis, 216 pages), the WSD lecture slides (44 pages) and two machine-learning PowerPoint files (28 and
-63 slides). Table~\ref{tab:real} reports the size of the rebuilt deck, total time from upload to finished files, fact
-retention and the layout audit. Fact retention is
+\section{System Overview}
+Fig.~\ref{fig:arch} shows the pipeline. An upload (PPTX, slide PDF, Word document or typed text) is converted into a
+Markdown intermediate representation with per-slide metadata. A planner splits overloaded slides with CLASS and adds an
+agenda, checkpoint questions and a glossary. The decision engine assigns a visual to each slide, the illustration stage
+attaches a picture, and two builders write an editable PowerPoint file and a web deck. A layout audit and a fact check run
+on the finished files. Stages that use a language model fall back to rules when no key is available.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[node distance=2.6mm and 2.4mm, font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, fill=blue!6, align=center, minimum width=16mm, minimum height=7mm},
+  opt/.style={draw, rounded corners=2pt, fill=orange!14, align=center, minimum width=16mm, minimum height=7mm},
+  arr/.style={-{Latex[length=1.5mm]}, thick}]
+\node[box] (in) {Upload};
+\node[box, right=of in] (rd) {Reader\\(Sec.~IV)};
+\node[box, right=of rd] (pl) {Planner,\\CLASS};
+\node[box, right=of pl] (de) {Decision\\engine};
+\node[opt, below=of de] (il) {Illustrate};
+\node[box, left=of il] (ly) {Layout};
+\node[box, left=of ly] (bd) {Builders};
+\node[box, left=of bd] (au) {Audit:\\PSF, facts};
+\draw[arr] (in)--(rd); \draw[arr] (rd)--(pl); \draw[arr] (pl)--(de); \draw[arr] (de)--(il);
+\draw[arr] (il)--(ly); \draw[arr] (ly)--(bd); \draw[arr] (bd)--(au);
+\end{tikzpicture}
+\caption{Learnova pipeline. The orange stage uses a language model when a key is available and offline rules otherwise.}
+\label{fig:arch}
+\end{figure}
+
+\section{Recovering Slide Structure}
+\label{sec:reader}
+The reader works on text lines, each with a box $(x_0,y_0,x_1,y_1)$, a font size $s$ and a font. Table~\ref{tab:reader}
+lists the thresholds; they were set on development decks and kept fixed for the evaluation.
+
+\textit{Furniture.} Let $n$ be the number of pages. A line in the top 12\% or bottom 14\% of a page is furniture if its
+normalised text appears in that band on at least
 \begin{equation}
-R = \frac{\lvert F_{\mathrm{src}} \cap F_{\mathrm{deck}} \rvert}{\lvert F_{\mathrm{src}} \rvert},
+m(n)=\max\bigl(3,\ \lfloor 0.3\,n\rfloor\bigr)
+\label{eq:furn}
 \end{equation}
-where $F$ is the set of numbers with units, years, percentages and capitalised named terms found in the source and in the
-generated deck.
+pages. Pictures are treated in the same way but counted only where they are drawn: some exporters list every image of a
+deck in one shared resource dictionary, and counting resources would mark every figure as a logo.
+
+\textit{Titles.} With body size $\bar s$ (the size carrying the most characters), the largest line $\ell^{*}$ in the top
+third of a page of height $H$ is the title if
+\begin{equation}
+s(\ell^{*})\ge 1.18\,\bar s\ \ \lor\ \ \bigl(\mathrm{bold}(\ell^{*})\land y_0(\ell^{*})<0.2H\bigr).
+\end{equation}
+A following line continues the title if its size differs by less than 0.8\,pt, it starts within 60\,pt horizontally and its
+vertical gap $g$ satisfies $-0.5\,s<g<0.9\,s$ (boxes from some exporters overlap, hence the negative bound).
+
+\textit{Levels.} Bullet-glyph positions are clustered with tolerance $\tau=9$\,pt into anchors $a_1<\dots<a_K$, and an item
+starting at $x$ has level
+\begin{equation}
+\ell(x)=\arg\min_{k}|x-a_k|.
+\end{equation}
+
+\textit{Glued titles.} For a capitalised token $t$ of length $L_t$ that is not a word and a vocabulary $V$ built from the
+deck and a dictionary,
+\begin{equation}
+B(j)=\max_{\substack{i<j,\ j-i\le 18\\ t_{i:j}\in V}}\bigl(B(i)+(j-i)^2\bigr),\qquad B(0)=0,
+\label{eq:dp}
+\end{equation}
+and the segmentation behind $B(L_t)$ is used when it has at least two words. Squaring the word length favours a few long
+words over many short ones.
+
+\textit{Picture-only slides.} If the largest picture covers at least 45\% of the page and the page has at most 12 words,
+the picture is read with Tesseract \cite{smith2007}. With $I$ the dark pixels and $M$ the padded word boxes, the graphic
+ratio is
+\begin{equation}
+\gamma=\frac{|I\setminus M|}{|I|}.
+\end{equation}
+The OCR text replaces the picture only if the mean confidence $\bar c\ge 62$, there are at least 12 words, $\gamma\le 0.42$,
+at most 15\% of lines are symbol debris and the tokens do not look like a photographed table; otherwise the picture is
+kept as a figure.
+
+\textit{Chart debris and PPTX input.} If a slide's items average fewer than four words and at least half of their tokens
+contain digits, they are the ticks of a drawn chart, and the region below the title is rendered as an image instead.
+A PowerPoint file is first rendered to PDF by LibreOffice (cached by content hash) and read by the same rules.
+Algorithm~\ref{alg:reader} summarises the procedure.
+
+\begin{table}[t]
+\centering
+\caption{Reader thresholds (fixed for all experiments)}
+\label{tab:reader}
+\begin{tabular}{llr}
+\toprule
+Rule & Symbol & Value \\
+\midrule
+Furniture bands (top / bottom) & -- & 12\% / 14\% \\
+Furniture repetition & $m(n)$ & $\max(3,0.3n)$ \\
+Title size ratio & -- & 1.18 \\
+Level clustering tolerance & $\tau$ & 9\,pt \\
+Longest glued word & -- & 18 \\
+OCR trigger: area / words & -- & 0.45 / 12 \\
+OCR acceptance: confidence & $\bar c$ & 62 \\
+OCR acceptance: graphic ratio & $\gamma$ & 0.42 \\
+OCR acceptance: debris lines & -- & 15\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{algorithm}[t]
+\caption{Reading one page of a slide PDF}
+\label{alg:reader}
+\begin{algorithmic}[1]
+\State $\mathcal{L}\gets$ text lines; drop furniture by (\ref{eq:furn}) and page counters
+\State merge words on one baseline; split glued titles by (\ref{eq:dp})
+\State $F\gets$ figures drawn on the page (not shared resources)
+\If{$F_1$ covers $\ge 45\%$ and the page has $\le 12$ words}
+  \State run OCR; \textbf{if} accepted \textbf{then} $\mathcal{L}\gets$ OCR lines \textbf{else} keep $F_1$
+\EndIf
+\State title $\gets$ largest top line, wrapped lines rejoined
+\State items $\gets$ bullets with levels $\ell(x)$, wrapped lines rejoined
+\If{items are chart debris} \State figure $\gets$ region below the title; items $\gets\varnothing$ \EndIf
+\State \Return (title, items, tables, figure, kind)
+\end{algorithmic}
+\end{algorithm}
+
+\section{Explainable Content Decision Engine}
+\label{sec:engine}
+For each slide a set $\mathcal{D}$ of 27 detectors is run. A detector $d$ returns nothing or a tuple
+$(f_d,v_d,c_d,D_d,r_d)$: a family, a variant, a confidence $c_d\in[0,1]$, the data the renderer needs and a reason in plain
+words. Tables, section outlines and reference lists are tested first because they are unambiguous. The remaining
+candidates $\mathcal{C}$ pass through exclusion rules $X$ (a cycle removes a linear process; a definition removes statistic
+tiles; a timeline removes cause--effect), and
+\begin{equation}
+d^{*}=\arg\max_{d\in X(\mathcal{C})}c_d,\qquad \hat c=\min(c_{d^{*}},\,0.97).
+\end{equation}
+The next three candidates are kept as alternatives for the editor. If $\mathcal{C}$ is empty, the slide becomes key-point
+cards that carry every sentence in full, so choosing a visual never removes text. Card headings are made from the sentence
+by removing discourse cues and pronouns, keeping the first three content words, cutting at an unbalanced parenthesis and
+removing trailing function words, modals and adverbs, so a heading never ends mid-phrase (Algorithm~\ref{alg:engine}).
+
+\begin{algorithm}[t]
+\caption{Visual decision for one slide}
+\label{alg:engine}
+\begin{algorithmic}[1]
+\If{a table, section list or reference list is found} \State \Return it \EndIf
+\State $\mathcal{C}\gets\{d(\mathit{slide}) : d\in\mathcal{D}\}\setminus\{\varnothing\}$; apply $X$
+\If{$\mathcal{C}=\varnothing$} \State \Return key-point cards (lossless) \EndIf
+\State \Return $d^{*}$, its reason and the next three alternatives
+\end{algorithmic}
+\end{algorithm}
+
+\section{PSF and CLASS}
+\label{sec:psf}
+\subsection{Pedagogical Slide Fitness}
+PSF scores a slide $s$ from three components in $[0,1]$.
+
+\textit{Information efficiency.} With $\mathcal{N}(s)$ the concepts introduced on $s$ that did not appear on earlier slides
+and a corpus-free rarity weight $\mathrm{idf}(w)\in[0.4,3.0]$ that grows with word length and is lower for common words,
+\begin{equation}
+U(s)=\sum_{w\in\mathcal{N}(s)}\mathrm{idf}(w),\qquad
+E(s)=\frac{U(s)}{U(s)+\kappa_e}\bigl(1-\rho(s)\bigr),
+\end{equation}
+where $\rho(s)$, the redundancy, is the mean Jaccard overlap of each bullet with the title or with the other bullets.
+
+\textit{Cognitive load.} With $k$ distinct concepts, relational-cue density $r$, word count $t$, the largest visual element
+count $v$ (table rows, flow nodes, cards) and a split-attention flag $\sigma_s$,
+\begin{equation}
+L(s)=\mathrm{sigm}\bigl(w_e\hat e+w_t\hat t+w_v\hat v+w_\sigma\sigma_s-\theta\bigr),
+\end{equation}
+\begin{equation}
+\hat e=\min\Bigl(1,\tfrac{k(1+r)}{e_{\mathrm{ref}}}\Bigr),\quad
+\hat t=\min\Bigl(1,\tfrac{t}{t_{\mathrm{ref}}}\Bigr),\quad
+\hat v=\min\Bigl(1,\tfrac{v}{v_{\mathrm{ref}}}\Bigr).
+\end{equation}
+
+\textit{Multimedia coherence.} $C(s)$ is the mean of four indicators from Mayer's principles: signalling (a real title and
+a takeaway), coherence (share of sentences on the slide's topic), non-redundancy (a picture's description does not repeat
+the text) and spatial contiguity (the figure is on the same slide as its text).
+
+\textit{Combination.} The slide score is a Cobb--Douglas product, so very high load cannot be compensated by more
+information:
+\begin{equation}
+\mathrm{PSF}(s)=E(s)^{\alpha}\bigl(1-L(s)\bigr)^{\beta}C(s)^{\gamma},\qquad \alpha+\beta+\gamma=1.
+\end{equation}
+For a deck $S=(s_1,\dots,s_n)$ the score is the geometric mean times a flow term that rewards moderate concept overlap
+$o_i$ between consecutive slides:
+\begin{equation}
+\mathrm{PSF}(S)=\Bigl(\prod_{i=1}^{n}\mathrm{PSF}(s_i)\Bigr)^{1/n}\Phi,\qquad
+\Phi=\frac{1}{n-1}\sum_{i=1}^{n-1}\phi(o_i),
+\end{equation}
+where $\phi(o)=1$ for $o\in[0.18,0.55]$, rises linearly from 0.6 below that band and falls towards 0.4 above it.
+Table~\ref{tab:params} gives the default parameters.
+
+\begin{table}[t]
+\centering
+\caption{PSF and CLASS parameters (defaults)}
+\label{tab:params}
+\begin{tabular}{llr}
+\toprule
+Parameter & Meaning & Value \\
+\midrule
+$\alpha,\beta,\gamma$ & weights of $E$, $1-L$, $C$ & 0.40, 0.42, 0.18 \\
+$\kappa_e$ & half-saturation of $U$ & 6 \\
+$w_e,w_t,w_v,w_\sigma$ & load weights & 1.10, 1.35, 0.85, 1.60 \\
+$\theta$ & load bias & 2.30 \\
+$e_{\mathrm{ref}},t_{\mathrm{ref}},v_{\mathrm{ref}}$ & load references & 9, 16, 8 \\
+$\lambda$ & cost of one more slide & 0.35 \\
+$\mu$ & weight of $1-E$ & 0.9 \\
+$\nu$ & overflow penalty & 0.25 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{CLASS: load-optimal segmentation}
+Given the $m$ points $b_1,\dots,b_m$ of an overloaded slide, a hard cap of $P$ points per slide and a soft target $T$, CLASS
+chooses break points $0=j_0<j_1<\dots<j_K=m$ that minimise
+\begin{equation}
+J=\sum_{k=1}^{K}\Bigl[L(G_k)+\mu\bigl(1-E(G_k)\bigr)+\nu\max\bigl(0,|G_k|-T\bigr)^2\Bigr]+\lambda K,
+\end{equation}
+where $G_k=(b_{j_{k-1}+1},\dots,b_{j_k})$ and $|G_k|\le P$. Because the cost of a group depends only on its own points, the
+optimum follows from
+\begin{equation}
+F(i)=\min_{\max(0,i-P)\le p<i}\bigl[F(p)+\mathrm{cost}(b_{p+1..i})+\lambda\bigr],\qquad F(0)=0,
+\end{equation}
+in $O(mP)$ time (Algorithm~\ref{alg:class}). Every point is placed exactly once, so segmentation never drops content.
+
+\begin{algorithm}[t]
+\caption{CLASS}
+\label{alg:class}
+\begin{algorithmic}[1]
+\State $F(0)\gets 0$; $F(i)\gets\infty$ for $i>0$
+\For{$i=1$ to $m$}
+  \For{$p=\max(0,i-P)$ to $i-1$}
+    \State $c\gets F(p)+\mathrm{cost}(b_{p+1..i})+\lambda$
+    \If{$c<F(i)$} \State $F(i)\gets c$; $\mathit{cut}(i)\gets p$ \EndIf
+  \EndFor
+\EndFor
+\State follow $\mathit{cut}$ back from $m$ to read off the groups
+\end{algorithmic}
+\end{algorithm}
+
+\section{Layout Without Broken Words}
+\label{sec:layout}
+Lines are counted with an average advance ratio $\bar\rho$ (0.52 regular, 0.575 bold): a box $W$ inches wide holds
+$\lfloor 72W/(\bar\rho s)\rfloor$ characters per line at size $s$. Single words are measured glyph by glyph,
+\begin{equation}
+w(u,s)=\kappa\,\frac{s}{72}\sum_{ch\in u}\rho(ch),
+\end{equation}
+with per-character advances $\rho$ from the font metrics and a safety factor $\kappa=1.06$; words are cut into unbreakable
+pieces only after hyphens and slashes. The chosen size is
+\begin{equation}
+s^{*}=\max\{s\in\mathcal{G}: H(t,s,W)\le H\},\qquad \mathcal{G}=\{s_{\max},s_{\max}-0.5,\dots,s_{\min}\},
+\end{equation}
+with $s_{\min}=11$\,pt for body text; content that does not fit is moved to a continuation slide by CLASS instead of being
+shrunk further. Each paragraph is then scaled by
+\begin{equation}
+\sigma=\max\Bigl(0.62,\ \min\bigl(1,\ \min_{u}\tfrac{W}{w(u,s)}\bigr)\Bigr),
+\end{equation}
+which guarantees that the longest word fits on one line. Wide visuals (processes, timelines, tables) keep the full slide
+width; side pictures are placed only on layouts with room for them.
+
+\section{Illustrations and Key Scheduling}
+\label{sec:ill}
+Every topic slide receives a picture, in this order: the source's own figure, a diagram written by a language model, and an
+offline scene. The model is asked for one SVG in a $600\times720$ view box showing the mechanism of the slide's idea with the
+slide's own terms. The answer is \emph{sanitised}: unsafe or unsupported elements (scripts, foreign objects, embedded images,
+filters, style sheets) are removed, inline styles become attributes, any external reference rejects the diagram, and it must
+contain at least five shapes and render. Labels that would cross the edge are scaled with the width estimate of
+Section~\ref{sec:layout}. An accepted diagram is cached by a hash of the slide text, embedded as live SVG in the web deck,
+rasterised for PowerPoint and published as a page to which the PowerPoint picture links.
+
+Requests are spread over a pool $K$ of keys. Each key is paced on its own,
+\begin{equation}
+t_{\mathrm{next}}(k)=\max\bigl(t_{\mathrm{now}},\ t_{\mathrm{last}}(k)+\Delta\bigr),\qquad \Delta=4.2\,\mathrm{s},
+\end{equation}
+two requests are kept in flight per key, and a key that returns an authentication or quota error is skipped for
+$T_d=15$ minutes. With $|K|$ keys the sustained rate is $|K|/\Delta$ requests per second, about 1.2 for five keys
+(Algorithm~\ref{alg:ill}).
+
+\begin{algorithm}[t]
+\caption{Illustration with fallbacks}
+\label{alg:ill}
+\begin{algorithmic}[1]
+\For{each topic slide $s$, in parallel with $2|K|$ workers}
+  \If{$s$ shows a source figure} \State use it; \textbf{continue} \EndIf
+  \If{$s$ has a wide visual} \State header picture (offline); \textbf{continue} \EndIf
+  \If{$\mathrm{hash}(s)$ is cached} \State use the cached diagram; \textbf{continue} \EndIf
+  \For{each live key $k$ in round-robin order}
+    \State wait for the pace of $k$; $a\gets$ \Call{Ask}{$k,s$}
+    \If{authentication or quota error} \State skip $k$ for $T_d$; \textbf{continue} \EndIf
+    \State $g\gets$ \Call{Sanitise}{$a$}; \textbf{break}
+  \EndFor
+  \State attach $g$ (SVG, PNG, page) or an offline scene
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\section{Evaluation}
+\label{sec:eval}
+\subsection{Setup}
+We used three gold sets of slide texts labelled with their acceptable visual families (development 38, held-out 32 and
+blind 31; the blind set was written by a member who had not seen the rules) and six real course decks: four slide PDFs of
+36, 44, 95 and 216 pages and two PowerPoint files of 28 and 63 slides, named A--F in the tables. All runs used a laptop
+CPU and no API key unless stated.
+
+\subsection{Visual decisions}
+Table~\ref{tab:gold} reports strict accuracy: the family is acceptable, is drawn as a real visual and receives data. Each set
+had a single miss, in each case a slide on which two families were defensible. The median decision time was 0.48\,ms per
+slide (95th percentile 0.82\,ms). Fig.~\ref{fig:families} shows the families chosen over the six rebuilt decks; figures
+dominate because the sources contain many picture slides, followed by key-point cards, outlines, prose and comparison
+tables.
+
+\begin{table}[t]
+\centering
+\caption{Visual decision accuracy on the gold sets}
+\label{tab:gold}
+\begin{tabular}{lcccc}
+\toprule
+Set & Slides & Strict acc. & Real visual & Families \\
+\midrule
+Development & 38 & 97.4\% & 100\% & 24 \\
+Held-out & 32 & 96.9\% & 100\% & 21 \\
+Blind & 31 & 96.8\% & 100\% & 21 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\columnwidth]{fig_families.png}
+\caption{Visual families chosen over the six rebuilt decks.}
+\label{fig:families}
+\end{figure}
+
+\subsection{Fidelity, layout and speed}
+Table~\ref{tab:real} reports the rebuilt decks. Fact retention is
+\begin{equation}
+R=\frac{|F_{\mathrm{src}}\cap F_{\mathrm{deck}}|}{|F_{\mathrm{src}}|},
+\end{equation}
+where $F$ is the set of numbers with units, years, percentages and capitalised terms. No slide was flagged for overflow or
+for a broken word; every flag marked a slide that is sparse because its source held a single short line. Run time grows
+roughly linearly with length (Fig.~\ref{fig:time}); the PowerPoint decks take longer per page because they are first
+rendered to PDF and contain many full-page figures.
 
 \begin{table}[t]
 \centering
 \caption{Rebuilt decks without an API key}
 \label{tab:real}
-\setlength{\tabcolsep}{3.5pt}
+\setlength{\tabcolsep}{3.2pt}
 \begin{tabular}{lrrrrr}
 \toprule
 Deck & Pages & Slides & Time (s) & $R$ & Flagged \\
 \midrule
-NLP Module 4        & 36  & 47  & 9.8  & 100\% & 0\% \\
-NLP Module 5        & 95  & 100 & 21.2 & 99\%  & 3\% \\
-NLP Syntax analysis & 216 & 225 & 34.4 & 100\% & 3\% \\
-WSD slides          & 44  & 53  & 14.8 & 98\%  & 4\% \\
-ML: Bias and variance (PPTX) & 28 & 33 & 11.7 & 100\% & 6\% \\
-ML: Linear regression (PPTX) & 63 & 69 & 44.0 & 100\% & 7\% \\
+A (PPTX) & 28 & 33 & 11.7 & 100\% & 6\% \\
+B (PPTX) & 63 & 69 & 44.0 & 100\% & 7\% \\
+C (PDF) & 36 & 47 & 9.8 & 100\% & 0\% \\
+D (PDF) & 44 & 53 & 14.8 & 98\% & 4\% \\
+E (PDF) & 95 & 100 & 21.2 & 99\% & 3\% \\
+F (PDF) & 216 & 225 & 34.4 & 100\% & 3\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-No slide in any deck was flagged for a broken word or for overflow. All flags were \emph{sparse} or \emph{empty bottom}:
-slides whose source content was a single short line. The PPTX decks are slower because LibreOffice renders them to PDF
-first (about 11\,s for the 63-slide deck) and because they contain many full-page figures.
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\columnwidth]{fig_time.png}
+\caption{Time from upload to finished files against source length (no API key).}
+\label{fig:time}
+\end{figure}
 
-\subsection{Effect of the PPTX route}
-On the Linear Regression deck the previous shape-by-shape parser produced 23 slides from 63 source slides, with titles such
-as ``Types of regression models Slide~9'' and three duplicated ``Advantages and Disadvantages'' slides. With the PDF route
-the rebuilt deck had 69 slides, every source slide was represented, 22 slides showed the original diagrams and derivations
-as figures, and no title contained ``Slide~$n$''.
+\subsection{Structural change}
+Table~\ref{tab:ba} and Fig.~\ref{fig:ba} compare each source deck with its rebuilt deck. Untitled slides fell from 83 to 0
+across the five decks, and the rebuilt decks show a picture on most slides and a structured visual on most slides, where
+the sources had none. The PowerPoint route matters: on deck~B the earlier shape-by-shape parser produced 23 slides from 63
+and titles such as ``Slide~9'', while the PDF route produced 68 slides covering every source slide.
+
+\begin{table}[t]
+\centering
+\caption{Source deck against rebuilt deck (with keys)}
+\label{tab:ba}
+\setlength{\tabcolsep}{2.6pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+Deck & Untitled & Pictures & Visual & Quiz & Lab & Linked \\
+ & (source) & src\,$\to$\,new & slides & slides & links & illustr. \\
+\midrule
+A & 14 & 22\,$\to$\,29 & 22 & 5 & 2 & 12 \\
+B & 36 & 49\,$\to$\,64 & 45 & 4 & 8 & 23 \\
+C & 0 & 13\,$\to$\,43 & 43 & 6 & 3 & 37 \\
+D & 1 & 7\,$\to$\,46 & 52 & 7 & 10 & 40 \\
+E & 32 & 49\,$\to$\,96 & 89 & 6 & 13 & 78 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_before_after.png}
+\caption{Untitled slides and pictures in the source decks, and pictures and visual slides in the rebuilt decks.}
+\label{fig:ba}
+\end{figure}
+
+\subsection{PSF and CLASS}
+Table~\ref{tab:psf} and Fig.~\ref{fig:psf} give the PSF components of each source deck read as-is and of its rebuilt deck.
+Coherence $C$ rose on five of the six decks, because every slide gains a real title, a takeaway and a picture next to its
+text. Mean PSF rose clearly on the two long PDF decks (E: 0.37\,$\to$\,0.49; F: 0.15\,$\to$\,0.24) and was unchanged on C,
+but fell on A, B and D. The components show why: on those decks the rebuilt slides carry more words, since explanations,
+examples and key terms are added to thin slides; this raises the estimated load $L$, and because the added sentences repeat
+concepts already introduced, it lowers $E$. PSF therefore penalises exactly the enrichment we added for readability, a
+calibration question we return to in Section~\ref{sec:disc}.
+
+\begin{table}[t]
+\centering
+\caption{PSF components: source deck / rebuilt deck}
+\label{tab:psf}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+Deck & $E$ & $L$ & $C$ & mean PSF \\
+\midrule
+A & 0.35 / 0.30 & 0.31 / 0.32 & 0.78 / 0.84 & 0.34 / 0.29 \\
+B & 0.24 / 0.23 & 0.25 / 0.30 & 0.77 / 0.84 & 0.28 / 0.26 \\
+C & 0.46 / 0.44 & 0.39 / 0.40 & 0.80 / 0.77 & 0.40 / 0.40 \\
+D & 0.56 / 0.51 & 0.46 / 0.44 & 0.76 / 0.78 & 0.52 / 0.46 \\
+E & 0.40 / 0.54 & 0.33 / 0.44 & 0.77 / 0.78 & 0.37 / 0.49 \\
+F & 0.14 / 0.25 & 0.20 / 0.31 & 0.76 / 0.83 & 0.15 / 0.24 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.78\textwidth]{fig_psf.png}
+\caption{(a) Mean PSF and (b) mean estimated cognitive load of each source deck and its rebuilt deck.}
+\label{fig:psf}
+\end{figure*}
+
+For CLASS we took every source slide with more than six points (75 sections) and split it with a cap of five points per
+slide, once with CLASS and once evenly. Table~\ref{tab:class} and Fig.~\ref{fig:class} show the result. Both methods used
+179 slides in total; CLASS had a lower total cost on 28 sections (37\%) and an equal cost on the rest. It never did worse,
+as expected of an exact optimiser of the same objective.
+
+\begin{table}[t]
+\centering
+\caption{CLASS against even splitting (75 overloaded sections)}
+\label{tab:class}
+\begin{tabular}{lcc}
+\toprule
+Measure & Even & CLASS \\
+\midrule
+Mean total cost $J$ & 2.799 & 2.780 \\
+Sections with lower cost & -- & 28 (37\%) \\
+Sections with higher cost & -- & 0 \\
+Slides produced & 179 & 179 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.8\columnwidth]{fig_class.png}
+\caption{Total cost per overloaded section, CLASS against even splitting. Points on or below the diagonal favour CLASS.}
+\label{fig:class}
+\end{figure}
 
 \subsection{Illustrations}
-Without a key the offline illustrator draws a scene on every topic slide. With the five-key pool, generating validated SVG
-diagrams for four test slides in parallel took 8.9\,s in total, and in the full ML deck the diagrams were prepared in
-parallel with the other stages. Diagrams that failed validation (three of the first eleven, mostly because of disallowed
-elements or too little drawing) were replaced by offline scenes, so no slide was left without a picture.
+Without a key every topic slide receives an offline scene. With the five-key pool, ten diagrams were written and accepted in
+10.1\,s in parallel. Before sanitisation replaced outright rejection, only 71 of 206 model answers (34.5\%) had been
+accepted, most of them failing on inline styles and gradients; after the change, all ten diagrams of a live check passed.
 
 \section{Discussion and Limitations}
-The decision engine is rule-based by choice: its errors can be read and fixed, it costs nothing to run and it works in a
-classroom without internet. The price is coverage; slides whose meaning lies mainly in a picture still depend on the
-original figure. OCR remains the weakest part of the reader for photographed equations, which we now keep as pictures
-rather than text. Without a key, slides that are thin in the source stay thin, because the system does not invent content.
-We have not yet run a controlled study with students; the gold sets measure whether the visual is appropriate, not whether
-it improves learning.
+\label{sec:disc}
+The rule-based design costs some coverage, but every decision can be read, tested and corrected, it takes under a
+millisecond, and it works without a network. The PSF results show that a metric built from theory does not automatically
+agree with every design choice: the explanations we add to thin slides help a reader but raise the estimated load. PSF's
+weights are literature priors; calibrating them against student ratings, and a classroom study of learning outcomes, are our
+next steps. OCR of photographed equations remains the weakest part of the reader, which is why such pictures are kept rather
+than transcribed.
 
 \section{Conclusion}
-Learnova rebuilds existing lecture decks instead of generating new ones. By treating the teacher's content as fixed and
-making every structural decision with inspectable rules, it keeps 98--100\% of the facts of real course decks, chooses an
-appropriate visual for about 97\% of slides and never breaks a word across lines. Language models are used only where they
-help and can be checked---titles, explanations and diagrams---and the system keeps working when every key is exhausted.
-The code, gold sets and measurement scripts are available in the project repository.
+Learnova rebuilds the decks teachers already use rather than generating new ones. Its methods---structure recovery rules,
+an explainable decision engine, the PSF metric, CLASS segmentation, glyph-measured layout and sanitised AI diagrams with
+offline fallbacks---kept 98--100\% of the source facts on real decks, removed every untitled slide and never broke a word,
+while running in seconds on ordinary hardware.
 
 \section*{Acknowledgment}
-We thank our project mentor and the faculty of the Department of Artificial Intelligence and Data Science, DJSCE, for their
-guidance and for the lecture material used in the evaluation.
+The authors thank the faculty of the Department of Artificial Intelligence and Data Science, DJSCE, for their guidance and
+for the lecture material used in the evaluation.
 
 \bibliographystyle{IEEEtran}
 \bibliography{../refs}
