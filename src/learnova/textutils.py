@@ -12,6 +12,7 @@ Everything that puts words on a slide should normalise through here.
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 # ``**bold**``, ``__bold__``, ``*em*``, ``_em_``, ``` `code` ```
 _BOLD = re.compile(r"\*\*(.+?)\*\*|__(.+?)__", re.S)
@@ -28,6 +29,39 @@ _OCR_BLOCK = re.compile(
     r"|<<FIGURE_TEXT>>|<<END_FIGURE_TEXT>>",
     re.I | re.S,
 )
+
+
+_TOKEN = re.compile(r"[A-Za-z]+")
+_WORDS: Optional[set] = None
+
+
+def _english() -> set:
+    """Lower-cased English words (the system dictionary), loaded once; empty when the machine has none."""
+    global _WORDS
+    if _WORDS is None:
+        try:
+            with open("/usr/share/dict/words", encoding="utf-8", errors="ignore") as fh:
+                _WORDS = {w.strip().lower() for w in fh if w.strip()}
+        except OSError:
+            _WORDS = set()
+    return _WORDS
+
+
+def is_readable(text: str, min_ratio: float = 0.7) -> bool:
+    """True when OCR'd text reads as language: most tokens of three or more letters are dictionary words (or, without a
+    dictionary, word-like). Axis ticks and misread equations ("ara vane nnn ee M=1 tt") fail and are never shown as a caption."""
+    toks = [t.lower() for t in _TOKEN.findall(text or "")]
+    long_ = [t for t in toks if len(t) >= 3]
+    if len(long_) < 3:
+        return False
+    words = _english()
+    if words:
+        good = sum(1 for t in long_ if t in words or t.rstrip("s") in words or t[:-2] in words and t.endswith(("ed", "ly")))
+    else:
+        good = sum(1 for t in long_ if re.search(r"[aeiouy]", t) and not re.search(r"(.)\1\1", t))
+    noise = len(re.findall(r"[^\w\s.,;:()'\-%/]", text)) / max(1, len(text))
+    short = sum(1 for t in toks if len(t) <= 2) / max(1, len(toks))
+    return good / len(long_) >= min_ratio and noise <= 0.08 and short <= 0.45
 
 
 def strip_ocr_block(text: str) -> str:
@@ -131,6 +165,7 @@ __all__ = [
     "strip_inline_markdown",
     "clean_bullet",
     "strip_ocr_block",
+    "is_readable",
     "truncate_words",
     "is_redundant",
     "dedupe_bullets",

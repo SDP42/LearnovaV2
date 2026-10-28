@@ -388,6 +388,10 @@ def generate(
             if description:
                 # Strip any nested marker the describer added; keep just the text.
                 clean = re.sub(r"^\s*\[[^\n\]]*:?\s*|\s*\]\s*$", "", str(description)).strip()
+                from learnova.textutils import is_readable
+
+                if not is_readable(clean):
+                    continue                                   # misread ticks and equations: no caption, no hint
                 image["description"] = clean
                 # Kept beside the slide, never inside its text: OCR of a figure is a hint for choosing the visual, and
                 # every path that bulletises chunk text would otherwise turn axis labels and equation scraps into points.

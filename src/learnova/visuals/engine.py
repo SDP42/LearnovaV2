@@ -1224,7 +1224,7 @@ def _raw_lines(text: str) -> List[Tuple[int, str]]:
             continue
         lead = len(raw) - len(raw.lstrip(" \t"))
         line = re.sub(r"^\s*(?:[-*•▪◦]\s+|\d+[.)]\s+)", "", raw).strip()
-        if line:
+        if line and (len(line) > 3 or "=" in line) and (re.search(r"[A-Za-z]", line) or "=" in line):   # chart ticks are not lines
             out.append((min(4, lead // 2), line))
     return out
 
@@ -1237,7 +1237,7 @@ def det_algorithm(title: str, text: str) -> Det:
         return None
     n = len(lines)
     code = sum(1 for _, l in lines if _CODE_LINE.search(l))
-    eq = sum(1 for _, l in lines if _EQ_LINE.match(l) and len(_MATHCH.findall(l)) >= 3)
+    eq = sum(1 for _, l in lines if _EQ_LINE.match(l) and len(_MATHCH.findall(l)) >= 2 and len(l.split()) <= 14)
     titled = bool(_ALGO_TITLE.search(title or ""))
     if code >= 3 and (code >= 0.5 * n or (titled and code >= 0.34 * n)):
         return ("ALGORITHM", "code", 0.93 if titled else 0.88,

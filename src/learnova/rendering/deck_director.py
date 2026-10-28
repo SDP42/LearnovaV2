@@ -481,7 +481,10 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
         # never run a text detector on its title.
         _img = (original or {}).get("image") if isinstance(original, dict) else None
         if (_img and _img.get("bytes") and existing_layout != "QUIZ" and len(" ".join(bullets).split()) <= 4 and "[TABLE DATA]" not in _otext):
+            from learnova.textutils import is_readable
+
             desc = re.sub(r"\s+", " ", str(_img.get("description") or "")).strip()
+            desc = desc if is_readable(desc) else ""                     # OCR noise is never shown as a caption
             treatment, family, variant = "FIGURE", "FIGURE", "full"
             data = {"caption": desc[:150], "figure": True}
             visual_reason, visual_alts, engine_conf = "the slide is a figure — shown large with zoom instead of being redrawn", [], 0.9
