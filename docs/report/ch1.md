@@ -27,6 +27,8 @@ Learnova was evaluated on gold sets of 101 labelled slides and on seven real cou
 **Keywords:** educational technology, presentation redesign, document structure recovery, explainable artificial intelligence, cognitive load, large language models, interactive learning.
 
 
+\newpage
+
 # Introduction
 
 ## Background
@@ -127,7 +129,7 @@ The primary users of Learnova are **faculty members**, who upload their existing
 Table: Functional requirements.
 
 | ID | Requirement |
-|---|---|
+|------|--------------------------------------------|
 | FR1 | The user shall sign in with a mobile number and a one-time password. |
 | FR2 | The user shall upload a PPTX, PDF, DOCX, Markdown or text file, or type a topic. |
 | FR3 | The system shall convert the input into structured slides with titles, bullet levels, tables and figures. |
@@ -148,7 +150,7 @@ Table: Functional requirements.
 Table: Non-functional requirements.
 
 | Category | Requirement |
-|---|---|
+|------|--------------------------------------------|
 | Fidelity | At least 98% of the numeric and named facts of the source shall appear in the output. |
 | Layout | No text shall overflow its box and no word shall be broken across lines. |
 | Performance | A 36-page deck shall be processed in under 15 seconds without API keys on a laptop. |
@@ -163,7 +165,7 @@ For development and for running the system for one department, a laptop with a 6
 
 ## Feasibility Study
 
-**Technical feasibility.** Every component of the system relies on mature open-source libraries, and the complete pipeline runs on an ordinary laptop. The prototype is working end to end, with 755 automated tests.
+**Technical feasibility.** Every component of the system relies on mature open-source libraries, and the complete pipeline runs on an ordinary laptop. The prototype is working end to end, with 757 automated tests.
 
 **Economic feasibility.** Learnova can run entirely offline at no cost. The free tier of Gemini, used through a pool of five keys, is sufficient for AI titles, explanations and diagrams. A department server would cost less per year than a single paid licence of a commercial AI presentation tool.
 

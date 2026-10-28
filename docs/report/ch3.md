@@ -14,7 +14,7 @@ Table: Technology stack.
 | OCR | Tesseract | Reading picture-only slides |
 | AI | Google Gemini (five-key pool), Groq, NVIDIA NIM | Titles, explanations, diagrams, laboratories |
 | Mathematics | SymPy, exact fractions | Step-by-step solvers |
-| Quality | pytest, layout audit, gold-set evaluation | 755 automated tests |
+| Quality | pytest, layout audit, gold-set evaluation | 757 automated tests |
 
 ## Project Structure
 
@@ -38,16 +38,48 @@ The code is organised as a reusable library (`src/learnova`) used by the web ser
 
 The Create page accepts a file by drag and drop or a typed topic, and offers options for the slide density, the design and whether quizzes and illustrations should be added. During generation, the Generate page shows each stage with its status. The Preview page lists every slide with its chosen visual and the reason, and shows the selected slide at full size; slides can be edited and saved as new versions. The Solve page accepts a problem and shows the step-by-step explanation, which can be downloaded as a page. The Export page provides the PowerPoint file, the web deck, the study pack and share links.
 
-![Solve page: a problem explained step by step.](img/app-solve.jpg){width=85%}
+![Solve page: a problem explained step by step.](img/app-solve.jpg){width=61%}
 
-![Viterbi explainer: every value computed exactly and explained.](img/explainer-viterbi.png){width=85%}
+![Viterbi explainer: every value computed exactly and explained.](img/explainer-viterbi.png){width=61%}
 
-![Interactive web deck: an AI-drawn diagram beside the slide content.](img/web_deck.png){width=95%}
+![Interactive web deck: an AI-drawn diagram beside the slide content.](img/web_deck.png){width=68%}
 
 ## Testing
 
-The project has 755 automated tests that run in about 25 seconds. They cover each parser, each detector of the decision engine, the layout guarantees (no broken words, no overflow), the quiz rules, every solver, the laboratory policy, the diagram sanitiser, the key pool, the API endpoints and complete end-to-end generation. The tests always run without AI keys: the test configuration blanks every key, so that a key in the developer's environment cannot change the results. In addition, an end-to-end script drives the running API with real files, a layout-audit tool checks finished PowerPoint files, and the gold sets measure the accuracy of the decision engine.
+The project has 757 automated tests that run in about 25 seconds. They cover each parser, each detector of the decision engine, the layout guarantees (no broken words, no overflow), the quiz rules, every solver, the laboratory policy, the diagram sanitiser, the key pool, the API endpoints and complete end-to-end generation. The tests always run without AI keys: the test configuration blanks every key, so that a key in the developer's environment cannot change the results. In addition, an end-to-end script drives the running API with real files, a layout-audit tool checks finished PowerPoint files, and the gold sets measure the accuracy of the decision engine.
 
+
+## Improvements after testing on the review decks
+
+Before the final review we rebuilt the teachers' own decks with the current code and inspected every page as a panel member
+would. This round found problems that the automated tests had not covered, and each was fixed in the code, given a regression
+test where possible, and pushed to the repository as a separate change. The table below summarises them.
+
+| Problem seen on the rebuilt deck | Cause | Change made | Effect |
+|---|---|---|---|
+| OCR scraps of pictures ("M=0 1 ee", axis ticks) appeared as numbered points | text read from a figure was appended to the slide text | figure text is kept beside the slide and used only as a hint | no OCR debris on any slide of the test decks |
+| A teacher's build-up slides (same title, one more row each time) appeared three times | each exported page became a slide | a page whose words are 90% contained in the next page with the same title is dropped | "Advantages (1/3)… (3/3)" became one complete slide |
+| Algorithms and runs of equations were split into separate numbered cards | the generic card layout was chosen | new ALGORITHM visual: one panel, numbered lines, indentation kept, keywords highlighted, equations centred | pseudocode and derivations read top to bottom |
+| The plain-words explanation sat in a 10 pt footer band | the footer carried all secondary text | an "In plain words" panel in the body, sized to its text at 11–14 pt, at most 40% of the area | explanations readable from the back of the room |
+| Captions under figures showed unreadable OCR | OCR output was always used as the caption | a caption is shown only when most of its words are dictionary words | no garbled captions |
+| AI diagrams rendered with black boxes | the PDF library cannot paint SVG gradients | diagrams rendered with resvg; gradients flattened when it is missing | diagrams look as designed |
+
+Table: Problems found on real decks and how they were fixed.
+
+The illustrations were also redesigned. Each slide is first classified into the kind of figure that would teach it — a
+*flow* for processes and apparatus, a *plot* for quantitative relations, an *anatomy* for parts and types, a *comparison*, or a
+concrete *scene* — and slides where a drawing adds nothing (agendas, references, quizzes, tables, algorithms, slides that are
+already figures) get none. The prompt asks for six to fourteen labels, the slide's own numbers and three to six numbered parts,
+each grouped with a short title. The linked HTML page uses those groups to step through the figure part by part, and a part
+can be highlighted by pointing at it, so the illustration is something a student explores rather than a static picture.
+Appendix A shows the Haber process plant drawn this way: the gas sources, the compressor at 200 atmospheres, the
+reactor with its iron catalyst at 450 °C, the condenser and the recycle loop, each numbered in teaching order.
+
+Two further gaps were closed. Problem slides that none of the sixteen exact solvers recognises now receive a step-by-step
+explanation written by the language model, at most six per deck, and the page states that these steps were not computed by
+Learnova. Second, the project can now be deployed: a Dockerfile builds one container with the API, the web application,
+LibreOffice, Tesseract and an English dictionary; a Render blueprint creates the service, and a Vercel configuration forwards
+the web application's API calls when the two are hosted separately.
 
 # Results and Evaluation
 
@@ -69,7 +101,7 @@ Table: Visual decision accuracy on the gold sets.
 
 Each set had a single miss, in every case a slide for which two families were defensible and the annotator had accepted only one. The median time for a decision was 0.48 milliseconds (95th percentile 0.82 milliseconds), so the engine adds no noticeable time to a deck.
 
-![Visual families chosen over the rebuilt decks.](img/fig_families.png){width=70%}
+![Visual families chosen over the rebuilt decks.](img/fig_families.png){width=50%}
 
 ## Fidelity, Layout and Speed
 
@@ -90,11 +122,11 @@ Table: Rebuilt decks without an API key.
 
 No slide in any deck was flagged for overflowing text or for a broken word. All flags marked slides that are sparse because their source contained a single short line, which Learnova does not pad with invented content. Run time grows roughly linearly with the length of the deck; PowerPoint files take longer per page because they are converted to PDF first and contain many full-page figures.
 
-![Time from upload to finished files against source length.](img/fig_time.png){width=65%}
+![Time from upload to finished files against source length.](img/fig_time.png){width=47%}
 
 With API keys, the same 36-page deck took about 74 seconds, most of which was spent writing laboratories and diagrams; generating laboratories in parallel reduced this from 163 seconds. When every key was rejected, the deck was still completed in 28 seconds because dead keys are switched off at once.
 
-![Time for a 36-page deck in different modes.](img/fig_modes.png){width=60%}
+![Time for a 36-page deck in different modes.](img/fig_modes.png){width=43%}
 
 ## Before and After
 
@@ -112,27 +144,27 @@ Table: Source decks against rebuilt decks.
 
 Across the five decks, untitled slides fell from 83 to zero; 251 slides were drawn as structured visuals and 190 illustrations were linked to their own pages, while none of the sources had any visual structure, quiz or laboratory. The PowerPoint route made a large difference: on the linear-regression deck the earlier shape-by-shape parser kept only 23 of 63 slides and produced titles such as "Slide 9", whereas the new route kept every slide and showed the original derivations as figures.
 
-![Structure of the source decks and the rebuilt decks.](img/fig_before_after.png){width=100%}
+![Structure of the source decks and the rebuilt decks.](img/fig_before_after.png){width=72%}
 
-![Before: an original slide.](img/pair1_before.png){width=70%}
+![Before: an original slide.](img/pair1_before.png){width=50%}
 
-![After: the same slide rebuilt by Learnova, with an assertion title, full text, the teacher's figure and key terms.](img/pair1_after.png){width=80%}
+![After: the same slide rebuilt by Learnova, with an assertion title, full text, the teacher's figure and key terms.](img/pair1_after.png){width=58%}
 
 ## PSF and CLASS
 
 We computed PSF for each source deck read as it is and for its rebuilt deck. Coherence rose on five of six decks, because every slide gains a real title, a takeaway and a picture next to its text. The mean PSF rose clearly on the two longest decks (from 0.37 to 0.49 and from 0.15 to 0.24) and was unchanged on one, but fell on the two machine-learning decks and the WSD deck. The reason is visible in the components: on those decks the rebuilt slides carry more words, because explanations, examples and key terms are added to thin slides; this raises the estimated load and, because the added sentences repeat concepts already introduced, lowers the information efficiency. In other words, PSF penalises exactly the enrichment we add for readability. This is an honest limitation of a metric built from theory alone, and calibrating its weights against student ratings is part of our future work.
 
-![Mean PSF and mean estimated cognitive load of each source deck and its rebuilt deck.](img/fig_psf.png){width=100%}
+![Mean PSF and mean estimated cognitive load of each source deck and its rebuilt deck.](img/fig_psf.png){width=72%}
 
 For CLASS, every source slide with more than six points (75 sections) was split with a limit of five points per slide, once with CLASS and once evenly. Both methods used 179 slides in total. CLASS had a lower total cost on 28 sections (37%) and an equal cost on the rest, and it was never worse, as expected of an exact optimiser.
 
-![Total cost per overloaded section, CLASS against even splitting.](img/fig_class.png){width=60%}
+![Total cost per overloaded section, CLASS against even splitting.](img/fig_class.png){width=43%}
 
 ## Step-by-Step Explainers
 
-We wrote 26 problems that do not appear in the tests, with new numbers and new wordings across all solver types, and worked out each answer by hand. The solvers detected 25 of them on the first run; the missed phrasing ("Find x if 4x + 9 = x + 21") was added, after which all 26 were detected, classified and answered correctly, and every step carried a reason. None of 12 ordinary lecture sentences was mistaken for a problem. The median time per problem was 0.7 milliseconds. During this exercise two of our own hand-worked answers turned out to be wrong, and the solvers were right in both cases.
+We wrote 26 problems that do not appear in the tests, with new numbers and new wordings across all solver types, and worked out each answer by hand. The solvers detected 25 of them on the first run; the missed phrasing ("Find x if 4x + 9 = x + 21") was added, after which all 26 were detected, classified and answered correctly, and every step carried a reason. None of 52 ordinary sentences (12 from lecture notes and 40 written to resemble problems) was mistaken for a problem. The median time per problem was 0.7 milliseconds. During this exercise two of our own hand-worked answers turned out to be wrong, and the solvers were right in both cases.
 
-![Average explainer length by problem type.](img/fig_steps.png){width=65%}
+![Average explainer length by problem type.](img/fig_steps.png){width=47%}
 
 ## Illustrations
 
@@ -209,13 +241,15 @@ The decision engine covers the structures we have written detectors for; slides 
 
 # Appendix A: Sample Outputs {.unnumbered}
 
-![Phone layout of the application.](img/mobile-home.jpg){width=40%}
+![AI illustration of the Haber process plant: five numbered parts that the linked page reveals in order.](img/haber_diagram.png){width=40%}
 
-![Region Splitting and Merging laboratory built on the shared laboratory bench.](img/lab_split.png){width=85%}
+![Phone layout of the application.](img/mobile-home.jpg){width=35%}
 
-![Before: original word sense disambiguation slide.](img/pair3_before.png){width=70%}
+![Region Splitting and Merging laboratory built on the shared laboratory bench.](img/lab_split.png){width=61%}
 
-![After: the same slide rebuilt with structured cards, an AI-drawn diagram, a quiz and a laboratory link.](img/pair3_after.png){width=80%}
+![Before: original word sense disambiguation slide.](img/pair3_before.png){width=50%}
+
+![After: the same slide rebuilt with structured cards, an AI-drawn diagram, a quiz and a laboratory link.](img/pair3_after.png){width=58%}
 
 # Appendix B: Project Timeline {.unnumbered}
 

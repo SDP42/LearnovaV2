@@ -9,15 +9,17 @@ author:
 date: "Under the guidance of the Department of Artificial Intelligence and Data Science (Head of Department: Dr. Pratik Kanani), Dwarkadas J. Sanghvi College of Engineering, Mumbai — October 2026"
 mainfont: "Times New Roman"
 fontsize: 12pt
-linestretch: 1.5
+linestretch: 1.15
 geometry:
-  - top=1.9in
-  - bottom=1in
-  - left=1in
-  - right=1in
-  - headheight=92pt
-  - headsep=12pt
-documentclass: report
+  - top=1.45in
+  - bottom=0.9in
+  - left=0.9in
+  - right=0.9in
+  - headheight=66pt
+  - headsep=10pt
+documentclass: article
+classoption:
+  - titlepage
 toc: true
 toc-depth: 2
 lof: true
@@ -26,14 +28,22 @@ numbersections: true
 colorlinks: true
 header-includes:
   - \usepackage{float}
-  - \floatplacement{figure}{H}
+  - \floatplacement{figure}{htbp}
   - \usepackage{titlesec}
-  - \titleformat{\chapter}[hang]{\normalfont\bfseries\LARGE}{\thechapter.}{0.6em}{}
-  - \titlespacing*{\chapter}{0pt}{0pt}{18pt}
+  - \titleformat{\section}{\normalfont\bfseries\Large}{\thesection.}{0.6em}{}
+  - \titlespacing*{\section}{0pt}{14pt}{8pt}
+  - \usepackage{parskip}
+  - \setlength{\parskip}{5pt}
+  - \setlength{\textfloatsep}{8pt}
+  - \setlength{\intextsep}{8pt}
+  - \renewcommand{\topfraction}{0.85}
+  - \renewcommand{\bottomfraction}{0.7}
+  - \renewcommand{\textfraction}{0.12}
+  - \renewcommand{\floatpagefraction}{0.8}
   - \renewcommand{\arraystretch}{1.25}
   - \usepackage{fancyhdr}
-  - \fancypagestyle{lh}{\fancyhf{}\fancyhead[C]{\includegraphics[width=\textwidth]{letterhead.jpeg}\\[1pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
-  - \fancypagestyle{plain}{\fancyhf{}\fancyhead[C]{\includegraphics[width=\textwidth]{letterhead.jpeg}\\[1pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
+  - \fancypagestyle{lh}{\fancyhf{}\fancyhead[C]{\includegraphics[width=0.78\textwidth]{letterhead.jpeg}\\[0pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
+  - \fancypagestyle{plain}{\fancyhf{}\fancyhead[C]{\includegraphics[width=0.78\textwidth]{letterhead.jpeg}\\[0pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
   - \pagestyle{lh}
   - \usepackage{etoolbox}
   - \patchcmd{\titlepage}{\thispagestyle{empty}}{\thispagestyle{lh}}{}{}

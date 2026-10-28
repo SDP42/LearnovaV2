@@ -4,7 +4,7 @@
 
 Learnova follows a layered architecture in which the user interface, the web service, the processing pipeline, the AI services and the storage are separate and replaceable. Figure 1 shows the system as a flow from inputs to outputs. Each layer communicates with the next through a narrow interface: the front end talks only to the REST API, the API starts and monitors jobs, the pipeline converts every input into one intermediate representation, and the builders turn the final slide plan into files.
 
-![System architecture: inputs, ingestion, engines, AI service and outputs, with deployment and methodology.](img/architecture.png){width=100%}
+![System architecture: inputs, ingestion, engines, AI service and outputs, with deployment and methodology.](img/architecture.png){width=72%}
 
 The five columns of the architecture are:
 
@@ -80,18 +80,18 @@ Table: Main API endpoints.
 
 | Group | Endpoints |
 |---|---|
-| Authentication | `POST /api/auth/otp/request`, `POST /api/auth/otp/verify` |
-| Jobs | `POST /api/jobs`, `POST /api/jobs/{id}/generate`, `GET /api/jobs/{id}`, `GET /api/jobs/{id}/download/{artifact}` |
-| Library | `GET /api/decks`, `GET /api/decks/{id}/editable`, `PUT /api/decks/{id}/slides`, `POST /api/decks/{id}/refresh` |
-| Sharing | `POST /api/decks/{id}/shares`, `GET /api/share/{token}` |
-| Learning | `POST /api/explain`, `GET /api/labs`, `GET /api/labs/{id}`, `GET /api/art/{id}`, `POST /api/decks/{id}/chat` |
+| Authentication | POST /api/auth/otp/request, POST /api/auth/otp/verify |
+| Jobs | POST /api/jobs, POST /api/jobs/{id}/generate, GET /api/jobs/{id}, GET /api/jobs/{id}/download/{artifact} |
+| Library | GET /api/decks, GET /api/decks/{id}/editable, PUT /api/decks/{id}/slides, POST /api/decks/{id}/refresh |
+| Sharing | POST /api/decks/{id}/shares, GET /api/share/{token} |
+| Learning | POST /api/explain, GET /api/labs, GET /api/labs/{id}, GET /api/art/{id}, POST /api/decks/{id}/chat |
 | Settings | provider key management and status endpoints |
 
 ## User Interface Design
 
 The front end is a single-page application with a warm, bright visual style. Its main pages are **Create** (upload or type a topic), **Generate** (live progress of every stage), **Preview** (every slide with its visual, reason, timing and transition, and a full-size preview of the selected slide), **Present** (presenter console with notes, timer and an audience window), **Solve** (type a problem and get a step-by-step explanation), **Export** (downloads, study pack and share links), **Quizzes**, **Gallery** (more than a thousand ready-made lesson decks), **Analytics** and **Settings**. On phones the layout switches to a dedicated mobile design with a bottom tab bar, and the application can be installed as a progressive web app.
 
-![Deck preview page showing each slide, the visual chosen and the reason.](img/app-preview.jpg){width=90%}
+![Deck preview page showing each slide, the visual chosen and the reason.](img/app-preview.jpg){width=65%}
 
 
 # Methodology and Algorithms
@@ -201,7 +201,7 @@ which guarantees that the longest word fits on one line. Wide visuals such as pr
 
 Every topic slide receives a picture, chosen in this order: the source's own figure, shown beside the text; a diagram written by a language model; and a scene from the offline illustrator. For the AI diagram, the model receives the slide's title and text and is asked for one SVG figure that shows the mechanism of the idea, labelled with the slide's own terms, in the deck's colours. The answer is sanitised before use: scripts, embedded images, external links, filters and style sheets are removed, inline styles are converted into attributes, and the diagram must contain at least five shapes and render correctly. Labels that would run past the edge are scaled down using the width model of the previous section. Accepted diagrams are cached by a hash of the slide text, embedded in the web deck, rasterised for PowerPoint and published as an HTML page to which the PowerPoint picture links. Offline scenes are published and linked in the same way, so every picture in the PowerPoint opens its own page.
 
-![Diagrams written by the language model for four slides.](img/art_sheet.png){width=95%}
+![Diagrams written by the language model for four slides.](img/art_sheet.png){width=68%}
 
 **Key-pool scheduling.** The free tier of the Gemini API allows a limited number of requests per minute per key. Learnova uses a pool of keys: each key is paced separately with a minimum interval $\Delta = 4.2$ seconds, two requests are kept in flight per key, and a key that reports an exhausted quota or an invalid credential is skipped for fifteen minutes. With $|K|$ keys the sustained rate is $|K|/\Delta$ requests per second. When every key fails, the system continues with offline logic, so a deck is never blocked by an external service.
 

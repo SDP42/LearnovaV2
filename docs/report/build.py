@@ -60,7 +60,7 @@ def letterhead_docx(path):
 
 
 def main():
-    subprocess.run(["pandoc", *SRC, "-o", PDF, "--pdf-engine=xelatex", "--top-level-division=chapter"], cwd=HERE, check=True)
+    subprocess.run(["pandoc", *SRC, "-o", PDF, "--pdf-engine=xelatex", "--top-level-division=section"], cwd=HERE, check=True)
     subprocess.run(["pandoc", *SRC, "-o", DOCX, "--reference-doc=reference.docx", "--toc", "--number-sections"], cwd=HERE, check=True)
     letterhead_docx(HERE / DOCX)
     print("built", PDF, DOCX)
