@@ -1212,7 +1212,7 @@ _CODE_LINE = re.compile(
     r"then\b|return\b|initiali[sz]e\b|init\b|set\b|update\b|compute\b|calculate\b|let\b|loop\b|break\b|continue\b|print\b|def\b|function\b|"
     r"procedure\b|call\b|swap\b|increment\b|decrement\b|append\b|push\b|pop\b|stop\b|exit\b|goto\b)|←|:=|==|\+=|-=|\w\s*\[[^\]]*\]\s*=|\)\s*[:{]\s*$|;\s*$",
     re.I)
-_EQ_LINE = re.compile(r"^[^.!?]{0,70}(?:=|≈|≤|≥|∝|→)[^.!?]{0,70}$")
+_EQ_LINE = re.compile(r"^(?!.*</?[A-Za-z])[^.!?]{0,70}(?:=|≈|≤|≥|∝|→)[^.!?]{0,70}$")
 _MATHCH = re.compile(r"[=+\-*/^Σ∑∂√θβαλσμ()\d]")
 
 
@@ -1258,6 +1258,10 @@ def det_algorithm(title: str, text: str) -> Det:
     if len(lines) < 3:
         return None
     n = len(lines)
+    markup = sum(1 for _, l in lines if re.search(r"</?[A-Za-z][\w:-]*(?:\s[^<>]*)?/?>", l))
+    if markup >= 2 and markup >= 0.5 * n:            # XML / HTML examples are code, shown verbatim, never as equations
+        return ("ALGORITHM", "code", 0.9, {"label": "Markup example", "lines": [{"text": l, "indent": d} for d, l in lines[:18]]},
+                f"{markup} of {n} lines are markup — shown verbatim as one block")
     code = sum(1 for _, l in lines if _CODE_LINE.search(l))
     eq = sum(1 for _, l in lines if _EQ_LINE.match(l) and len(_MATHCH.findall(l)) >= 2 and len(l.split()) <= 14)
     titled = bool(_ALGO_TITLE.search(title or ""))
