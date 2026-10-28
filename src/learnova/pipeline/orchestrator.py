@@ -724,7 +724,11 @@ def generate(
             imp = e.get("improved") if isinstance(e.get("improved"), dict) else None
             if imp and str(imp.get("layout_type", "")).upper() != "QUIZ":
                 body = " ".join(str(b) for b in (imp.get("bullets") or [])) or str((e.get("original") or {}).get("text") or "")
-                items.append({"id": i, "title": str(imp.get("title") or ""), "text": body})
+                from learnova.ai.escalation import should_escalate, title_is_weak
+
+                # a title that already states the point gives a good rule-based takeaway: no model call for it
+                if should_escalate("takeaway", title_is_weak(str(imp.get("title") or ""))):
+                    items.append({"id": i, "title": str(imp.get("title") or ""), "text": body})
         got = assist.polish_takeaways(items)
         for i, t in got.items():
             result.final_deck[i]["improved"]["takeaway_llm"] = t
