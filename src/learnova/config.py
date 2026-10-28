@@ -53,6 +53,12 @@ def apply_runtime_env() -> None:
     """Apply the C-extension safety flags. Call first, before heavy imports."""
     for key, value in RUNTIME_ENV.items():
         os.environ.setdefault(key, value)
+    try:                       # keys from the project's .env for every entry point (scripts too); never overrides a set variable
+        from dotenv import load_dotenv
+
+        load_dotenv(PROJECT_ROOT / ".env", override=False)
+    except Exception:
+        pass
 
 
 def ensure_dirs() -> None:

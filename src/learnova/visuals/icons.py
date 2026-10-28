@@ -210,8 +210,29 @@ def icon_group(name: str, x: float, y: float, size: float, stroke: str = "#1D4ED
             f'stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round">{"".join(body)}</g>')
 
 
+_GRAD = re.compile(r"<(linearGradient|radialGradient)\b[^>]*\bid=\"([^\"]+)\"[^>]*>(.*?)</\1>", re.S)
+
+
+def _flatten_gradients(svg: str) -> str:
+    """MuPDF paints gradient fills black: replace each url(#gradient) by the gradient's middle stop colour."""
+    colours = {}
+    for _, gid, body in _GRAD.findall(svg):
+        stops = re.findall(r"stop-color=\"([^\"]+)\"", body)
+        if stops:
+            colours[gid] = stops[len(stops) // 2]
+    return re.sub(r"url\(#([^)]+)\)", lambda m: colours.get(m.group(1), m.group(0)), svg) if colours else svg
+
+
 def svg_to_png(svg: str, width_px: int, height_px: int, alpha: bool = False) -> bytes:
-    """Rasterise an SVG string with PyMuPDF (already a dependency)."""
+    """Rasterise an SVG string: resvg when installed (gradients, markers, full SVG), else PyMuPDF with gradients flattened."""
+    try:
+        import resvg_py
+
+        out = resvg_py.svg_to_bytes(svg_string=svg, width=int(width_px), background=None if alpha else "#ffffff")
+        return bytes(out)
+    except Exception:
+        pass
+    svg = _flatten_gradients(svg)
     import fitz
 
     doc = fitz.open(stream=svg.encode("utf-8"), filetype="svg")
