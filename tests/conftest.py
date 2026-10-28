@@ -38,7 +38,7 @@ def _no_live_ai(request, monkeypatch):
         yield
         return
     for var in ("GEMINI_API_KEY", "GEMINI_API_KEYS", "GROQ_API_KEY", "NVIDIA_API_KEY", "GEMINI_IMAGE_API_KEY", "GOOGLE_API_KEY"):
-        monkeypatch.delenv(var, raising=False)
+        monkeypatch.setenv(var, "")                 # blank, not removed: a later load_dotenv() would put a removed key back
     try:
         from learnova.providers import router
 

@@ -1131,9 +1131,21 @@ class SlidesEdit(BaseModel):
     note: str = "edited"
 
 
+@app.post("/api/decks/{deck_id}/refresh")
+def refresh_deck(deck_id: str, user_id: str = Depends(current_user)) -> JSONResponse:
+    """Re-render a saved deck with the current builders and an illustration on every topic slide (saved as a new version)."""
+    record = deck_library.get_deck(user_id, deck_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="deck not found")
+    slides = deck_library.read_editable(user_id, deck_id) or []
+    if not slides:
+        raise HTTPException(status_code=409, detail="This deck has no editable slides to rebuild — generate it again.")
+    return save_deck_slides(deck_id, SlidesEdit(slides=slides, note="refreshed: illustrations and layout"), user_id, illustrate=True)
+
+
 @app.put("/api/decks/{deck_id}/slides")
 def save_deck_slides(
-    deck_id: str, body: SlidesEdit, user_id: str = Depends(current_user)
+    deck_id: str, body: SlidesEdit, user_id: str = Depends(current_user), illustrate: bool = False
 ) -> JSONResponse:
     record = deck_library.get_deck(user_id, deck_id)
     if record is None:
@@ -1150,6 +1162,7 @@ def save_deck_slides(
             theme_id=record.get("theme_id", "auto"),
             theme_spec=record.get("theme_spec"),
             images=deck_library.read_all_images(user_id, deck_id),
+            illustrate=illustrate,
         )
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=f"re-render failed: {exc}") from exc
