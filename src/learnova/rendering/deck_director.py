@@ -27,6 +27,7 @@ Design notes: ``docs/research/DECK_DIRECTOR.md``.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
@@ -318,8 +319,12 @@ def _residual_notes(text: str, data: Dict[str, Any], limit: int = 4) -> List[str
     return out[:limit]
 
 
+_LLM_EXPLAINERS = {"n": 0}       # model-written explainers in the deck being planned (capped per deck)
+
+
 def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
     """Produce the full DeckPlan for a finished deck."""
+    _LLM_EXPLAINERS["n"] = 0
     from learnova.ai.master_prompt import TREATMENT_TO_FAMILY
     from learnova.ai.text_policy import classify_sentences
     from learnova.ai.visual_selector import plan_animation_steps, select_visual
@@ -470,6 +475,14 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
                     from learnova.explain import find_and_solve
 
                     _ex = find_and_solve(title, vms_source, data if family == "WORKED_EXAMPLE" and isinstance(data, dict) else None)
+                    _strong = re.search(r"\b(solve|calculate|compute|find the|determine the|evaluate|numerical|exercise|problem)\b",
+                                        f"{title} {vms_source}", re.I)
+                    if (not _ex and _strong and re.search(r"\d|=", vms_source)
+                            and _LLM_EXPLAINERS["n"] < int(os.getenv("LEARNOVA_LLM_EXPLAINERS", "6"))):
+                        from learnova.explain.llm import llm_explain   # no rule solver knows this problem: the model writes the steps,
+                                                                      # and the page says so (source "llm")
+                        _ex = llm_explain(f"{title}. {vms_source}"[:1200])
+                        _LLM_EXPLAINERS["n"] += 1 if _ex else 0
                     if _ex:
                         treatment, family, variant, data = "STEPPER", "STEPPER", "steps", _ex.to_dict()
                         visual_reason = f"a {_ex.kind} that can be solved on the slide — shown step by step with the reasoning ({_ex.source})"
