@@ -267,7 +267,7 @@ cols = [("Detailed explanation of the solution", BLUE, "workflow", [
 for i, (title, col, ic, items) in enumerate(cols):
     x = 0.3 + i * 4.27
     panel(s, x, 2.22, 4.13, 3.38, title, col, ic)
-    text(s, x + 0.1, 2.64, 3.95, 2.95, bullets(items, 10.3), spacing=4)
+    text(s, x + 0.1, 2.62, 3.95, 2.97, bullets(items, 11), spacing=4)
 phases = [("PHASE 1 · Sep–Dec 2025", "Research & design", "Literature survey, competitor study, problem statement, architecture, UI plan", ORANGE),
           ("PHASE 2 · Jan–Mar 2026", "Prototype V1", "Parsing, AI rewriting, engagement score, quiz generation, Streamlit demo", BLUE),
           ("PHASE 3 · Apr–Jul 2026", "Learnova V2 platform", "FastAPI + React, decision engine, PPTX & web builders, OTP accounts, library", GREEN),
@@ -518,7 +518,7 @@ benefits = [("Students", BLUE, "graduation-cap", ["One clear idea per slide with
 for i, (h, col, ic, items) in enumerate(benefits):
     x = 0.3 + i * 3.2
     panel(s, x, 4.08, 3.08, 2.15, h, col, ic)
-    text(s, x + 0.08, 4.47, 2.95, 1.75, bullets(items, 10.4, mark="✔"), spacing=4)
+    text(s, x + 0.08, 4.47, 2.95, 1.75, bullets(items, 11.5, mark="✔"), spacing=5)
 rect(s, 0.3, 6.32, 12.75, 0.78, TINT[BLUE], line=BLUE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.1)
 text(s, 0.45, 6.34, 12.5, 0.75, [
     [("Use cases:  ", {"bold": True, "color": BLUE, "size": 10.5}),
@@ -539,7 +539,7 @@ for i, (h, col, ic, body) in enumerate(feas):
     y = 1.0 + i * 1.22
     rect(s, 0.3, y, 4.5, 1.14, TINT[col], line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.08)
     badge(s, ic, 0.4, y + 0.12, 0.5, col)
-    text(s, 0.98, y + 0.04, 3.78, 1.08, [(h, {"bold": True, "size": 10.5, "color": col}), (body, {"size": 9.3})], spacing=1)
+    text(s, 0.98, y + 0.04, 3.78, 1.08, [(h, {"bold": True, "size": 11, "color": col}), (body, {"size": 10.2})], spacing=1)
 panel(s, 4.95, 1.0, 4.1, 6.08, "Challenges / risks → our safeguard", RED, "shield")
 risks = [("Messy lecture PDFs", "symbol bullets, glued titles, picture slides → page reader, DP title split, OCR decision"),
          ("AI hallucination", "paraphrase, invented facts → grounded checks, verbatim source, SymPy numbers"),
@@ -552,7 +552,7 @@ for i, (h, b) in enumerate(risks):
     y = 1.45 + i * 0.8
     rect(s, 5.05, y, 0.42, 0.42, RED, shape=MSO_SHAPE.OVAL)
     text(s, 5.05, y, 0.42, 0.42, [(str(i + 1), {"bold": True, "size": 11, "color": WHITE, "align": PP_ALIGN.CENTER})], anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 5.55, y - 0.04, 3.45, 0.8, [(h, {"bold": True, "size": 10.2}), (b, {"size": 9.2, "color": MUTED})], spacing=0)
+    text(s, 5.55, y - 0.04, 3.45, 0.8, [(h, {"bold": True, "size": 11}), (b, {"size": 10, "color": INK})], spacing=0)
 panel(s, 9.2, 1.0, 3.85, 3.1, "Adoption path", GREEN, "route")
 steps = [("1 · Pilot", "AI & DS department: our own courses this semester, feedback from 3–4 faculty"),
          ("2 · Department", "shared server, deck library per teacher, labs library grows with faculty labs"),
@@ -560,38 +560,41 @@ steps = [("1 · Pilot", "AI & DS department: our own courses this semester, feed
 for i, (h, b) in enumerate(steps):
     y = 1.45 + i * 0.86
     rect(s, 9.3, y, 3.65, 0.78, WHITE, line=GREEN, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.1, lw=0.75)
-    text(s, 9.38, y + 0.02, 3.5, 0.75, [(h, {"bold": True, "size": 10, "color": GREEN}), (b, {"size": 9})], spacing=0)
+    text(s, 9.38, y + 0.02, 3.5, 0.75, [(h, {"bold": True, "size": 11, "color": GREEN}), (b, {"size": 10})], spacing=0)
 panel(s, 9.2, 4.2, 3.85, 2.88, "Deployment plan", BLUE, "cloud")
 text(s, 9.3, 4.62, 3.65, 2.45, bullets([("Front end:", "static React build on Vercel / Netlify."),
                                         ("Back end:", "Docker container (FastAPI + LibreOffice + Tesseract) on Render, Railway or Google Cloud Run with a persistent volume."),
                                         ("Config:", "API URL for the front end; LEARNOVA_PUBLIC_URL so PowerPoint lab and illustration links resolve."),
-                                        ("Why not all on Vercel:", "long jobs, system binaries and on-disk storage do not fit serverless functions.")], 9.2), spacing=3)
+                                        ("Why not all on Vercel:", "long jobs, system binaries and on-disk storage do not fit serverless functions.")], 10.2), spacing=3)
 
 # ── 9. Research & references ─────────────────────────────────────────────────
-s = frame("RESEARCH & REFERENCES", "Papers we built on · tools we compared · our own publications and code", 9)
-cards = [("SLIDE GENERATION", BLUE, "presentation", ["Hu & Wan, PPSGen, IEEE TKDE 27(4):1085–1097, 2015", "Fu et al., DOC2PPT, AAAI 36:634–642, 2022", "Sun et al., D2S, NAACL 2021, pp. 1405–1418"]),
-         ("FAITHFULNESS", RED, "shield-check", ["Maynez et al., ACL 2020, pp. 1906–1919", "Ji et al., Survey of hallucination, ACM CSUR 55(12), 2023"]),
-         ("LEARNING SCIENCE", GREEN, "graduation-cap", ["Mayer, Multimedia Learning, CUP, 2009", "Sweller, Cognitive Science 12(2), 1988", "Garner & Alley, IJEE 29(6), 2013"]),
-         ("WORKED EXAMPLES & LABS", ORANGE, "flask-conical", ["Sweller & Cooper, Cogn. & Instr. 2(1), 1985", "Hundhausen et al., JVLC 13(3), 2002", "Wieman et al., PhET, Science 322, 2008"]),
-         ("LAYOUT & VISUALS", PURPLE, "ruler", ["Knuth & Plass, Breaking paragraphs into lines, SPE 11(11), 1981", "Mackinlay, APT, ACM TOG 5(2), 1986", "Moritz et al., Draco, IEEE TVCG 25(1), 2019"]),
-         ("NLP & OCR", TEAL, "languages", ["Jurafsky & Martin, Speech and Language Processing, 3rd ed. draft", "Smith, Tesseract OCR, ICDAR 2007", "Meurer et al., SymPy, PeerJ CS 3:e103, 2017"]),
-         ("TOOLS COMPARED", INK if False else BLUE, "search", ["Gamma (gamma.app)", "Microsoft Copilot in PowerPoint", "Gemini in Google Slides · Canva Magic Design"]),
-         ("OUR PAPERS", RED, "newspaper", ["IEEE conf. paper: Rebuilding lecture slide decks into visually structured, interactive presentations",
-                                          "Springer LNCS paper: Computed step-by-step explainers and generated labs"])]
-for i, (h, col, ic, refs) in enumerate(cards):
+s = frame("RESEARCH & REFERENCES", "12 sources behind our design — what each showed and how Learnova uses it", 9)
+refs = [("THE PROBLEM", RED, "flag", "Tufte, The Cognitive Style of PowerPoint (2003)", "Bullet outlines fragment reasoning; teachers' decks hide the argument.", "Why we redesign, not decorate"),
+        ("SLIDE DESIGN", ORANGE, "presentation", "Garner & Alley, IJEE 29(6), 2013", "Sentence headline + visual evidence beat bullet lists for comprehension.", "Assertion titles on every slide"),
+        ("MULTIMEDIA LEARNING", GREEN, "graduation-cap", "Mayer, Multimedia Learning, CUP 2009", "Coherence, signalling, contiguity: picture beside its words.", "Side pictures, takeaways, PSF term C"),
+        ("COGNITIVE LOAD", BLUE, "brain", "Sweller, Cognitive Science 12(2), 1988", "Working memory is small; too many new elements block learning.", "Load model L and CLASS splitting"),
+        ("SLIDE GENERATION", PURPLE, "file-text", "Fu et al., DOC2PPT, AAAI 2022 · Sun et al., D2S, NAACL 2021", "Neural systems summarise papers into slides — and lose content.", "Gap: rebuild existing decks instead"),
+        ("FAITHFULNESS", RED, "shield-check", "Maynez et al., ACL 2020", "Abstractive models hallucinate and omit facts in many outputs.", "Verbatim source + fact-retention check"),
+        ("WORKED EXAMPLES", ORANGE, "list-checks", "Sweller & Cooper, Cognition and Instruction 2(1), 1985", "Studying solved steps teaches novices more than solving alone.", "Step-by-step explainers with reasons"),
+        ("INTERACTIVE LABS", GREEN, "flask-conical", "Hundhausen et al., JVLC 13(3), 2002 · PhET, Science 2008", "Learners gain when they act on a visual, not just watch it.", "Labs with step / play / own input"),
+        ("LAYOUT", BLUE, "ruler", "Knuth & Plass, Software P&E 11(11), 1981", "Line breaking as an optimisation over break points.", "Glyph-measured fitting, CLASS DP"),
+        ("VISUAL DESIGN RULES", PURPLE, "palette", "Mackinlay, APT, ACM TOG 1986 · Draco, IEEE TVCG 2019", "Design knowledge written as explicit, checkable rules.", "Explainable decision engine"),
+        ("OCR & DOCUMENTS", TEAL, "eye", "Smith, Tesseract OCR, ICDAR 2007 · PyMuPDF · LibreOffice", "Open tools to read text, pictures and layout of documents.", "Slide reader, picture-slide OCR"),
+        ("TOOLS COMPARED", INK, "search", "Gamma · MS Copilot · Gemini in Slides · Canva Magic Design", "Attractive new decks from prompts; content rewritten, cloud-only.", "Our benchmark for what is missing")]
+for i, (cat, col, ic, ref, finding, use) in enumerate(refs):
     x = 0.3 + (i % 4) * 3.2
-    y = 1.0 + (i // 4) * 2.55
-    rect(s, x, y, 3.08, 2.45, TINT[col], line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.06)
-    badge(s, ic, x + 0.1, y + 0.1, 0.5, col)
-    text(s, x + 0.68, y + 0.12, 2.35, 0.45, [(h, {"bold": True, "size": 11, "color": col, "font": HEAD})], anchor=MSO_ANCHOR.MIDDLE)
-    text(s, x + 0.12, y + 0.66, 2.88, 1.76, [[("▸ ", {"color": col, "bold": True, "size": 10}), (r, {"size": 10})] for r in refs], spacing=7)
-rect(s, 0.3, 6.14, 12.75, 0.95, TINT[BLUE], line=BLUE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.1)
-qr(s, REPO, 0.38, 6.19, 0.85)
-qr(s, REPO + "/tree/main/docs/research/papers", 1.32, 6.19, 0.85)
-text(s, 2.3, 6.17, 10.6, 0.9, [
-    [("Scan to verify:  ", {"bold": True, "color": BLUE, "size": 10.5}), ("left — full source code, tests and demo decks (github.com/SDP42/LearnovaV2); right — both research papers (IEEE and "
-     "Springer LNCS), gold sets and the measurement scripts used for every number on these slides. ", {"size": 10.5}),
-     ("Web resources: ", {"bold": True, "size": 10.5}), ("revealjs.com · python-pptx · PyMuPDF · LibreOffice · Tesseract · ai.google.dev", {"size": 10.5})]])
+    y = 1.0 + (i // 4) * 1.72
+    rect(s, x, y, 3.1, 1.64, TINT[col] if col in TINT else RGBColor(0xF0, 0xF2, 0xF5), line=col, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.06)
+    badge(s, ic, x + 0.08, y + 0.08, 0.44, col)
+    text(s, x + 0.58, y + 0.06, 2.48, 0.48, [(cat, {"bold": True, "size": 11.5, "color": col, "font": HEAD})], anchor=MSO_ANCHOR.MIDDLE)
+    text(s, x + 0.1, y + 0.55, 2.92, 1.08, [(ref, {"bold": True, "size": 10}), (finding, {"size": 10, "color": INK}),
+                                           [("→ ", {"bold": True, "color": col, "size": 10}), (use, {"bold": True, "size": 10, "color": col})]], spacing=2)
+rect(s, 0.3, 6.18, 12.75, 0.92, TINT[BLUE], line=BLUE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.1)
+qr(s, REPO, 0.4, 6.22, 0.84)
+text(s, 1.38, 6.2, 11.55, 0.88, [
+    [("Scan to verify:  ", {"bold": True, "color": BLUE, "size": 11.5}), ("full source code, 755 automated tests, gold sets, measurement scripts and the demo decks behind every number "
+     "on these slides — github.com/SDP42/LearnovaV2.  ", {"size": 11.5}), ("Web resources: ", {"bold": True, "size": 11.5}),
+     ("revealjs.com · python-pptx.readthedocs.io · pymupdf.readthedocs.io · libreoffice.org · github.com/tesseract-ocr · ai.google.dev", {"size": 11.5})]], anchor=MSO_ANCHOR.MIDDLE)
 
 # ── 10. Thank you ────────────────────────────────────────────────────────────
 s = prs.slides.add_slide(prs.slide_layouts[6])
@@ -613,7 +616,7 @@ picture(s, f"{IMG}/art_sheet.png", 8.1, 1.25, 4.6, 2.1, border=False)
 text(s, 8.1, 3.38, 4.6, 0.3, [("Diagrams drawn by Learnova for real lecture slides", {"size": 10, "color": RGBColor(0xA8, 0xB3, 0xC4), "align": PP_ALIGN.CENTER})])
 rect(s, 8.55, 3.95, 3.7, 2.45, WHITE, shape=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.06)
 qr(s, REPO, 8.7, 4.08, 1.55)
-text(s, 10.35, 4.1, 1.85, 2.25, [("Scan for", {"size": 11, "color": MUTED}), ("code, papers & demo decks", {"bold": True, "size": 12, "color": INK}),
+text(s, 10.35, 4.1, 1.85, 2.25, [("Scan for", {"size": 11, "color": MUTED}), ("code & demo decks", {"bold": True, "size": 12, "color": INK}),
                                  ("github.com/SDP42/LearnovaV2", {"size": 9.5, "color": BLUE})], spacing=4, anchor=MSO_ANCHOR.MIDDLE)
 text(s, 1.0, 6.65, 11.3, 0.4, [("LEARNOVA  ·  Read  ·  Redesign  ·  Illustrate  ·  Engage  ·  Deliver", {"bold": True, "size": 13, "color": RGBColor(0x7F, 0x8C, 0xA0), "font": HEAD})])
 

@@ -80,3 +80,30 @@ def test_refresh_unknown_deck_is_404():
         assert TestClient(main.app).post("/api/decks/does-not-exist/refresh").status_code == 404
     finally:
         main.app.dependency_overrides.pop(main.current_user, None)
+
+
+def test_label_fit_uses_the_svg_own_width():
+    body = "".join(f'<rect x="{10 + 40 * i}" y="10" width="30" height="30"/>' for i in range(5))
+    raw = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 405">{body}'
+           '<text x="640" y="200" font-size="22">a label far too long for its place</text></svg>')
+    out = topic_art.clean_svg(raw, "#1E40AF", "#F97316")
+    assert out and 'font-size="11.0"' in out
+
+
+def test_spent_key_is_skipped_on_the_next_diagram(monkeypatch):
+    from learnova.providers import gemini_provider as gp
+
+    calls = []
+
+    def fake(self, prompt, system_prompt=None, **kw):
+        calls.append(self.api_key)
+        if self.api_key == "k1":
+            raise RuntimeError("429 RESOURCE_EXHAUSTED: quota per day")
+        return "ok"
+
+    monkeypatch.setenv("GEMINI_API_KEYS", "k1,k2")
+    monkeypatch.setattr(gp.GeminiProvider, "generate", fake)
+    monkeypatch.setattr(gp, "_dead_keys", {})
+    for _ in range(4):
+        assert topic_art._ask("x") == "ok"                              # noqa: SLF001
+    assert calls.count("k1") == 1                                       # tried once, then remembered as spent

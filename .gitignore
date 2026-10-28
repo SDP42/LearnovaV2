@@ -62,3 +62,6 @@ logs/
 # frontend deps kept out of iCloud sync (node_modules is a link to node_modules.nosync)
 node_modules
 *.nosync/
+
+# college letterhead image (kept out of the public repo)
+docs/report/letterhead.jpeg

@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "learnova-api",
-      "runtimeExecutable": "python",
+      "runtimeExecutable": "/opt/anaconda3/bin/python",
       "runtimeArgs": ["-m", "uvicorn", "apps.api.main:app", "--port", "8000"],
       "port": 8000
     },

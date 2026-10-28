@@ -100,3 +100,6 @@ def test_ai_written_lab_is_used_only_when_its_code_checks_out(tmp_path, monkeypa
     r.reply = _json.dumps({**good, "js": good["js"] + "fetch('http://x')"})              # network access is refused
     made3 = auto.lab_for_slide("Edit distance 3", "x", "KEY_POINTS", {}, ["Insert: add one character", "Delete: remove one character", "Substitute: change one character"])
     assert "step-through" in made3["name"]
+    r.reply = _json.dumps({**good, "js": good["js"] + "import('http://x/m.js')"})       # dynamic import is refused too
+    made4 = auto.lab_for_slide("Edit distance 4", "x", "KEY_POINTS", {}, ["Insert: add one character", "Delete: remove one character", "Substitute: change one character"])
+    assert "step-through" in made4["name"]

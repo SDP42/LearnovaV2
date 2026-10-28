@@ -145,6 +145,8 @@ def _num(v: Optional[str], default: float) -> float:
 
 def _fit_labels(root) -> None:
     """LaTeX dollars out, and a label that would run past the edge gets a smaller font (never below 11)."""
+    vb = (root.get("viewBox") or "").replace(",", " ").split()
+    vw = _num(vb[2], W) if len(vb) == 4 else W            # the model's own canvas width, not the panel's
     for el in root.iter():
         if _local(el.tag) != "text":
             continue
@@ -158,7 +160,7 @@ def _fit_labels(root) -> None:
         x = _num(el.get("x"), 0.0)
         anchor = el.get("text-anchor", "start")
         width = 0.56 * size * len(label)
-        room = {"middle": 2 * min(x - 12, W - 12 - x), "end": x - 12}.get(anchor, W - 12 - x)
+        room = {"middle": 2 * min(x - 12, vw - 12 - x), "end": x - 12}.get(anchor, vw - 12 - x)
         if width > room > 0:
             el.set("font-size", f"{max(11.0, size * room / width):.1f}")
 
@@ -216,7 +218,7 @@ def _cache(key: str):
 def _ask(prompt: str) -> str:
     """One generation: Gemini keys round-robin (each paced on its own), then the router as a fallback."""
     try:
-        from learnova.providers.gemini_provider import GeminiProvider, gemini_keys
+        from learnova.providers.gemini_provider import _KEY_RETRY_S, GeminiProvider, _dead_keys, _key_is_dead, gemini_keys
 
         keys = gemini_keys()
     except Exception:
@@ -224,11 +226,14 @@ def _ask(prompt: str) -> str:
     if keys:
         start = next(_rr) % len(keys)
         order = keys[start:] + keys[:start]
+        live = [k for k in order if time.time() - _dead_keys.get(k, -1e18) > _KEY_RETRY_S]
         last: Optional[Exception] = None
-        for k in order:
+        for k in live:                        # a key known to be spent is skipped, so it does not cost a paced slot
             try:
                 return GeminiProvider(api_key=k, timeout=60.0).generate(prompt, system_prompt=_SYSTEM, temperature=0.4, max_tokens=8192)
-            except Exception as exc:          # spent or rejected key: the next one
+            except Exception as exc:          # spent or rejected key: remember it, then the next one
+                if _key_is_dead(exc):
+                    _dead_keys[k] = time.time()
                 last = exc
                 continue
         logger.info("topic_art: every Gemini key failed (%s) — trying the router", last)

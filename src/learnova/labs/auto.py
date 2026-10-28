@@ -159,7 +159,7 @@ def _llm_lab(topic: str, text: str) -> Optional[Dict[str, Any]]:
     if not isinstance(obj, dict) or not all(isinstance(obj.get(k), str) for k in ("js", "inputs", "title")):
         return None
     js = obj["js"]
-    if "</script" in js.lower() or re.search(r"\b(fetch|XMLHttpRequest|import\s*\(|eval|document\.cookie|localStorage)\b", js):
+    if "</script" in js.lower() or re.search(r"\b(?:fetch|XMLHttpRequest|eval|document\.cookie|localStorage)\b|\bimport\s*\(", js):
         return None                                                   # a lab never talks to the network or storage
     if not all(re.search(rf"\b{name}\b", js) for name in ("PRESETS", "function build", "function fill", "function readInputs")):
         return None

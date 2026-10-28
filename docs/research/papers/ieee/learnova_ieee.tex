@@ -5,6 +5,7 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{graphicx}
+\usepackage{float}
 \usepackage{booktabs}
 \usepackage{textcomp}
 \usepackage{xcolor}
@@ -84,7 +85,7 @@ or constraints; our decision engine applies the same idea to sentences. The asse
 the design targets that PSF formalises. CLASS follows the structure of Knuth--Plass line breaking \cite{knuth1981}, with
 slides in place of lines and cognitive load in place of badness.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Capabilities of related systems}
 \label{tab:related}
@@ -110,7 +111,7 @@ agenda, checkpoint questions and a glossary. The decision engine assigns a visua
 attaches a picture, and two builders write an editable PowerPoint file and a web deck. A layout audit and a fact check run
 on the finished files. Stages that use a language model fall back to rules when no key is available.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=2.6mm and 2.4mm, font=\scriptsize,
   box/.style={draw, rounded corners=2pt, fill=blue!6, align=center, minimum width=16mm, minimum height=7mm},
@@ -183,7 +184,7 @@ contain digits, they are the ticks of a drawn chart, and the region below the ti
 A PowerPoint file is first rendered to PDF by LibreOffice (cached by content hash) and read by the same rules.
 Algorithm~\ref{alg:reader} summarises the procedure.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Reader thresholds (fixed for all experiments)}
 \label{tab:reader}
@@ -204,7 +205,7 @@ OCR acceptance: debris lines & -- & 15\% \\
 \end{tabular}
 \end{table}
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{Reading one page of a slide PDF}
 \label{alg:reader}
 \begin{algorithmic}[1]
@@ -236,7 +237,7 @@ cards that carry every sentence in full, so choosing a visual never removes text
 by removing discourse cues and pronouns, keeping the first three content words, cutting at an unbalanced parenthesis and
 removing trailing function words, modals and adverbs, so a heading never ends mid-phrase (Algorithm~\ref{alg:engine}).
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{Visual decision for one slide}
 \label{alg:engine}
 \begin{algorithmic}[1]
@@ -289,7 +290,7 @@ $o_i$ between consecutive slides:
 where $\phi(o)=1$ for $o\in[0.18,0.55]$, rises linearly from 0.6 below that band and falls towards 0.4 above it.
 Table~\ref{tab:params} gives the default parameters.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{PSF and CLASS parameters (defaults)}
 \label{tab:params}
@@ -322,7 +323,7 @@ F(i)=\min_{\max(0,i-P)\le p<i}\bigl[F(p)+\mathrm{cost}(b_{p+1..i})+\lambda\bigr]
 \end{equation}
 in $O(mP)$ time (Algorithm~\ref{alg:class}). Every point is placed exactly once, so segmentation never drops content.
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{CLASS}
 \label{alg:class}
 \begin{algorithmic}[1]
@@ -375,7 +376,7 @@ two requests are kept in flight per key, and a key that returns an authenticatio
 $T_d=15$ minutes. With $|K|$ keys the sustained rate is $|K|/\Delta$ requests per second, about 1.2 for five keys
 (Algorithm~\ref{alg:ill}).
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{Illustration with fallbacks}
 \label{alg:ill}
 \begin{algorithmic}[1]
@@ -408,7 +409,7 @@ slide (95th percentile 0.82\,ms). Fig.~\ref{fig:families} shows the families cho
 dominate because the sources contain many picture slides, followed by key-point cards, outlines, prose and comparison
 tables.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Visual decision accuracy on the gold sets}
 \label{tab:gold}
@@ -423,7 +424,7 @@ Blind & 31 & 96.8\% & 100\% & 21 \\
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.92\columnwidth]{fig_families.png}
 \caption{Visual families chosen over the six rebuilt decks.}
@@ -440,7 +441,7 @@ for a broken word; every flag marked a slide that is sparse because its source h
 roughly linearly with length (Fig.~\ref{fig:time}); the PowerPoint decks take longer per page because they are first
 rendered to PDF and contain many full-page figures.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Rebuilt decks without an API key}
 \label{tab:real}
@@ -459,7 +460,7 @@ F (PDF) & 216 & 225 & 34.4 & 100\% & 3\% \\
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\columnwidth]{fig_time.png}
 \caption{Time from upload to finished files against source length (no API key).}
@@ -472,7 +473,7 @@ across the five decks, and the rebuilt decks show a picture on most slides and a
 the sources had none. The PowerPoint route matters: on deck~B the earlier shape-by-shape parser produced 23 slides from 63
 and titles such as ``Slide~9'', while the PDF route produced 68 slides covering every source slide.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Source deck against rebuilt deck (with keys)}
 \label{tab:ba}
@@ -491,7 +492,7 @@ E & 32 & 49\,$\to$\,96 & 89 & 6 & 13 & 78 \\
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\columnwidth]{fig_before_after.png}
 \caption{Untitled slides and pictures in the source decks, and pictures and visual slides in the rebuilt decks.}
@@ -507,7 +508,7 @@ examples and key terms are added to thin slides; this raises the estimated load 
 concepts already introduced, it lowers $E$. PSF therefore penalises exactly the enrichment we added for readability, a
 calibration question we return to in Section~\ref{sec:disc}.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{PSF components: source deck / rebuilt deck}
 \label{tab:psf}
@@ -526,7 +527,7 @@ F & 0.14 / 0.25 & 0.20 / 0.31 & 0.76 / 0.83 & 0.15 / 0.24 \\
 \end{tabular}
 \end{table}
 
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
 \includegraphics[width=0.78\textwidth]{fig_psf.png}
 \caption{(a) Mean PSF and (b) mean estimated cognitive load of each source deck and its rebuilt deck.}
@@ -538,7 +539,7 @@ slide, once with CLASS and once evenly. Table~\ref{tab:class} and Fig.~\ref{fig:
 179 slides in total; CLASS had a lower total cost on 28 sections (37\%) and an equal cost on the rest. It never did worse,
 as expected of an exact optimiser of the same objective.
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{CLASS against even splitting (75 overloaded sections)}
 \label{tab:class}
@@ -554,7 +555,7 @@ Slides produced & 179 & 179 \\
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.8\columnwidth]{fig_class.png}
 \caption{Total cost per overloaded section, CLASS against even splitting. Points on or below the diagonal favour CLASS.}

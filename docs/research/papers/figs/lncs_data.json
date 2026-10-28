@@ -1,0 +1,312 @@
+{
+ "sanitiser": [
+  {
+   "case": "Plain diagram, five shapes",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": -31
+  },
+  {
+   "case": "Diagram wrapped in prose and a code fence",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": 1
+  },
+  {
+   "case": "Gradient fill and arrow marker",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": -34
+  },
+  {
+   "case": "Inline style attribute",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": -30
+  },
+  {
+   "case": "Script element",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": -6
+  },
+  {
+   "case": "Event handler attribute",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": -13
+  },
+  {
+   "case": "foreignObject with HTML",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": 74
+  },
+  {
+   "case": "Embedded remote image",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": 32
+  },
+  {
+   "case": "Link element around shapes",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": 42
+  },
+  {
+   "case": "External href on use",
+   "accepted": false,
+   "unsafe_left": false,
+   "removed": null
+  },
+  {
+   "case": "CSS url() to remote file",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": 1
+  },
+  {
+   "case": "Animation elements",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": 17
+  },
+  {
+   "case": "Style sheet element",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": -2
+  },
+  {
+   "case": "Too few shapes (two)",
+   "accepted": false,
+   "unsafe_left": false,
+   "removed": null
+  },
+  {
+   "case": "Too many labels (35)",
+   "accepted": false,
+   "unsafe_left": false,
+   "removed": null
+  },
+  {
+   "case": "Truncated answer (no closing tag)",
+   "accepted": false,
+   "unsafe_left": false,
+   "removed": null
+  },
+  {
+   "case": "Malformed XML",
+   "accepted": false,
+   "unsafe_left": false,
+   "removed": null
+  },
+  {
+   "case": "Over-long label at right edge",
+   "accepted": true,
+   "unsafe_left": false,
+   "removed": -33,
+   "font": [
+    "11.0"
+   ]
+  }
+ ],
+ "labs": [
+  {
+   "case": "Well-formed lab",
+   "accepted": true,
+   "ms": 386.9
+  },
+  {
+   "case": "Calls fetch()",
+   "accepted": false,
+   "ms": 0.2
+  },
+  {
+   "case": "Uses XMLHttpRequest",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Dynamic import()",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Uses eval",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Reads document.cookie",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Writes localStorage",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Closes the script tag",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Missing build()",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Missing PRESETS",
+   "accepted": false,
+   "ms": 0.0
+  },
+  {
+   "case": "Syntax error",
+   "accepted": false,
+   "ms": 57.2
+  },
+  {
+   "case": "Answer is not JSON",
+   "accepted": false,
+   "ms": 0.1
+  }
+ ],
+ "pool": [
+  {
+   "keys": 1,
+   "dead": 0,
+   "workers": 4,
+   "served": 40,
+   "real_s": 182.8
+  },
+  {
+   "keys": 2,
+   "dead": 0,
+   "workers": 4,
+   "served": 40,
+   "real_s": 97.9
+  },
+  {
+   "keys": 3,
+   "dead": 0,
+   "workers": 6,
+   "served": 40,
+   "real_s": 70.2
+  },
+  {
+   "keys": 4,
+   "dead": 0,
+   "workers": 8,
+   "served": 40,
+   "real_s": 51.9
+  },
+  {
+   "keys": 5,
+   "dead": 0,
+   "workers": 10,
+   "served": 40,
+   "real_s": 42.4
+  }
+ ],
+ "failover": [
+  {
+   "keys": 5,
+   "dead": 2,
+   "workers": 10,
+   "served": 40,
+   "real_s": 73.1
+  },
+  {
+   "keys": 5,
+   "dead": 4,
+   "workers": 10,
+   "served": 40,
+   "real_s": 174.9
+  },
+  {
+   "keys": 3,
+   "dead": 3,
+   "workers": 6,
+   "served": 0,
+   "real_s": 21.9
+  }
+ ],
+ "failover_before": [
+  {
+   "keys": 5,
+   "dead": 2,
+   "real_s": 73.1,
+   "served": 40
+  },
+  {
+   "keys": 5,
+   "dead": 4,
+   "real_s": 175.4,
+   "served": 40
+  },
+  {
+   "keys": 3,
+   "dead": 3,
+   "real_s": 166.3,
+   "served": 0
+  }
+ ],
+ "grounding": [
+  {
+   "slide": "Key pool",
+   "title": "The scheduler spaces requests so each key stays within its quota",
+   "title_kept": true,
+   "explain_words": 22,
+   "explain_kept": true
+  },
+  {
+   "slide": "Key pool",
+   "title": "Bananas are a rich source of potassium for athletes",
+   "title_kept": false,
+   "explain_words": 14,
+   "explain_kept": false
+  },
+  {
+   "slide": "Sanitiser",
+   "title": "Compare the sanitiser with a firewall",
+   "title_kept": false,
+   "explain_words": 0,
+   "explain_kept": null
+  },
+  {
+   "slide": "Sanitiser",
+   "title": "Sanitiser",
+   "title_kept": false,
+   "explain_words": 0,
+   "explain_kept": null
+  },
+  {
+   "slide": "Sanitiser",
+   "title": "The sanitiser removes scripts and remote images but keeps shapes, gradients and markers in every model diagram it receives from any provider today",
+   "title_kept": false,
+   "explain_words": 0,
+   "explain_kept": null
+  },
+  {
+   "slide": "Lab gate",
+   "title": "Generated lab code runs only after a Node syntax check",
+   "title_kept": true,
+   "explain_words": 95,
+   "explain_kept": true
+  },
+  {
+   "slide": "Lab gate",
+   "title": "Generated lab code runs only after a Node syntax check",
+   "title_kept": true,
+   "explain_words": 20,
+   "explain_kept": true
+  }
+ ],
+ "negatives": {
+  "sentences": 40,
+  "false_detections": []
+ }
+}

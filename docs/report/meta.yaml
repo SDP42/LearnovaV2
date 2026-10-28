@@ -10,7 +10,13 @@ date: "Under the guidance of the Department of Artificial Intelligence and Data 
 mainfont: "Times New Roman"
 fontsize: 12pt
 linestretch: 1.5
-geometry: "margin=1in"
+geometry:
+  - top=1.9in
+  - bottom=1in
+  - left=1in
+  - right=1in
+  - headheight=92pt
+  - headsep=12pt
 documentclass: report
 toc: true
 toc-depth: 2
@@ -25,4 +31,10 @@ header-includes:
   - \titleformat{\chapter}[hang]{\normalfont\bfseries\LARGE}{\thechapter.}{0.6em}{}
   - \titlespacing*{\chapter}{0pt}{0pt}{18pt}
   - \renewcommand{\arraystretch}{1.25}
+  - \usepackage{fancyhdr}
+  - \fancypagestyle{lh}{\fancyhf{}\fancyhead[C]{\includegraphics[width=\textwidth]{letterhead.jpeg}\\[1pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
+  - \fancypagestyle{plain}{\fancyhf{}\fancyhead[C]{\includegraphics[width=\textwidth]{letterhead.jpeg}\\[1pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
+  - \pagestyle{lh}
+  - \usepackage{etoolbox}
+  - \patchcmd{\titlepage}{\thispagestyle{empty}}{\thispagestyle{lh}}{}{}
 ---
