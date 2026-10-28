@@ -45,10 +45,16 @@ Rules:
   enough to fit inside the viewBox at its font size (about 0.55 x font-size per character).
 - Be accurate to the slide: do not invent facts, numbers or steps it does not support.
 - No script, style, foreignObject, image, href, filter, CSS or animation.
+Keep the whole SVG under 6000 characters (round coordinates to integers, no comments) so it is never cut off.
 Reply with the SVG only."""
 
-_ALLOWED = {"svg", "g", "rect", "circle", "ellipse", "line", "polyline", "polygon", "path", "text", "tspan", "defs", "marker", "title", "desc"}
-_BAD_ATTR = re.compile(r"^(?:on\w+|href|xlink:href|style|filter|class)$", re.I)
+_ALLOWED = {"svg", "g", "rect", "circle", "ellipse", "line", "polyline", "polygon", "path", "text", "tspan", "defs", "marker", "title", "desc",
+            "linearGradient", "radialGradient", "stop", "clipPath", "pattern", "symbol", "use"}
+_DROP = {"script", "foreignObject", "image", "iframe", "a", "audio", "video", "animate", "animateTransform", "animateMotion", "set", "style", "filter",
+         "feGaussianBlur", "feOffset", "feBlend", "feMerge", "feMergeNode", "feFlood", "feComposite", "feColorMatrix", "feDropShadow", "mask", "metadata"}
+_STYLE_PROPS = {"fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity",
+                "font-size", "font-family", "font-weight", "font-style", "text-anchor", "dominant-baseline", "marker-end", "marker-start"}
+_BAD_ATTR = re.compile(r"^(?:on\w+|class|filter|mask)$", re.I)
 
 # Visuals that need the slide's full width: they get the header picture, not a side diagram (so no diagram is requested).
 _WIDE = {"COMPARE_TABLE", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
@@ -89,17 +95,32 @@ def clean_svg(raw: str, primary: str, accent: str) -> Optional[str]:
         return None
     if _local(root.tag) != "svg":
         return None
+    # sanitise rather than reject: unsafe or unsupported elements are removed, inline styles become attributes
+    for parent in list(root.iter()):
+        for child in list(parent):
+            if _local(child.tag) in _DROP or _local(child.tag) not in _ALLOWED:
+                parent.remove(child)
     shapes = texts = 0
     for el in root.iter():
         name = _local(el.tag)
-        if name not in _ALLOWED:
-            return None
+        style = el.attrib.pop("style", "")
+        for decl in style.split(";"):
+            if ":" in decl:
+                k, v = (t.strip() for t in decl.split(":", 1))
+                if k in _STYLE_PROPS and "url(" not in v.replace("url(#", ""):
+                    el.set(k, v)
         for k in list(el.attrib):
-            if _BAD_ATTR.match(_local(k)) or "url(" in el.attrib[k] and name != "marker" and not el.attrib[k].startswith("url(#"):
-                return None
-        shapes += name in {"rect", "circle", "ellipse", "line", "polyline", "polygon", "path"}
+            v = el.attrib[k]
+            lk = _local(k)
+            if _BAD_ATTR.match(lk):
+                del el.attrib[k]
+            elif lk == "href" and not v.startswith("#"):
+                return None                                   # an external link or embedded file: not used
+            elif "url(" in v and not v.replace(" ", "").startswith("url(#"):
+                del el.attrib[k]
+        shapes += name in {"rect", "circle", "ellipse", "line", "polyline", "polygon", "path", "use"}
         texts += name == "text"
-    if shapes < 6 or texts > 16:
+    if shapes < 5 or texts > 28:
         return None
     _fit_labels(root)
     root.set("viewBox", root.get("viewBox") or f"0 0 {W} {H}")
@@ -206,7 +227,7 @@ def _ask(prompt: str) -> str:
         last: Optional[Exception] = None
         for k in order:
             try:
-                return GeminiProvider(api_key=k, timeout=60.0).generate(prompt, system_prompt=_SYSTEM, temperature=0.4, max_tokens=4096)
+                return GeminiProvider(api_key=k, timeout=60.0).generate(prompt, system_prompt=_SYSTEM, temperature=0.4, max_tokens=8192)
             except Exception as exc:          # spent or rejected key: the next one
                 last = exc
                 continue
@@ -216,7 +237,7 @@ def _ask(prompt: str) -> str:
 
     if not assist.llm_available():
         return ""
-    return get_router().generate(prompt, system_prompt=_SYSTEM, task=TASK_DIAGRAM, temperature=0.4, max_tokens=4096, timeout=60.0)
+    return get_router().generate(prompt, system_prompt=_SYSTEM, task=TASK_DIAGRAM, temperature=0.4, max_tokens=8192, timeout=60.0)
 
 
 def diagram(title: str, text: str, primary: str, accent: str, family: str = "") -> Optional[Dict[str, Any]]:
@@ -224,7 +245,7 @@ def diagram(title: str, text: str, primary: str, accent: str, family: str = "") 
     words = re.sub(r"\s+", " ", f"{title} {text}").strip()
     if len(re.findall(r"[A-Za-z]{3,}", words)) < 4:
         return None
-    key = hashlib.sha1(json.dumps([title, text[:1500], primary, accent, "v2"]).encode()).hexdigest()[:20]
+    key = hashlib.sha1(json.dumps([title, text[:1500], primary, accent, "v3"]).encode()).hexdigest()[:20]
     cp = _cache(key)
     svg = None
     if cp.is_file():

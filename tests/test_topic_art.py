@@ -15,9 +15,11 @@ def test_clean_svg_accepts_drawing_and_fixes_labels():
     assert 'width="600"' in svg
 
 
-def test_clean_svg_rejects_unsafe_or_empty():
-    assert topic_art.clean_svg(GOOD.replace("<rect", "<script>alert(1)</script><rect"), "#000000", "#111111") is None
-    assert topic_art.clean_svg(GOOD.replace('<rect width', '<image href="http://x/y.png"/><rect width'), "#000000", "#111111") is None
+def test_clean_svg_strips_unsafe_parts_and_rejects_empty():
+    safe = topic_art.clean_svg(GOOD.replace("<rect", '<script>alert(1)</script><image href="http://x/y.png"/><rect style="fill:#ff0000;cursor:pointer" class="x"', 1),
+                               "#000000", "#111111")
+    assert safe and "<script" not in safe and "<image" not in safe and "class=" not in safe and 'fill="#ff0000"' in safe and "cursor" not in safe
+    assert topic_art.clean_svg(GOOD.replace('<rect width', '<use href="http://x/y.svg#a"/><rect width'), "#000000", "#111111") is None
     assert topic_art.clean_svg('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>', "#000000", "#111111") is None
     assert topic_art.clean_svg("no svg here", "#000000", "#111111") is None
 
