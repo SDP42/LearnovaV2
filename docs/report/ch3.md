@@ -80,6 +80,11 @@ explanations already followed this rule. A switch (`auto`, `always`, `off`) sets
 decisions went to a model and how many stayed offline. Several free keys are pooled for each provider; a key that reaches its
 daily limit is set aside for fifteen minutes and the next one is used.
 
+On the eight test inputs (599 output slides) this kept 37% of picture reads, 30% of diagram requests and 22% of takeaway
+requests offline. Titles were sent to the model in 97% of cases, because lecture decks almost always use topic labels such as
+"Linear Regression" rather than statements. During the run every free Gemini key and the Groq account reached their daily
+limit, and the remaining decks were completed by the offline logic without a single failed build.
+
 The illustrations were also redesigned. Each slide is first classified into the kind of figure that would teach it — a
 *flow* for processes and apparatus, a *plot* for quantitative relations, an *anatomy* for parts and types, a *comparison*, or a
 concrete *scene* — and slides where a drawing adds nothing (agendas, references, quizzes, tables, algorithms, slides that are

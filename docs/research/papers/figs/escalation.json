@@ -1,0 +1,100 @@
+{
+ "total": {
+  "picture:offline": 86,
+  "picture:ai": 144,
+  "titles:ai": 309,
+  "visual:ai": 217,
+  "takeaway:ai": 411,
+  "takeaway:offline": 119,
+  "diagram:ai": 109,
+  "explainer:ai": 8,
+  "diagram:offline": 47,
+  "titles:offline": 10
+ },
+ "per_deck": {
+  "1__Introduction_to_ML_Bias_and_Variance": {
+   "picture:offline": 12,
+   "picture:ai": 9,
+   "titles:ai": 15,
+   "visual:ai": 7,
+   "takeaway:ai": 20,
+   "takeaway:offline": 9,
+   "diagram:ai": 3
+  },
+  "2__Linear_Regression_MRR": {
+   "picture:ai": 29,
+   "picture:offline": 14,
+   "titles:ai": 36,
+   "visual:ai": 20,
+   "takeaway:ai": 51,
+   "takeaway:offline": 11,
+   "explainer:ai": 1,
+   "diagram:ai": 9,
+   "diagram:offline": 2
+  },
+  "Module_4__Part_1___Word": {
+   "picture:offline": 4,
+   "picture:ai": 2,
+   "titles:ai": 29,
+   "visual:ai": 21,
+   "takeaway:offline": 13,
+   "takeaway:ai": 30,
+   "diagram:ai": 12,
+   "diagram:offline": 4
+  },
+  "Module_5_lecture_slides__3_": {
+   "picture:offline": 8,
+   "picture:ai": 15,
+   "titles:ai": 76,
+   "titles:offline": 2,
+   "visual:ai": 55,
+   "takeaway:ai": 76,
+   "takeaway:offline": 20,
+   "explainer:ai": 3,
+   "diagram:offline": 14,
+   "diagram:ai": 30
+  },
+  "Syntax_analysis_part_2": {
+   "picture:offline": 45,
+   "picture:ai": 86,
+   "titles:ai": 87,
+   "titles:offline": 5,
+   "visual:ai": 64,
+   "takeaway:ai": 165,
+   "takeaway:offline": 52,
+   "explainer:ai": 3,
+   "diagram:ai": 26,
+   "diagram:offline": 14
+  },
+  "WSD__2_": {
+   "titles:ai": 20,
+   "titles:offline": 1,
+   "visual:ai": 13,
+   "takeaway:ai": 20,
+   "takeaway:offline": 6,
+   "diagram:ai": 13,
+   "diagram:offline": 4
+  },
+  "lesk_algorithm__3_": {
+   "titles:ai": 7,
+   "titles:offline": 1,
+   "visual:ai": 4,
+   "takeaway:ai": 9,
+   "takeaway:offline": 1,
+   "explainer:ai": 1,
+   "diagram:offline": 1,
+   "diagram:ai": 5
+  },
+  "wsd_notes__3_": {
+   "picture:ai": 3,
+   "picture:offline": 3,
+   "titles:ai": 39,
+   "titles:offline": 1,
+   "visual:ai": 33,
+   "takeaway:ai": 40,
+   "takeaway:offline": 7,
+   "diagram:offline": 8,
+   "diagram:ai": 11
+  }
+ }
+}

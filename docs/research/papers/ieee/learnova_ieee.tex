@@ -384,6 +384,12 @@ contain at least five shapes and render. Labels that would cross the edge are sc
 Section~\ref{sec:layout}. An accepted diagram is cached by a hash of the slide text, embedded as live SVG in the web deck,
 rasterised for PowerPoint and published as a page to which the PowerPoint picture links.
 
+Only free-tier keys are used, so a model is called only when the offline result is weak: Tesseract's text fails a dictionary
+readability test, a title is a bare label or the slide is under 60 words, or the slide needs a drawn mechanism, plot, anatomy or
+comparison that an offline scene cannot show; the figure kind is chosen per slide before any request. On eight real inputs
+(599 output slides) this kept 37\% of picture reads and 30\% of diagram requests offline, and every deck completed after the
+daily free quota ran out.
+
 Requests are spread over a pool $K$ of keys. Each key is paced on its own,
 \begin{equation}
 t_{\mathrm{next}}(k)=\max\bigl(t_{\mathrm{now}},\ t_{\mathrm{last}}(k)+\Delta\bigr),\qquad \Delta=4.2\,\mathrm{s},

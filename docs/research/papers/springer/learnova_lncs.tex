@@ -656,6 +656,35 @@ Keys & Spent & Served & Before (s) & After (s) \\
 \end{tabular}
 \end{table}
 
+\subsection{How often the model is needed}
+We rebuilt eight real course inputs (two PowerPoint decks, four slide PDFs and two Word files, 599 output slides in all) in the
+\textsf{auto} mode and counted, for each place, how often the offline result was judged weak (Table~\ref{tab:esc}).
+
+\begin{table}[H]
+\centering
+\caption{Escalation on eight real inputs (599 slides)}
+\label{tab:esc}
+\begin{tabular}{lrrr}
+\toprule
+Place & Sent to model & Kept offline & Share kept offline \\
+\midrule
+Reading a picture & 144 & 86 & 37\% \\
+Topic diagram & 109 & 47 & 30\% \\
+Takeaway & 411 & 119 & 22\% \\
+Title and explanation & 309 & 10 & 3\% \\
+Visual choice (engine unsure) & 217 & 382 & 64\% \\
+Explainer (no solver) & 8 & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The policy keeps about a third of picture reads and diagrams offline, the two most expensive kinds of request. Titles almost
+always escalate because lecture decks use topic labels (``Linear Regression'', ``Steps'') rather than statements, which the
+test treats as weak by design. During this run the daily free quota of every Gemini key and of the Groq account was used up
+part-way through; the remaining decks were finished by the offline paths, as Eq.~\ref{eq:checked} requires, with no failed
+build. Several Groq keys created under one account shared that account's daily token budget, so a key pool only adds
+capacity when its keys belong to different accounts.
+
 \subsection{Whole decks}
 Figure~\ref{fig:modes} shows the build time of a 36-page deck in four modes. Offline rules alone take about 10\,s. With every key
 dead the deck still finishes in under 30\,s, because the router switches failing providers off and the offline paths take over. With working keys,
