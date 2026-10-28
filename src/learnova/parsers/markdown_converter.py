@@ -714,6 +714,53 @@ def _reflow_slide_body(body: str, title: str) -> List[str]:
     return items
 
 
+def docx_to_markdown(path: str) -> str:
+    """A Word file read natively with python-docx: Heading styles become sections, list paragraphs keep their level,
+    tables become pipe tables, everything else stays as paragraphs — in document order."""
+    import docx
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    d = docx.Document(path)
+    out: List[str] = []
+    for el in d.element.body.iterchildren():
+        tag = el.tag.rsplit("}", 1)[-1]
+        if tag == "p":
+            para = Paragraph(el, d)
+            text = re.sub(r"\s+", " ", para.text or "").strip()
+            if not text:
+                continue
+            style = (para.style.name if para.style is not None else "") or ""
+            m = re.match(r"(?:Heading|Title)\s*(\d?)", style, re.I)
+            if m:
+                level = int(m.group(1) or 1)
+                out.append(("#" * min(3, max(1, level + (0 if style.lower().startswith("title") else 1)))) + " " + text)
+                continue
+            num = el.find(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}numPr")
+            if num is not None or re.match(r"List", style, re.I):
+                ilvl = el.find(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ilvl")
+                lvl = int(ilvl.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val", 0)) if ilvl is not None else 0
+                out.append("  " * min(lvl, 2) + "- " + text)
+            elif len(text) <= 80 and all(r.bold for r in para.runs if r.text.strip()) and para.runs and not text.endswith("."):
+                out.append("## " + text)                                # a bold short line used as a heading
+            else:
+                out.append(text)
+        elif tag == "tbl":
+            rows = [[re.sub(r"\s+", " ", c.text).strip().replace("|", "/") for c in r.cells] for r in Table(el, d).rows]
+            rows = [r for r in rows if any(r)]
+            if len(rows) >= 2:
+                out.append("")
+                out.append("| " + " | ".join(rows[0]) + " |")
+                out.append("|" + "---|" * len(rows[0]))
+                out.extend("| " + " | ".join((r + [""] * len(rows[0]))[:len(rows[0])]) + " |" for r in rows[1:])
+                out.append("")
+    heads = [len(l) - len(l.lstrip("#")) for l in out if l.startswith("#")]
+    if heads:                                    # the highest heading level the author used becomes a section (##)
+        shift = min(heads) - 2
+        out = [("#" * max(2, len(l) - len(l.lstrip("#")) - shift) + l.lstrip("#")) if l.startswith("#") else l for l in out]
+    return "\n".join(out)
+
+
 def _native_to_markdown(path: str, ext: str, textbook_mode: bool = False):
     """Convert via the existing parsers, flattening their output to markdown."""
     from learnova.parsers.pdf_parser import parse_pdf, parse_textbook_pdf
@@ -892,6 +939,13 @@ def _convert_to_markdown_impl(
                 assets=assets,
                 meta={"asset_count": len(assets)},
             )
+
+    if ext in (".docx", ".dotx"):                       # Word without AnyDoc: read it natively, never as a PDF
+        markdown = _clean_markdown(docx_to_markdown(str(file_path)))
+        if use_cache and markdown:
+            cache_file.write_text(markdown, encoding="utf-8")
+        return MarkdownDocument(markdown=markdown, source_name=name, source_type="docx", converter="python-docx",
+                                assets=assets, meta={"asset_count": len(assets)})
 
     markdown, document = _native_to_markdown(str(file_path), ext, textbook_mode)
     if use_cache and markdown:
