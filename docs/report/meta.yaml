@@ -1,0 +1,28 @@
+---
+title: "Learnova: Redesigning Outdated Lecture Presentations into Modern, Illustrated and Interactive Teaching Decks"
+subtitle: "Interdisciplinary Project Report"
+author:
+  - "Swayam Devendra Panchal (60018240013)"
+  - "Kawaljeet Singh Bharaj (60018240016)"
+  - "Jeevesh Bharat Bodhani (60018240096)"
+  - "Rishit Pankajkumar Lahoti (6001840101)"
+date: "Under the guidance of the Department of Artificial Intelligence and Data Science (Head of Department: Dr. Pratik Kanani), Dwarkadas J. Sanghvi College of Engineering, Mumbai — October 2026"
+mainfont: "Times New Roman"
+fontsize: 12pt
+linestretch: 1.5
+geometry: "margin=1in"
+documentclass: report
+toc: true
+toc-depth: 2
+lof: true
+lot: true
+numbersections: true
+colorlinks: true
+header-includes:
+  - \usepackage{float}
+  - \floatplacement{figure}{H}
+  - \usepackage{titlesec}
+  - \titleformat{\chapter}[hang]{\normalfont\bfseries\LARGE}{\thechapter.}{0.6em}{}
+  - \titlespacing*{\chapter}{0pt}{0pt}{18pt}
+  - \renewcommand{\arraystretch}{1.25}
+---
