@@ -331,6 +331,33 @@ def _delatex_all(x: Any) -> Any:
     return x
 
 
+def _item_words(x: Any) -> set:
+    import json as _j
+
+    return {w for w in re.findall(r"[a-z0-9]{3,}", _j.dumps(x, default=str).lower())} - {"the", "and", "are", "for", "with", "that"}
+
+
+def _dedupe_items(data: Any) -> Any:
+    """A list of steps, stages, events or cards in which one item repeats an earlier one (an AI expansion restating the list):
+    the repeat is dropped."""
+    if not isinstance(data, dict):
+        return data
+    out = dict(data)
+    for key in ("steps", "stages", "nodes", "events", "cards", "items", "points"):
+        items = out.get(key)
+        if not isinstance(items, list) or len(items) < 4:
+            continue
+        kept, seen = [], []
+        for it in items:
+            w = _item_words(it)
+            if w and any(len(w & o) >= 0.7 * len(w) for o in seen):
+                continue
+            kept.append(it)
+            seen.append(w)
+        out[key] = kept
+    return out
+
+
 _LLM_EXPLAINERS = {"n": 0}       # model-written explainers in the deck being planned (capped per deck)
 
 
@@ -475,7 +502,6 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
             _tk = str(imp.get("takeaway_llm") or dec.takeaway)
             params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk), "explain": explain_text(imp)}
-        data = _delatex_all(data)                              # a model's stray LaTeX never reaches the slide
         if (imp.get("is_glossary") or re.match(r"^(?:glossary|key terms?)\b", title, re.I)) and family == "LIST_STRUCTURED" and isinstance(data, dict):
             data = {**data, "flip": True}                      # web deck: term on the front, meaning on the back
         # A problem that can be solved on the slide (with numbers or a grammar): show it solved, step by step, with the reasoning.
@@ -515,6 +541,7 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             data = {"caption": desc[:150], "figure": True}
             visual_reason, visual_alts, engine_conf = "the slide is a figure — shown large with zoom instead of being redrawn", [], 0.9
             params = {"notes": [], "takeaway": "", "footer": []}
+        data = _dedupe_items(_delatex_all(data))           # whatever path built it: no stray LaTeX, no step said twice
         animation = plan_animation_steps(
             bullets, treatment, family, takeaway=str(imp.get("takeaway", ""))
         )
