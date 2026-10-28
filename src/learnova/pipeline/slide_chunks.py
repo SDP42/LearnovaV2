@@ -27,9 +27,30 @@ def _text_of(page: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _words(page: Dict[str, Any]) -> set:
+    return set(re.findall(r"[a-z0-9]{2,}", _text_of(page).lower()))
+
+
+def collapse_buildups(pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Teachers often build a slide up over several pages (same title, one more row or point each time). Only the last,
+    complete page is kept: a page is dropped when the next page has the same title and contains at least 90% of its words."""
+    out: List[Dict[str, Any]] = []
+    for k, p in enumerate(pages):
+        nxt = pages[k + 1] if k + 1 < len(pages) else None
+        if nxt is not None and re.sub(r"\W+", "", (p.get("title") or "").lower()) == re.sub(r"\W+", "", (nxt.get("title") or "").lower()) \
+                and (p.get("title") or "").strip():
+            mine, theirs = _words(p), _words(nxt)
+            same_fig = not p.get("figure") or (nxt.get("figure") and (p["figure"].get("bytes") == nxt["figure"].get("bytes")))
+            if mine and len(mine & theirs) >= 0.9 * len(mine) and len(theirs) > len(mine) and same_fig:
+                continue
+        out.append(p)
+    return out
+
+
 def chunks_from_pages(pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """[{id, title, text, source, image?, outline, slide_kind}] — titles of consecutive pages that share one are numbered (1/3)…"""
     kept = [p for p in pages if p.get("kind") != "title" and (p.get("items") or p.get("tables") or p.get("figure") or p.get("labels"))]
+    kept = collapse_buildups(kept)
     titles: List[str] = []
     last = ""
     for p in kept:

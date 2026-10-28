@@ -389,8 +389,9 @@ def generate(
                 # Strip any nested marker the describer added; keep just the text.
                 clean = re.sub(r"^\s*\[[^\n\]]*:?\s*|\s*\]\s*$", "", str(description)).strip()
                 image["description"] = clean
-                # A single-line, easily-stripped marker (see textutils.strip_ocr_block).
-                chunk["text"] += f"\n\n{_OCR_OPEN}\n{clean}\n{_OCR_CLOSE}"
+                # Kept beside the slide, never inside its text: OCR of a figure is a hint for choosing the visual, and
+                # every path that bulletises chunk text would otherwise turn axis labels and equation scraps into points.
+                chunk.setdefault("figure_text", clean)
         return len(by_bytes)
 
     has_images = any(

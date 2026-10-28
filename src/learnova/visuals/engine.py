@@ -1206,6 +1206,50 @@ def _tidy_pairs(data: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
+_ALGO_TITLE = re.compile(r"\b(algorithms?|pseudo-?code|procedure|routine|function\s+\w+\(|code)\b", re.I)
+_CODE_LINE = re.compile(
+    r"^(?:step\s*\d+\b|input\b|output\b|begin\b|end\b|for\b|for each\b|foreach\b|while\b|repeat\b|until\b|do\b|if\b|else\b|elif\b|"
+    r"then\b|return\b|initiali[sz]e\b|init\b|set\b|update\b|compute\b|calculate\b|let\b|loop\b|break\b|continue\b|print\b|def\b|function\b|"
+    r"procedure\b|call\b|swap\b|increment\b|decrement\b|append\b|push\b|pop\b|stop\b|exit\b|goto\b)|←|:=|==|\+=|-=|\w\s*\[[^\]]*\]\s*=|\)\s*[:{]\s*$|;\s*$",
+    re.I)
+_EQ_LINE = re.compile(r"^[^.!?]{0,70}(?:=|≈|≤|≥|∝|→)[^.!?]{0,70}$")
+_MATHCH = re.compile(r"[=+\-*/^Σ∑∂√θβαλσμ()\d]")
+
+
+def _raw_lines(text: str) -> List[Tuple[int, str]]:
+    """(indent level, line) for each non-empty line, with list markers removed and indentation kept."""
+    out = []
+    for raw in (text or "").split("\n"):
+        if not raw.strip() or raw.strip().startswith("|") or raw.strip() == "[TABLE DATA]":
+            continue
+        lead = len(raw) - len(raw.lstrip(" \t"))
+        line = re.sub(r"^\s*(?:[-*•▪◦]\s+|\d+[.)]\s+)", "", raw).strip()
+        if line:
+            out.append((min(4, lead // 2), line))
+    return out
+
+
+def det_algorithm(title: str, text: str) -> Det:
+    """Pseudocode or a run of equations is one artefact: it is shown whole, in a single panel, line by line with its indentation —
+    never split into separate cards or numbered points, which breaks the reading of loops, branches and derivations."""
+    lines = _raw_lines(text)
+    if len(lines) < 3:
+        return None
+    n = len(lines)
+    code = sum(1 for _, l in lines if _CODE_LINE.search(l))
+    eq = sum(1 for _, l in lines if _EQ_LINE.match(l) and len(_MATHCH.findall(l)) >= 3)
+    titled = bool(_ALGO_TITLE.search(title or ""))
+    if code >= 3 and (code >= 0.5 * n or (titled and code >= 0.34 * n)):
+        return ("ALGORITHM", "code", 0.93 if titled else 0.88,
+                {"label": "Algorithm", "lines": [{"text": l, "indent": d} for d, l in lines[:18]]},
+                f"{code} of {n} lines read as pseudocode — kept together as one algorithm")
+    if eq >= 3 and eq >= 0.6 * n:
+        return ("ALGORITHM", "math", 0.9,
+                {"label": "Equations", "lines": [{"text": l, "indent": 0} for _, l in lines[:12]]},
+                f"{eq} of {n} lines are equations — shown together as one derivation")
+    return None
+
+
 def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any = None, outline: Optional[List[Dict[str, Any]]] = None) -> Decision:
     """
     Pick the visual and build its data.
@@ -1227,6 +1271,9 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     ref = det_references(title, text)
     if ref:
         return Decision(ref[0], ref[1], ref[2], ref[3], ref[4], [], takeaway="")
+    alg = det_algorithm(title, raw_text)
+    if alg:
+        return Decision(alg[0], alg[1], alg[2], alg[3], alg[4], [], takeaway="")
     sents = split_sentences(text) or [s for b in bullets for s in split_sentences(b)]
     if not sents:
         sents = [title or "Key idea"]

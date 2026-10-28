@@ -389,7 +389,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
     _lab_docs: dict = {}            # lab id → its page, embedded once per deck as an inert text holder
     # Wide visuals keep the full width; their illustration sits in the header instead of a side panel.
-    _WIDE = {"COMPARE_TABLE", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
+    _WIDE = {"COMPARE_TABLE", "ALGORITHM", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
              "FUNNEL", "LAYERS", "OUTLINE", "COMPARE_VISUAL", "ALGORITHM_TRACE", "DATA_STRUCTURE", "FUNCTION_PLOT", "FIGURE"}
 
     def _scene_svg(title: str, text: str, kind: str, width: int) -> str:
@@ -649,6 +649,14 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             "MINIMAL_TEXT", "", "CARD_GRID", "FLOWCHART", "PROCESS_DIAGRAM"
         } and not _fam_block
         _notes = (getattr(sp, "params", None) or {}).get("notes") if (sp and _family_used) else None
+        _explain = str((getattr(sp, "params", None) or {}).get("explain") or "") if sp else ""
+        if _explain:
+            slide_body += (
+                f'<div class="lv-explain" style="margin-top:14px;padding:12px 16px;border-left:4px solid {theme.accent_hex};'
+                f'background:{theme.card_bg_hex};border-radius:10px;font-size:0.95rem;line-height:1.55;color:{theme.text_hex};text-align:left;">'
+                f'<div style="font-size:0.7rem;font-weight:800;letter-spacing:.08em;color:{theme.accent_hex};margin-bottom:4px;">IN PLAIN WORDS</div>'
+                f'{html.escape(_explain)}</div>'
+            )
         if _notes:
             slide_body += (
                 f'<div class="lv-vnotes" style="margin-top:14px;padding:12px 16px;border-left:4px solid {theme.accent_hex};'

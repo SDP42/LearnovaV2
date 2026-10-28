@@ -655,6 +655,30 @@ def _formula_callout(data: Dict[str, Any], theme) -> Optional[str]:
     )
 
 
+_KW_HTML = re.compile(r"^(step\s*\d+|input|output|begin|end|for each|foreach|for|while|repeat|until|do|if|else|elif|then|return|"
+                      r"initiali[sz]e|init|set|update|compute|calculate|let|loop|break|continue|print|def|function|procedure|call|stop|exit)\b:?", re.I)
+
+
+def _algorithm_block(data: Dict[str, Any], theme) -> Optional[str]:
+    lines = [(str(x.get("text", "")), int(x.get("indent", 0))) for x in (data.get("lines") or []) if str(x.get("text", "")).strip()]
+    if len(lines) < 2:
+        return None
+    math = str(data.get("label", "")).lower().startswith("equation")
+    rows = ""
+    for i, (t, d) in enumerate(lines):
+        m = None if math else _KW_HTML.match(t)
+        body = (f'<b style="color:{theme.primary_hex}">{_esc(t[:m.end()])}</b>{_esc(t[m.end():])}' if m else
+                (_subs_html(t) if math else _esc(t)))
+        num = "" if math else f'<span style="display:inline-block;width:2.2em;color:{theme.subtext_hex};font-size:.8em;">{i + 1}</span>'
+        rows += (f'<div data-el="el.{i}" data-build="{i}" style="padding:4px 0;padding-left:{d * 1.4}em;'
+                 f'{"text-align:center;font-size:1.35rem;" if math else ""}">{num}{body}</div>')
+    font = "'Cambria Math',Georgia,serif" if math else "Consolas,'SFMono-Regular',Menlo,monospace"
+    return (f'<div style="margin-top:14px;border:1px solid {_tint(theme, "55")};border-radius:16px;overflow:hidden;text-align:left;">'
+            f'<div style="background:{theme.primary_hex};color:{_on(theme)};padding:8px 16px;font-weight:800;letter-spacing:.08em;font-size:.8rem;">'
+            f'{_esc(str(data.get("label") or ("Equations" if math else "Algorithm"))).upper()}</div>'
+            f'<div style="padding:14px 18px;font-family:{font};font-size:1.05rem;line-height:1.5;color:{theme.text_hex};background:{theme.card_bg_hex};">{rows}</div></div>')
+
+
 def _checklist(data: Dict[str, Any], theme) -> Optional[str]:
     items = data.get("items") or []
     if len(items) < 2:
@@ -1104,6 +1128,7 @@ _BUILDERS = {
     "CALCULUS_VIZ": _function_plot,
     "ML_VIZ": _ml_regression,
     "ALGORITHM_TRACE": _algorithm_trace,
+    "ALGORITHM": _algorithm_block,
     "DATA_STRUCTURE": _data_structure,
     "GEOMETRY": _geometry,
     "LINEAR_ALGEBRA": _geometry,

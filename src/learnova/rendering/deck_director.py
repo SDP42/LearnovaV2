@@ -277,18 +277,23 @@ def build_speaker_notes(imp: Dict[str, Any], animation: Dict[str, Any],
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def explain_text(imp: Dict[str, Any]) -> str:
+    """The plain-words explanation shown in the slide body (not squeezed into the footer), with its example."""
+    ex = str(imp.get("explain") or "").strip()
+    eg = str(imp.get("example") or "").strip()
+    if eg and eg.lower() not in ex.lower():
+        ex = (ex + " " if ex else "") + ("For example, " + eg[0].lower() + eg[1:] if not eg.lower().startswith(("for example", "e.g", "example")) else eg)
+    return ex
+
+
 def footer_rows(imp: Dict[str, Any], takeaway: str) -> List[List[str]]:
     """[[label, text], …] shown under a slide: takeaway, key terms from the document's own definitions, an example."""
     rows: List[List[str]] = []
     if takeaway:
         rows.append(["Key takeaway", takeaway])
-    if imp.get("explain"):
-        rows.append(["In plain words", str(imp["explain"])])
     kt = imp.get("key_terms") or []
     if kt:
         rows.append(["Key terms", "  ·  ".join(f"{t['term']} — {t['definition']}" for t in kt[:3])])
-    if imp.get("example"):
-        rows.append(["Example", str(imp["example"])])
     for sent in (imp.get("context") or [])[:2]:
         rows.append(["Also in this lecture", str(sent)])
     return rows
@@ -442,7 +447,7 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             treatment = _FAMILY_TO_TREATMENT.get(family, family)
             visual_reason, engine_conf = "chosen by the AI assistant (the rules were unsure)", 0.9
             _tk = str(imp.get("takeaway_llm") or "")
-            params = {"notes": _residual_notes(vms_source, data), "takeaway": _tk, "footer": footer_rows(imp, _tk)}
+            params = {"notes": _residual_notes(vms_source, data), "takeaway": _tk, "footer": footer_rows(imp, _tk), "explain": explain_text(imp)}
         if not user_forced and not hard_layout and existing_layout != "QUIZ" and not llm_data:
             from learnova.visuals import decide
 
@@ -452,7 +457,7 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             visual_reason, visual_alts = dec.reason, dec.alternatives
             engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
             _tk = str(imp.get("takeaway_llm") or dec.takeaway)
-            params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk)}
+            params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk), "explain": explain_text(imp)}
         if (imp.get("is_glossary") or re.match(r"^(?:glossary|key terms?)\b", title, re.I)) and family == "LIST_STRUCTURED" and isinstance(data, dict):
             data = {**data, "flip": True}                      # web deck: term on the front, meaning on the back
         # A problem that can be solved on the slide (with numbers or a grammar): show it solved, step by step, with the reasoning.

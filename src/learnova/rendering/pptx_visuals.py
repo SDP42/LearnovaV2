@@ -1349,14 +1349,104 @@ def _lum(a: RGBColor, bg: RGBColor) -> bool:
     return (hi + 0.05) / (lo + 0.05) >= 3.0
 
 
+_KW = re.compile(r"^(step\s*\d+|input|output|begin|end|for each|foreach|for|while|repeat|until|do|if|else|elif|then|return|initiali[sz]e|init|"
+                 r"set|update|compute|calculate|let|loop|break|continue|print|def|function|procedure|call|stop|exit)\b:?", re.I)
+
+
+def _algorithm(c: _Canvas, data) -> bool:
+    """Pseudocode or a derivation in ONE panel: numbered lines, indentation kept, keywords bold (code) or centred maths (math)."""
+    lines = [(str(x.get("text", "")), int(x.get("indent", 0))) for x in (data.get("lines") or []) if str(x.get("text", "")).strip()]
+    if len(lines) < 2:
+        return False
+    math = data.get("variant") == "math" or str(data.get("label", "")).lower().startswith("equation")
+    head_h = 0.42
+    with c.group():
+        c.card(c.x, c.y, c.w, c.h, fill=_blend(c.t.primary_rgb, 0.96), line=_blend(c.t.primary_rgb, 0.7), radius=0.14)
+        strip = c.shape(MSO_SHAPE.RECTANGLE, c.x, c.y, c.w, head_h, c.t.primary_rgb)
+        c.tb(0, 0, 0, 0, [P(str(data.get("label") or ("Equations" if math else "Algorithm")).upper(), 13, True, _on(c.t.primary_rgb))],
+             MSO_ANCHOR.MIDDLE, shape=strip, inset=(PAD, 0, PAD, 0))
+    num_w = 0.0 if math else 0.45
+    tx, tw = c.x + PAD + num_w, c.w - 2 * PAD - num_w
+    avail = c.h - head_h - 0.3
+    size = 22.0 if math else 18.0
+    while size > 11:
+        need = sum(L.estimate_lines(t, tw - 0.32 * d, size) * size * 1.32 / 72 for t, d in lines)
+        if need <= avail and L.longest_word_fits([t for t, _ in lines], tw, size):
+            break
+        size -= 0.5
+    row = [L.estimate_lines(t, tw - 0.32 * d, size) * size * 1.32 / 72 for t, d in lines]
+    y = c.y + head_h + 0.15 + max(0.0, (avail - sum(row)) / 2) * (0.5 if math else 0.0)
+    font = "Cambria Math" if math else "Consolas"
+    for i, ((t, d), h) in enumerate(zip(lines, row)):
+        with c.group():
+            if not math:
+                nb = c.s.shapes.add_textbox(Inches(c.x + PAD * 0.6), Inches(y), Inches(num_w), Inches(h))
+                r = nb.text_frame.paragraphs[0].add_run()
+                r.text, r.font.size, r.font.color.rgb = str(i + 1), Pt(size * 0.75), _blend(c.t.text_rgb, 0.5)
+            box = c.s.shapes.add_textbox(Inches(tx + 0.32 * d), Inches(y), Inches(tw - 0.32 * d), Inches(h))
+            tf = box.text_frame
+            tf.word_wrap = True
+            tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+            p_ = tf.paragraphs[0]
+            if math:
+                p_.alignment = PP_ALIGN.CENTER
+            m = None if math else _KW.match(t)
+            parts = [(t[:m.end()], True), (t[m.end():], False)] if m else [(t, False)]
+            for txt, kw in parts:
+                if not txt:
+                    continue
+                r = p_.add_run()
+                r.text = _superscripts(txt) if math else txt
+                r.font.size, r.font.name = Pt(size), font
+                r.font.bold = kw
+                r.font.color.rgb = c.t.primary_rgb if kw else c.t.text_rgb
+        y += h
+    return True
+
+
+_NO_PANEL = {"COMPARE_TABLE", "REFERENCES", "SECTIONS", "PROSE", "FORMULA_CALLOUT", "DEFINITION", "QUOTE", "WORKED_EXAMPLE", "STEPPER"}
+
+
+def explain_panel(explain: str, notes: Sequence[str], band, family: str = ""):
+    """(height, font size, label, paragraphs) of the "In plain words" panel under a visual, or None.
+
+    The panel carries the AI's plain explanation and the slide's own sentences that the visual does not show, as readable
+    paragraphs (11–14 pt) instead of a one-line strip. It may take at most 40% of the band; sentences that do not fit are
+    dropped from the end (they stay in the speaker notes), never shrunk below 11 pt."""
+    explain = explain.strip()
+    notes = [n.strip() for n in notes if n.strip() and n.strip() not in explain]
+    if family in _NO_PANEL and not explain:
+        return None
+    paras = ([explain] if explain else []) + ([" ".join(notes)] if notes else [])
+    if not paras:
+        return None
+    label = "IN PLAIN WORDS" if explain else "ALSO ON THIS SLIDE"
+    width = band.width - 0.08 - PAD * 1.6
+    cap = band.height * 0.4
+    while paras:
+        for size in (14.0, 13.0, 12.0, 11.0):
+            h = L.paras_height([(label, size * 0.72, True, 0)] + [(t, size, False, 3) for t in paras], width) * 1.08 + 0.2
+            if h <= cap:
+                return (max(h, 0.62), size, label, paras)
+        last = paras[-1]
+        cut = re.split(r"(?<=[.!?])\s+", last)
+        if len(cut) > 1:
+            paras[-1] = " ".join(cut[:-1])
+        else:
+            paras.pop()
+    return None
+
+
 def draw_family(slide, sp, theme, band) -> bool:
     family = getattr(sp, "family", "") or ""
     data = getattr(sp, "data", {}) or {}
     if not data:
         return False
-    notes = [str(n) for n in ((getattr(sp, "params", None) or {}).get("notes") or []) if str(n).strip()]
-    note_h = 0.7
-    c = _Canvas(slide, theme, band, reserve=(note_h + GUT) if notes else 0.0)
+    params = getattr(sp, "params", None) or {}
+    notes = [str(n) for n in (params.get("notes") or []) if str(n).strip()]
+    panel = explain_panel(str(params.get("explain") or ""), notes, band, family)
+    note_h = panel[0] if panel else 0.0
+    c = _Canvas(slide, theme, band, reserve=(note_h + GUT) if panel else 0.0)
     try:
         if family in {"PROCESS_LINEAR", "PROCESS_CYCLIC"}:
             ok = _process(c, data, family == "PROCESS_CYCLIC")
@@ -1376,6 +1466,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             ok = _references(c, data)
         elif family == "PROSE":
             ok = _prose(c, data)
+        elif family == "ALGORITHM":
+            ok = _algorithm(c, {**data, "variant": getattr(sp, "variant", "") or data.get("variant", "")})
         elif family == "SECTIONS":
             ok = _sections(c, data)
         elif family == "OUTLINE":
@@ -1425,15 +1517,15 @@ def draw_family(slide, sp, theme, band) -> bool:
             if len(flat) < 2:
                 return False
             _grid(c, [(t[:60], t if len(t) > 60 else "") for t in flat], icons=True)
-        if notes:
+        if panel:
+            _, size, label, paras = panel
+            y0 = band.top + band.height - note_h
             with group(slide):
-                box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, band.left, band.top + band.height - note_h, band.width, note_h,
-                              _blend(theme.accent_rgb, 0.85), None, radius=0.2)
-                text = " ".join(notes)
-                text = text if len(text) <= 230 else text[:230].rsplit(" ", 1)[0].rstrip(",;: ") + "…"
-                nsz = c.fit([text], band.width - 2 * PAD - 0.1, note_h - 0.12, 15, 10)
-                c.tb(0, 0, 0, 0, [P(text, nsz, False, theme.text_rgb)], MSO_ANCHOR.MIDDLE, PP_ALIGN.LEFT, shape=box,
-                     inset=(PAD, 0.05, PAD, 0.05))
+                c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, band.left, y0, band.width, note_h, _blend(theme.primary_rgb, 0.93), None, radius=0.08)
+                c.accent_bar(band.left, y0, note_h, 0.08)
+                body = [P(label, size * 0.72, True, _readable_accent(theme))] if label else []
+                body += [P(t, size, False, theme.text_rgb, 3) for t in paras]
+                c.tb(band.left + 0.08 + PAD * 0.8, y0 + 0.08, band.width - 0.08 - PAD * 1.6, note_h - 0.16, body, MSO_ANCHOR.MIDDLE)
         return True
     except Exception as exc:  # best-effort: never break deck export
         logger.warning("pptx visual %s failed: %s", family, exc)
