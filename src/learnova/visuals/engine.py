@@ -478,6 +478,10 @@ def det_agenda(title: str, sents: List[str], outline: Optional[List[Dict[str, An
 
 def det_pros_cons(title: str, sents: List[str]) -> Det:
     blob = " ".join(sents)
+    one_sided = re.search(r"\b(?:disadvantages?|limitations?|challenges?|drawbacks?|demerits?)\b", title, re.I) and not re.search(
+        r"(?<!dis)\badvantages?\b|\bbenefits?\b|\bmerits?\b|\bpros\b", title, re.I)
+    if one_sided:                        # a slide only about drawbacks is a list of drawbacks, not a two-sided comparison
+        return None
     labelled_a = re.search(r"advantages?\s*[:\-]\s*(.+?)(?=disadvantages?\s*[:\-]|drawbacks?\s*[:\-]|cons?\s*[:\-]|$)", blob, re.I | re.S)
     labelled_d = re.search(r"(?:disadvantages?|drawbacks?|cons?)\s*[:\-]\s*(.+)$", blob, re.I | re.S)
     pros: List[str] = []

@@ -210,6 +210,22 @@ def build_markdown(
 
 
 # ── Half 2: markdown → deck ───────────────────────────────────────────────────
+def deck_title(source_name: str, markdown: str) -> str:
+    """A title for the deck: the file name without download copies "(3)", underscores and extensions; a file name that is
+    only a code or a generic word ("lecture", "notes", "slides") gives way to the document's first heading."""
+    import re as _re
+
+    name = _re.sub(r"\.(pdf|pptx?|docx?|md|txt)$", "", str(source_name or ""), flags=_re.I)
+    name = _re.sub(r"\s*\(\d+\)\s*|_+", " ", name)
+    name = _re.sub(r"^\d+[.)]\s*", "", name).strip()
+    head = next((l.lstrip("#").strip() for l in (markdown or "").splitlines() if _re.match(r"#{1,2}\s+\S", l)), "")
+    head = _re.split(r"\s*[:–—-]\s+", head)[0].strip()
+    generic = not name or len(name) <= 3 or bool(_re.fullmatch(r"(?i)(lecture|notes?|slides?|module\s*\d*|unit\s*\d*|chapter\s*\d*|ppt|deck|document)[\w\s-]*", name))
+    if (generic or name.islower()) and head and len(head) <= 70:
+        return head
+    return name[:1].upper() + name[1:] if name else (head or "Lecture")
+
+
 def generate(
     markdown_doc,
     config: Optional[PipelineConfig] = None,
@@ -265,7 +281,7 @@ def generate(
         )
 
     result = PipelineResult(
-        source_name=markdown_doc.source_name,
+        source_name=deck_title(markdown_doc.source_name, markdown_doc.markdown),
         markdown=markdown_doc.markdown,
         converter=markdown_doc.converter,
     )

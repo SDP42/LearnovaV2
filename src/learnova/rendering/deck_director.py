@@ -544,7 +544,10 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             visual_reason, visual_alts, engine_conf = "the slide is a figure — shown large with zoom instead of being redrawn", [], 0.9
             params = {"notes": [], "takeaway": "", "footer": []}
         data = _dedupe_items(_delatex_all(data))           # whatever path built it: no stray LaTeX, no step said twice
+        _one_sided = (re.search(r"\b(?:disadvantages?|limitations?|challenges?|drawbacks?|demerits?)\b", title, re.I)
+                      and not re.search(r"(?<!dis)\badvantages?\b|\bbenefits?\b|\bmerits?\b|\bpros\b", title, re.I))
         if (family == "COMPARE_VISUAL" and isinstance(data, dict) and (data.get("pros") or data.get("cons"))
+                and _one_sided or family == "COMPARE_VISUAL" and isinstance(data, dict) and (data.get("pros") or data.get("cons"))
                 and not re.search(r"advantage|disadvantage|benefit|drawback|downside|upside|\bpros?\b|\bcons?\b|strengths?|weakness|"
                                   r"trade-?off|merits?|limitations?|demerits?", f"{title} {vms_source}", re.I)):
             # "Advantages / Trade-offs" boxes on a slide that never weighs anything up: plain cards instead
