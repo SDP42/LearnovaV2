@@ -66,7 +66,7 @@ Thank you, Swayam. Our method has six stages. **Read**: every word is read with 
 a title and what is a bullet. **Clean**: anything repeated on many pages, like a college logo or a footer, is removed, and titles
 that lost their spaces are split back into words using dynamic programming.
 
-**Plan**: long sections are split with our algorithm CLASS, which picks the split points with the lowest cognitive load.
+Algorithms and equations are kept whole: pseudocode goes into one numbered panel with its indentation, and equations are written as real PowerPoint equations, the way Word shows them, not as plain text. **Plan**: long sections are split with our algorithm CLASS, which picks the split points with the lowest cognitive load.
 **Decide**: 27 detectors score each slide, and the best one decides whether it becomes a process, a timeline, a comparison, and
 so on. **Enrich**: AI adds titles, diagrams and labs, but only after a check, and solved problems get exact steps. **Build and
 audit**: we produce the files and then score every slide.
@@ -95,7 +95,7 @@ Thank you. Everything on this slide is measured, not promised. *(left to right)*
 with a picture went up on every deck. Visual slides, quizzes, labs and illustrations went from zero to hundreds. And the time
 grows in a straight line: a 216-page PDF becomes a full deck in about 35 seconds without any API key.
 
-The impact is **educational**, because each slide has one idea and a picture, and hard topics have labs; **social**, because it is
+The impact is **educational**, because each slide has one idea and a picture, and hard topics have labs, with a short quiz every four slides so students stay active; **social**, because it is
 free and works on a phone; **institutional**, because the department builds a shared library of decks and labs; and
 **technological**, because AI is used only where its output can be checked. The bottom row sums it up: 98 to 100 percent of
 facts kept, zero broken words, and all 26 test problems solved correctly.

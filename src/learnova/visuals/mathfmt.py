@@ -307,4 +307,28 @@ def pretty(text: str) -> str:
         return text
 
 
-__all__ = ["parse", "to_mathml", "to_omml_paragraph", "pretty", "looks_like_equation"]
+_LATEX_SYM = {r"\times": "×", r"\cdot": "·", r"\to": "→", r"\rightarrow": "→", r"\leftarrow": "←", r"\approx": "≈", r"\leq": "≤",
+              r"\le": "≤", r"\geq": "≥", r"\ge": "≥", r"\neq": "≠", r"\pm": "±", r"\rightleftharpoons": "⇌", r"\infty": "∞", r"\sum": "Σ",
+              r"\Delta": "Δ", r"\degree": "°", r"\circ": "°", r"\%": "%", r"\,": " ", r"\;": " ", r"\ ": " "}
+
+
+def delatex(text: str) -> str:
+    """LaTeX a model slipped into plain slide text → readable text: \\text{tonnes N}_2 → tonnes N₂, \\times → ×, \\frac{a}{b} → a/b."""
+    t = str(text or "")
+    if "\\" not in t and "$" not in t:
+        return t
+    t = t.replace("$", "")
+    for _ in range(3):
+        t = re.sub(r"\\(?:text|mathrm|mathbf|textbf|mathit|operatorname)\{([^{}]*)\}", r"\1", t)
+        t = re.sub(r"\\frac\{([^{}]*)\}\{([^{}]*)\}", r"(\1)/(\2)", t)
+        t = re.sub(r"\\sqrt\{([^{}]*)\}", r"√(\1)", t)
+    for k in sorted(_LATEX_SYM, key=len, reverse=True):
+        t = t.replace(k, _LATEX_SYM[k])
+    t = re.sub(r"\\(alpha|beta|gamma|delta|epsilon|theta|lambda|mu|pi|rho|sigma|tau|phi|omega)\b", lambda m: GREEK[m.group(1)], t)
+    t = re.sub(r"_\{?(\d+)\}?", lambda m: m.group(1).translate(_SUB), t)
+    t = re.sub(r"\^\{?(\d+)\}?", lambda m: m.group(1).translate(_SUP), t)
+    t = re.sub(r"\\[A-Za-z]+", "", t).replace("{", "").replace("}", "")
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
+__all__ = ["delatex", "parse", "to_mathml", "to_omml_paragraph", "pretty", "looks_like_equation"]

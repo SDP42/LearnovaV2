@@ -1275,6 +1275,20 @@ def det_algorithm(title: str, text: str) -> Det:
     return None
 
 
+def _dedupe_sents(sents: List[str]) -> List[str]:
+    """Drop a sentence whose content words are mostly those of an earlier one (an expanded paragraph repeating the list)."""
+    kept: List[str] = []
+    seen: List[set] = []
+    for s_ in sents:
+        w = {x for x in re.findall(r"[a-z0-9]{3,}", s_.lower()) if x not in _STOP}
+        if w and any(len(w & o) >= 0.75 * len(w) for o in seen):
+            continue
+        kept.append(s_)
+        if w:
+            seen.append(w)
+    return kept
+
+
 def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any = None, outline: Optional[List[Dict[str, Any]]] = None) -> Decision:
     """
     Pick the visual and build its data.
@@ -1300,6 +1314,7 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     if alg:
         return Decision(alg[0], alg[1], alg[2], alg[3], alg[4], [], takeaway="")
     sents = split_sentences(text) or [s for b in bullets for s in split_sentences(b)]
+    sents = _dedupe_sents(sents)
     if not sents:
         sents = [title or "Key idea"]
     cands: List[Tuple[str, str, float, Dict[str, Any], str]] = []

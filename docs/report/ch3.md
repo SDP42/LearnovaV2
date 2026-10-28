@@ -63,6 +63,9 @@ test where possible, and pushed to the repository as a separate change. The tabl
 | The plain-words explanation sat in a 10 pt footer band | the footer carried all secondary text | an "In plain words" panel in the body, sized to its text at 11–14 pt, at most 40% of the area | explanations readable from the back of the room |
 | Captions under figures showed unreadable OCR | OCR output was always used as the caption | a caption is shown only when most of its words are dictionary words | no garbled captions |
 | AI diagrams rendered with black boxes | the PDF library cannot paint SVG gradients | diagrams rendered with resvg; gradients flattened when it is missing | diagrams look as designed |
+| Equations appeared as plain text ("x^2", "(1/2m)") | the slide text was copied as typed | equations parsed into fractions, powers, sums and roots and written as native Office Math (PPTX) and MathML (web) | equations look as they do in Word |
+| Pseudocode lost its indentation | export flattens bullet levels | a depth counter re-indents after for/while/if/repeat and dedents at end/until/else | loops and branches read correctly |
+| Long decks had a quiz only every nine slides | spacing grew with deck length | a checkpoint every four content slides, at most twenty per deck | students answer something every few minutes |
 
 Table: Problems found on real decks and how they were fixed.
 
@@ -243,11 +246,7 @@ The decision engine covers the structures we have written detectors for; slides 
 
 ![AI illustration of the Haber process plant: five numbered parts that the linked page reveals in order.](img/haber_diagram.png){width=40%}
 
-![Phone layout of the application.](img/mobile-home.jpg){width=35%}
-
 ![Region Splitting and Merging laboratory built on the shared laboratory bench.](img/lab_split.png){width=61%}
-
-![Before: original word sense disambiguation slide.](img/pair3_before.png){width=50%}
 
 ![After: the same slide rebuilt with structured cards, an AI-drawn diagram, a quiz and a laboratory link.](img/pair3_after.png){width=58%}
 

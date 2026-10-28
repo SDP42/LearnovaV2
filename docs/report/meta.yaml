@@ -9,7 +9,7 @@ author:
 date: "Under the guidance of the Department of Artificial Intelligence and Data Science (Head of Department: Dr. Pratik Kanani), Dwarkadas J. Sanghvi College of Engineering, Mumbai — October 2026"
 mainfont: "Times New Roman"
 fontsize: 12pt
-linestretch: 1.15
+linestretch: 1.1
 geometry:
   - top=1.45in
   - bottom=0.9in
@@ -22,8 +22,6 @@ classoption:
   - titlepage
 toc: true
 toc-depth: 2
-lof: true
-lot: true
 numbersections: true
 colorlinks: true
 header-includes:

@@ -319,6 +319,18 @@ def _residual_notes(text: str, data: Dict[str, Any], limit: int = 4) -> List[str
     return out[:limit]
 
 
+def _delatex_all(x: Any) -> Any:
+    from learnova.visuals.mathfmt import delatex
+
+    if isinstance(x, str):
+        return delatex(x)
+    if isinstance(x, list):
+        return [_delatex_all(v) for v in x]
+    if isinstance(x, dict):
+        return {k: _delatex_all(v) for k, v in x.items()}
+    return x
+
+
 _LLM_EXPLAINERS = {"n": 0}       # model-written explainers in the deck being planned (capped per deck)
 
 
@@ -463,6 +475,7 @@ def plan_deck(final_deck: List[Dict[str, Any]]) -> DeckPlan:
             engine_conf = max(dec.confidence, 0.66)  # the engine guarantees a drawable payload
             _tk = str(imp.get("takeaway_llm") or dec.takeaway)
             params = {"notes": _residual_notes(vms_source, dec.data), "takeaway": _tk, "footer": footer_rows(imp, _tk), "explain": explain_text(imp)}
+        data = _delatex_all(data)                              # a model's stray LaTeX never reaches the slide
         if (imp.get("is_glossary") or re.match(r"^(?:glossary|key terms?)\b", title, re.I)) and family == "LIST_STRUCTURED" and isinstance(data, dict):
             data = {**data, "flip": True}                      # web deck: term on the front, meaning on the back
         # A problem that can be solved on the slide (with numbers or a grammar): show it solved, step by step, with the reasoning.
