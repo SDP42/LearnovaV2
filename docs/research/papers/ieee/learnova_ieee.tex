@@ -358,6 +358,22 @@ shrunk further. Each paragraph is then scaled by
 which guarantees that the longest word fits on one line. Wide visuals (processes, timelines, tables) keep the full slide
 width; side pictures are placed only on layouts with room for them.
 
+\subsection{Algorithms and equations kept whole}
+Lecture slides often hold pseudocode or a short derivation. Splitting such a slide into cards destroys loops and the order of
+a derivation, so a detector runs before all others. For the $n$ distinct lines $\ell_1..\ell_n$ of a slide (duplicates and
+bare tick labels removed) let $c$ be the number that start with a control word or contain an assignment
+(\emph{for, while, repeat, if, return, $\leftarrow$, :=}) and $e$ the number that are short equations. The slide becomes one
+\textsc{Algorithm} panel when
+\begin{equation}
+c\ge 3 \wedge \bigl(c\ge 0.5n \vee (\tau \wedge c\ge 0.34n)\bigr),
+\end{equation}
+where $\tau$ is true if the title names an algorithm, and one \textsc{Equations} panel when $e\ge3 \wedge e\ge0.6n$.
+Indentation lost in export is recovered with a depth counter: $d_{i+1}=d_i+[\ell_i\ \text{opens a block}]$ and
+$d_i\leftarrow d_i-1$ when $\ell_i$ starts with \emph{end, until, else}. Equations are parsed from their linear form
+(``$J(w,b)=(1/2m)\,\Sigma_{(i=1)}^{m}(h(x_i)-y_i)^2$'') into a tree of fractions, powers, subscripts, roots and n-ary
+operators, which is written as Office Math in the PPTX, so PowerPoint shows a native, editable equation as Word does, and as
+MathML in the web deck; a Unicode form (\texttt{x\^{}2} becomes x$^2$, \texttt{beta\_0} becomes $\beta_0$) is the fallback for viewers without equation support.
+
 \section{Illustrations and Key Scheduling}
 \label{sec:ill}
 Every topic slide receives a picture, in this order: the source's own figure, a diagram written by a language model, and an
