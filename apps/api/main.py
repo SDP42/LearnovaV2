@@ -1051,7 +1051,7 @@ def sample_file(sample_id: str):
     s = next((x for x in _samples() if x["id"] == sample_id), None)
     if not s or not (_SAMPLES_DIR / s["file"]).is_file():
         raise HTTPException(status_code=404, detail="no such sample")
-    return FileResponse(_SAMPLES_DIR / s["file"], filename=s["file"])
+    return FileResponse(_SAMPLES_DIR / s["file"], filename=pathlib.Path(s["file"]).name)
 
 
 @app.get("/api/art/{art_id}")

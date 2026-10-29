@@ -32,6 +32,8 @@ ENV/
 day5_transformation_plans.json
 *.pptx
 !tests/fixtures/*.pptx
+!data/samples/*.pptx
+!data/samples/built/*.pptx
 Learnova_Visual_*.pptx
 Learnova_Interactive_*.html
 
