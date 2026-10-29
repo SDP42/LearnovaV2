@@ -1462,13 +1462,26 @@ def _explain_stmt(st: str) -> str:
     return ""
 
 
+_OCR_SPLITS = [(r"\bimpor\s+t\b", "import"), (r"\bprin\s+t\b", "print"), (r"\bretur\s+n\b", "return"), (r"\brang\s+e\b", "range"),
+               (r"\binpu\s+t\b", "input"), (r"\bfloa\s+t\b", "float"), (r"\bsu\s+m\b", "sum"), (r"\bmea\s+n\b", "mean"),
+               (r"\b(np|pd|plt)\.\s+", r"\1."), (r"\s+\(\s*", "("), (r"\bdf\s+\[", "df["), (r"\ba\s+s\s+(np|pd|plt)\b", r"as \1"),
+               (r"\bappen\s+d\b", "append"), (r"\bscatte\s+r\b", "scatter")]
+
+
+def _ocr_code_fix(t: str) -> str:
+    """OCR of a code screenshot splits keywords ("impor t numpy a s np", "np. su m"): join the common ones back."""
+    for pat, rep in _OCR_SPLITS:
+        t = re.sub(pat, rep, t)
+    return t
+
+
 def det_code(title: str, text: str) -> Det:
     """Program text (often flattened by PDF export or OCR) is shown as code: statements split back onto lines in an editor
     panel with line numbers, a "what it does" note per statement, and the program's printed output in a separate console."""
-    t = re.sub(r"\s+", " ", text or "")
+    t = _ocr_code_fix(re.sub(r"\s+", " ", text or ""))
     hits = len(_CODE_TOK.findall(t))
     sym = len(re.findall(r"[=()\[\]{};]", t)) / max(1, len(t))
-    if hits < 3 or sym < 0.025:
+    if not ((hits >= 3 and sym >= 0.025) or (hits >= 2 and sym >= 0.045)):
         return None
     t = re.sub(r"\s*\|(?:\s*\|)+\s*", " ", t)                 # table-rule debris
     code, output = [], []
