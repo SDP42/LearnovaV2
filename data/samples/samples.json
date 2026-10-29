@@ -1,0 +1,10 @@
+[
+ {"id": "ml-bias-variance", "file": "ml_bias_variance.pptx", "title": "Introduction to ML: Bias and Variance", "kind": "PowerPoint", "subject": "Machine Learning", "blurb": "A real lecture deck: underfitting vs overfitting, the bias-variance trade-off, with figures and equations."},
+ {"id": "linear-regression", "file": "linear_regression.pptx", "title": "Linear Regression", "kind": "PowerPoint", "subject": "Machine Learning", "blurb": "Hypothesis, least squares, cost function and gradient descent — build-up slides, equations and plots."},
+ {"id": "wsd-word", "file": "wsd.docx", "title": "Word Sense Disambiguation (notes)", "kind": "Word", "subject": "NLP", "blurb": "Word notes on corpora, dictionary-based, supervised and semi-supervised WSD."},
+ {"id": "wsd-notes", "file": "wsd_notes.pdf", "title": "Word Sense Disambiguation (slides)", "kind": "Slide PDF", "subject": "NLP", "blurb": "Lecture slides: SemCor, context windows, collocational and bag-of-words features."},
+ {"id": "lesk", "file": "lesk_algorithm.docx", "title": "Lesk's Algorithm", "kind": "Word", "subject": "NLP", "blurb": "The steps of Lesk's algorithm with its advantages and limitations."},
+ {"id": "nlp-module5", "file": "nlp_module5_semantics.pdf", "title": "NLP Module 5: Lexical Semantics", "kind": "Slide PDF", "subject": "NLP", "blurb": "Polysemy, homonymy, synonymy, WordNet and WSD — a 116-page lecture."},
+ {"id": "nlp-module4", "file": "nlp_module4_pos_tagging.pdf", "title": "NLP Module 4: Part-of-Speech Tagging", "kind": "Slide PDF", "subject": "NLP", "blurb": "Tag sets, ambiguity, Penn Treebank tags and HMM tagging."},
+ {"id": "nlp-syntax", "file": "nlp_syntax_analysis.pdf", "title": "NLP: Syntax Analysis", "kind": "Slide PDF", "subject": "NLP", "blurb": "Grammars, parse trees and CYK parsing — a long 216-page deck."}
+]

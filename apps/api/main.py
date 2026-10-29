@@ -15,6 +15,7 @@ Run with:  uvicorn apps.api.main:app --reload --port 8000
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import re
@@ -1020,6 +1021,37 @@ def list_labs() -> dict:
     from learnova import labs
 
     return {"labs": labs.catalog()}
+
+
+_SAMPLES_DIR = pathlib.Path(__file__).resolve().parents[2] / "data" / "samples"
+
+
+def _samples() -> list:
+    try:
+        return json.loads((_SAMPLES_DIR / "samples.json").read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+@app.get("/api/samples")
+def list_samples() -> list:
+    """Real lecture files a user can try in one click (Templates → Sample decks)."""
+    out = []
+    for s in _samples():
+        f = _SAMPLES_DIR / s["file"]
+        if f.is_file():
+            out.append({**s, "size": f.stat().st_size, "url": f"/api/samples/{s['id']}/file"})
+    return out
+
+
+@app.get("/api/samples/{sample_id}/file")
+def sample_file(sample_id: str):
+    from fastapi.responses import FileResponse
+
+    s = next((x for x in _samples() if x["id"] == sample_id), None)
+    if not s or not (_SAMPLES_DIR / s["file"]).is_file():
+        raise HTTPException(status_code=404, detail="no such sample")
+    return FileResponse(_SAMPLES_DIR / s["file"], filename=s["file"])
 
 
 @app.get("/api/art/{art_id}")

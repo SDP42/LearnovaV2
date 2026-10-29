@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useUser } from "@/auth";
+import { toast } from "sonner";
+import { fetchSampleFile } from "@/api";
 import AppLayout from "@/components/app/AppLayout";
 import Composer, { SAMPLE_SYLLABUS, TEMPLATE_CHIPS } from "@/components/app/Composer";
 import DashEmpty from "@/components/app/DashEmpty";
@@ -18,7 +20,19 @@ export default function Dashboard() {
   const { decks, error, removeWithUndo } = useDecks();
   const taRef = useRef(null);
   const tpl = location.state?.template;
+  const sample = location.state?.sample;
   const [text, setText] = useState(tpl?.text ?? "");
+  const [sampleFile, setSampleFile] = useState(null);
+
+  // Templates → Sample decks: load the real lecture file and attach it to the composer
+  useEffect(() => {
+    if (!sample?.url) return;
+    let alive = true;
+    fetchSampleFile(sample)
+      .then((f) => alive && setSampleFile(f))
+      .catch(() => toast.error("Could not load the sample file"));
+    return () => { alive = false; };
+  }, [sample?.url]);
 
   // "New deck" button / N shortcut / template hand-off → focus the composer.
   useEffect(() => {
@@ -51,7 +65,7 @@ export default function Dashboard() {
             {greeting()}, {first}.
             <br className="sm:hidden" /> <span className="text-[#B44A22]">What are we teaching today?</span>
           </h1>
-          <Composer value={text} onChange={setText} textareaRef={taRef} />
+          <Composer value={text} onChange={setText} textareaRef={taRef} initialFile={sampleFile} />
           <div className="flex flex-wrap items-center gap-2">
             <span className="t-meta mr-1">Start from</span>
             {TEMPLATE_CHIPS.map((c) => (

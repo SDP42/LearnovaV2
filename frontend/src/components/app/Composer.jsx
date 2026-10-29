@@ -62,7 +62,7 @@ function Opt({ label, value, onChange, items }) {
 }
 
 /** Hero composer: describe or drop a source, tune it, Generate. */
-export default function Composer({ value, onChange, textareaRef, className }) {
+export default function Composer({ value, onChange, textareaRef, className, initialFile }) {
   const navigate = useNavigate();
   const innerRef = useRef(null);
   const ta = textareaRef || innerRef;
@@ -77,6 +77,11 @@ export default function Composer({ value, onChange, textareaRef, className }) {
   const [improving, setImproving] = useState(false);
   const [busy, setBusy] = useState(false);
   const depth = useRef(0);
+
+  // a sample deck chosen on the Templates page arrives already attached
+  useEffect(() => {
+    if (initialFile) setFile(initialFile);
+  }, [initialFile]);
 
   // auto-grow
   useEffect(() => {

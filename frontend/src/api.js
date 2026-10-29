@@ -171,6 +171,19 @@ export function listTemplates() {
   return swr("templates:all", async () => json(await fetch(`${BASE}/api/templates`)));
 }
 
+/** Real lecture files the user can try in one click → [{id,title,kind,subject,blurb,file,size,url}]. */
+export function listSamples() {
+  return swr("samples:all", async () => json(await fetch(`${BASE}/api/samples`)));
+}
+
+/** A sample lecture file as a File, ready to attach to the composer. */
+export async function fetchSampleFile(sample) {
+  const r = await fetch(`${BASE}${sample.url}`);
+  if (!r.ok) throw new Error("Could not load the sample file");
+  const blob = await r.blob();
+  return new File([blob], sample.file, { type: blob.type || "application/octet-stream" });
+}
+
 export async function getConfig() {
   return json(await fetch(`${BASE}/api/config`));
 }

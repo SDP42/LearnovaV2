@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   BarChart3,
   BookOpen,
   Clock,
+  FileText,
+  Download,
   GitBranch,
   History,
   Layers,
@@ -23,6 +25,7 @@ import { PageContainer } from "@/components/app/Page";
 import { Stagger, StaggerItem } from "@/components/app/motion";
 import { NoResults } from "@/components/app/states";
 import LibraryToolbar from "@/components/app/LibraryToolbar";
+import { listSamples } from "@/api";
 
 const KIND_META = {
   process: { icon: GitBranch, ring: "text-chart-1" },
@@ -38,6 +41,15 @@ export default function Library() {
   const [kind, setKind] = useState("all");
   const [q, setQ] = useState("");
   const [preview, setPreview] = useState(null);
+  const [samples, setSamples] = useState([]);
+
+  useEffect(() => {
+    listSamples().then((s) => setSamples(Array.isArray(s) ? s : [])).catch(() => setSamples([]));
+  }, []);
+
+  function pickSample(s) {
+    navigate("/app", { state: { sample: { url: s.url, file: s.file, title: s.title } } });
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -74,6 +86,45 @@ export default function Library() {
             </p>
           </div>
         </div>
+
+        {/* real lecture files: one click attaches the file to the composer */}
+        {samples.length ? (
+          <section className="flex flex-col gap-3">
+            <div>
+              <h3 className="font-[Bricolage_Grotesque] text-lg font-bold text-[#402B25]">Sample decks from real lectures</h3>
+              <p className="text-sm text-[#5A453B]">
+                The PowerPoint, slide PDF and Word files we test Learnova on. Generate one to see what it does with a real teacher&apos;s deck.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {samples.map((s) => (
+                <Card key={s.id} className="lv-card lv-lift flex h-full flex-col overflow-hidden">
+                  <CardContent className="flex flex-1 flex-col gap-2 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="flex size-9 items-center justify-center rounded-xl bg-[#FCE5D6] text-chart-1">
+                        <FileText className="size-4" />
+                      </span>
+                      <span className="rounded-full bg-[#FFF4EC] px-2 py-0.5 text-[10.5px] font-semibold text-[#8F3A18]">
+                        {s.kind} · {(s.size / 1048576).toFixed(1)} MB
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-medium leading-snug">{s.title}</h4>
+                    <p className="text-xs text-muted-foreground">{s.blurb}</p>
+                    <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#715A4E]">{s.subject}</p>
+                    <div className="mt-auto flex gap-2 pt-1">
+                      <Button size="sm" className="flex-1" onClick={() => pickSample(s)}>
+                        <Sparkles /> Generate
+                      </Button>
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={s.url} download={s.file} aria-label={`Download ${s.title}`}><Download /></a>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {/* controls */}
         <LibraryToolbar
