@@ -1,0 +1,46 @@
+---
+title: "Learnova: Technical Architecture and System Documentation"
+subtitle: "How the system works, the technology stack and the rules it applies"
+author:
+  - "Swayam Devendra Panchal (60018240013)"
+  - "Kawaljeet Singh Bharaj (60018240016)"
+  - "Jeevesh Bharat Bodhani (60018240096)"
+  - "Rishit Pankajkumar Lahoti (6001840101)"
+date: "Department of Artificial Intelligence and Data Science (Head of Department: Dr. Pratik Kanani), Dwarkadas J. Sanghvi College of Engineering, Mumbai — October 2026"
+mainfont: "Times New Roman"
+monofont: "Menlo"
+fontsize: 12pt
+linestretch: 1.1
+geometry:
+  - top=1.45in
+  - bottom=0.9in
+  - left=0.9in
+  - right=0.9in
+  - headheight=66pt
+  - headsep=10pt
+documentclass: article
+classoption:
+  - titlepage
+toc: true
+toc-depth: 2
+numbersections: true
+colorlinks: true
+header-includes:
+  - \usepackage{float}
+  - \floatplacement{figure}{H}
+  - \usepackage{titlesec}
+  - \titleformat{\section}{\normalfont\bfseries\Large}{\thesection.}{0.6em}{}
+  - \titlespacing*{\section}{0pt}{14pt}{8pt}
+  - \usepackage{parskip}
+  - \setlength{\parskip}{5pt}
+  - \renewcommand{\arraystretch}{1.2}
+  - \usepackage{ragged2e}
+  - \AtBeginDocument{\justifying}
+  - \AtBeginDocument{\fvset{fontsize=\small}}
+  - \usepackage{fancyhdr}
+  - \fancypagestyle{lh}{\fancyhf{}\fancyhead[C]{\includegraphics[width=0.78\textwidth]{letterhead.jpeg}\\[0pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
+  - \fancypagestyle{plain}{\fancyhf{}\fancyhead[C]{\includegraphics[width=0.78\textwidth]{letterhead.jpeg}\\[0pt]\textbf{\small Department of Artificial Intelligence (AI) and Data Science}}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0.5pt}}
+  - \pagestyle{lh}
+  - \usepackage{etoolbox}
+  - \patchcmd{\titlepage}{\thispagestyle{empty}}{\thispagestyle{lh}}{}{}
+---
