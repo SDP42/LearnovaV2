@@ -95,7 +95,7 @@ _STYLE_PROPS = {"fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-li
 _BAD_ATTR = re.compile(r"^(?:on\w+|class|filter|mask)$", re.I)
 
 # Visuals that need the slide's full width: they get the header picture, not a side diagram (so no diagram is requested).
-_WIDE = {"COMPARE_TABLE", "ALGORITHM", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
+_WIDE = {"COMPARE_TABLE", "ALGORITHM", "FLOWCHART", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
          "FUNNEL", "LAYERS", "OUTLINE", "COMPARE_VISUAL", "ALGORITHM_TRACE", "DATA_STRUCTURE", "FUNCTION_PLOT", "FIGURE"}
 
 _lock = threading.Lock()

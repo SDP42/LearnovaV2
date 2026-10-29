@@ -28,7 +28,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tu
 from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
-from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml import parse_xml
 from pptx.util import Emu, Inches, Pt
@@ -1429,7 +1429,111 @@ def _algorithm(c: _Canvas, data) -> bool:
     return True
 
 
-_NO_PANEL = {"COMPARE_TABLE", "REFERENCES", "SECTIONS", "PROSE", "FORMULA_CALLOUT", "DEFINITION", "QUOTE", "WORKED_EXAMPLE", "STEPPER"}
+def _flow_layout(n: int, x: float, y: float, w: float, h: float, lane: float):
+    """Boxes for n flowchart nodes: one row up to 7, else two rows; returns [(x, y, w, h)] and the row of each node."""
+    rows = 1 if n <= 7 else 2
+    per = math.ceil(n / rows)
+    gap = 0.42
+    bw = min(2.3, (w - gap * (per - 1)) / per)
+    bh = min(1.25, (h - lane * rows - 0.25 * (rows - 1)) / rows)
+    x0 = x + (w - (bw * per + gap * (per - 1))) / 2
+    out, row_of = [], []
+    for i in range(n):
+        r, k = divmod(i, per)
+        out.append((x0 + k * (bw + gap), y + r * (bh + lane + 0.25), bw, bh))
+        row_of.append(r)
+    return out, row_of, bh
+
+
+def _line(slide, x1, y1, x2, y2, color, arrow=False, w=1.75):
+    ln = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(x1), Inches(y1), Inches(x2), Inches(y2))
+    ln.line.color.rgb = color
+    ln.line.width = Pt(w)
+    if arrow:
+        ln.line._get_or_add_ln().append(parse_xml(f'<a:tailEnd xmlns:a="{_A}" type="triangle" w="med" len="med"/>'))
+    return ln
+
+
+def _flowchart(c: _Canvas, data) -> bool:
+    """Start / process / decision / end shapes joined by arrows; a decision's other branch goes to a side box in the lane
+    below, or loops back (Yes / No labelled) to the step it repeats."""
+    nodes = [n for n in (data.get("nodes") or []) if isinstance(n, dict) and str(n.get("text", "")).strip()]
+    if len(nodes) < 3:
+        return False
+    lane = 0.95 if any(n.get("kind") == "decision" for n in nodes) else 0.2
+    top = 0.35 if len(nodes) > 7 and any(n.get("back") for n in nodes) else 0.05     # room above row 1 for a loop from row 2
+    boxes, row_of, bh = _flow_layout(len(nodes), c.x + 0.3, c.y + top, c.w - 0.3, c.h - top - 0.05, lane)
+    ink = c.t.text_rgb
+    shapes = []
+    size = c.fit([str(n["text"]) for n in nodes if n.get("kind") != "decision"], boxes[0][2] - 0.25, bh - 0.2, 16, 10.5)
+    dtexts = [str(n["text"]) for n in nodes if n.get("kind") == "decision"]
+    dw = (boxes[0][2] + 0.16) * 0.5 - 0.04                # text area of a diamond: the inscribed half-width rectangle
+    dsize = c.fit(dtexts, dw, (bh + 0.1) * 0.52, 13, 8.5, bold=True) if dtexts else size
+    while dtexts and dsize > 8.5 and not L.longest_word_fits(dtexts, dw, dsize, True):
+        dsize -= 0.5                                                   # a diamond's middle is narrow: never split a word there
+    for n, (x, y, w, h) in zip(nodes, boxes):
+        kind = n.get("kind")
+        with c.group():
+            if kind in ("start", "end"):
+                shp = c.shape(MSO_SHAPE.FLOWCHART_TERMINATOR, x + w * 0.12, y + h * 0.2, w * 0.76, h * 0.6, c.t.primary_rgb)
+                c.tb(0, 0, 0, 0, [P(str(n["text"]), size, True, _on(c.t.primary_rgb))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=shp)
+            elif kind == "decision":
+                shp = c.shape(MSO_SHAPE.DIAMOND, x - 0.08, y - 0.05, w + 0.16, h + 0.1, _blend(c.t.accent_rgb, 0.75), c.t.accent_rgb, 1.5)
+                # a text box over the diamond's inscribed middle (viewers differ on text insets inside a diamond)
+                c.tb(x + w / 2 - dw / 2, y + h * 0.2, dw, h * 0.6, [P(str(n["text"]), dsize, True, ink)], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER)
+            else:
+                shp = c.card(x, y, w, h)
+                c.tb(0, 0, 0, 0, [P(str(n["text"]), size, False, ink)], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=shp,
+                     inset=(0.1, 0.05, 0.1, 0.05))
+        shapes.append(shp)
+    proc_index = [i for i, n in enumerate(nodes) if n.get("kind") == "process"]
+    lab = lambda x, y, t: c.tb(x, y, 0.5, 0.26, [P(t, 11, True, _readable_accent(c.t))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER)   # noqa: E731
+    for i in range(len(nodes) - 1):
+        (x1, y1, w1, h1), (x2, y2, w2, h2) = boxes[i], boxes[i + 1]
+        with c.group():
+            if row_of[i] == row_of[i + 1]:
+                _line(c.s, x1 + w1, y1 + h1 / 2, x2, y2 + h2 / 2, ink, arrow=True)
+            else:                                          # wrap to the next row: down, across to the left, down
+                mid = y1 + h1 + lane + 0.12
+                _line(c.s, x1 + w1 / 2, y1 + h1, x1 + w1 / 2, mid, ink)
+                _line(c.s, x1 + w1 / 2, mid, x2 + w2 / 2, mid, ink)
+                _line(c.s, x2 + w2 / 2, mid, x2 + w2 / 2, y2, ink, arrow=True)
+            if nodes[i].get("kind") == "decision":
+                lab(x1 + w1 - 0.05, y1 + h1 / 2 - 0.32, str(nodes[i].get("cont") or "Yes"))
+    for i, n in enumerate(nodes):
+        if n.get("kind") != "decision":
+            continue
+        x, y, w, h = boxes[i]
+        low = y + h + lane * 0.55
+        side = str(n.get("side") or "No")
+        with c.group():
+            if n.get("back") and proc_index:               # loop back to the step it repeats
+                t = proc_index[min(len(proc_index), max(1, int(n["back"]))) - 1]
+                tx, ty, tw, th = boxes[t]
+                acc = c.t.accent_rgb
+                _line(c.s, x + w / 2, y + h, x + w / 2, low, acc, w=2)
+                if row_of[t] == row_of[i]:                 # same row: a U under the row
+                    _line(c.s, x + w / 2, low, tx + tw / 2, low, acc, w=2)
+                    _line(c.s, tx + tw / 2, low, tx + tw / 2, ty + th, acc, arrow=True, w=2)
+                else:                                      # earlier row: round the left edge and come in from above
+                    lx, hy = boxes[0][0] - 0.2, ty - 0.18
+                    _line(c.s, x + w / 2, low, lx, low, acc, w=2)
+                    _line(c.s, lx, low, lx, hy, acc, w=2)
+                    _line(c.s, lx, hy, tx + tw / 2, hy, acc, w=2)
+                    _line(c.s, tx + tw / 2, hy, tx + tw / 2, ty, acc, arrow=True, w=2)
+                lab(x + w / 2 + 0.02, y + h + 0.02, side)
+            elif n.get("side_text"):                       # the other case: its own box in the lane below
+                sw = min(w * 1.25, 2.6)
+                bx = x + w / 2 - sw / 2
+                _line(c.s, x + w / 2, y + h, x + w / 2, y + h + 0.22, c.t.accent_rgb, arrow=True, w=2)
+                box = c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, bx, y + h + 0.24, sw, lane - 0.3, _blend(c.t.accent_rgb, 0.88), c.t.accent_rgb, 1.25)
+                c.tb(0, 0, 0, 0, [P(str(n["side_text"]), min(size, 13), False, ink)], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, shape=box,
+                     inset=(0.06, 0.02, 0.06, 0.02))
+                lab(x + w / 2 + 0.02, y + h - 0.02, side)
+    return True
+
+
+_NO_PANEL = {"FLOWCHART", "ALGORITHM", "COMPARE_TABLE", "REFERENCES", "SECTIONS", "PROSE", "FORMULA_CALLOUT", "DEFINITION", "QUOTE", "WORKED_EXAMPLE", "STEPPER"}
 
 
 def explain_panel(explain: str, notes: Sequence[str], band, family: str = ""):
@@ -1491,6 +1595,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             ok = _references(c, data)
         elif family == "PROSE":
             ok = _prose(c, data)
+        elif family == "FLOWCHART":
+            ok = _flowchart(c, data)
         elif family == "ALGORITHM":
             ok = _algorithm(c, {**data, "variant": getattr(sp, "variant", "") or data.get("variant", "")})
         elif family == "SECTIONS":

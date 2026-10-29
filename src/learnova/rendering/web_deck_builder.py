@@ -390,7 +390,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
     _lab_docs: dict = {}            # lab id → its page, embedded once per deck as an inert text holder
     # Wide visuals keep the full width; their illustration sits in the header instead of a side panel.
-    _WIDE = {"COMPARE_TABLE", "ALGORITHM", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
+    _WIDE = {"COMPARE_TABLE", "ALGORITHM", "FLOWCHART", "TIMELINE", "STEPPER", "WORKED_EXAMPLE", "PROCESS_LINEAR", "PROCESS_CYCLIC", "CAUSE_EFFECT", "MATRIX_2X2",
              "FUNNEL", "LAYERS", "OUTLINE", "COMPARE_VISUAL", "ALGORITHM_TRACE", "DATA_STRUCTURE", "FUNCTION_PLOT", "FIGURE"}
 
     def _scene_svg(title: str, text: str, kind: str, width: int) -> str:

@@ -691,6 +691,79 @@ def _algorithm_block(data: Dict[str, Any], theme) -> Optional[str]:
             f'<div style="padding:14px 18px;font-family:{font};font-size:1.05rem;line-height:1.5;color:{theme.text_hex};background:{theme.card_bg_hex};">{rows}</div></div>')
 
 
+def _flowchart_svg(data: Dict[str, Any], theme) -> Optional[str]:
+    """The flowchart as inline SVG: terminators, process boxes, decision diamonds, arrows, Yes / No branches, loop-backs.
+    Each node is a build step (click reveals the flow in order)."""
+    nodes = [n for n in (data.get("nodes") or []) if isinstance(n, dict) and str(n.get("text", "")).strip()]
+    if len(nodes) < 3:
+        return None
+    n = len(nodes)
+    rows = 1 if n <= 7 else 2
+    per = -(-n // rows)
+    W, gap = 1000, 34
+    bw = min(170, (W - 40 - gap * (per - 1)) / per)
+    bh, lane = 92, 78
+    H = rows * (bh + lane) + 54
+    x0 = (W - (bw * per + gap * (per - 1))) / 2
+    pos = [(x0 + (i % per) * (bw + gap), 34 + (i // per) * (bh + lane)) for i in range(n)]
+    P_, A_ = theme.primary_hex, theme.accent_hex
+    ink = theme.text_hex
+    parts = [f'<defs><marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">'
+             f'<path d="M0 0L10 5L0 10z" fill="{ink}"/></marker><marker id="fb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
+             f'markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{A_}"/></marker></defs>']
+
+    def label(x, y, w, h, t, color, bold=False, size=15):
+        return (f'<foreignObject x="{x}" y="{y}" width="{w}" height="{h}"><div xmlns="http://www.w3.org/1999/xhtml" style="height:100%;'
+                f'display:flex;align-items:center;justify-content:center;text-align:center;font:{"700" if bold else "500"} {size}px Inter,Arial,sans-serif;'
+                f'color:{color};line-height:1.25;padding:4px">{_esc(t)}</div></foreignObject>')
+
+    for i, (nd, (x, y)) in enumerate(zip(nodes, pos)):
+        k, t = nd.get("kind"), str(nd["text"])
+        if k in ("start", "end"):
+            g = f'<rect x="{x + bw * 0.12}" y="{y + bh * 0.2}" width="{bw * 0.76}" height="{bh * 0.6}" rx="{bh * 0.3}" fill="{P_}"/>' + label(x, y, bw, bh, t, _on(theme), True)
+        elif k == "decision":
+            cx, cy = x + bw / 2, y + bh / 2
+            g = (f'<polygon points="{cx},{y - 6} {x + bw + 8},{cy} {cx},{y + bh + 6} {x - 8},{cy}" fill="{A_}22" stroke="{A_}" stroke-width="2"/>'
+                 + label(x + bw * 0.16, y, bw * 0.68, bh, t, ink, True, 13))
+        else:
+            g = f'<rect x="{x}" y="{y}" width="{bw}" height="{bh}" rx="12" fill="{theme.card_bg_hex}" stroke="{P_}55" stroke-width="1.5"/>' + label(x, y, bw, bh, t, ink)
+        parts.append(f'<g data-el="el.{i}" data-build="{i}">{g}</g>')
+    for i in range(n - 1):
+        (x1, y1), (x2, y2) = pos[i], pos[i + 1]
+        if y1 == y2:
+            d = f"M{x1 + bw} {y1 + bh / 2}L{x2 - 2} {y2 + bh / 2}"
+        else:
+            mid = y1 + bh + lane / 2
+            d = f"M{x1 + bw / 2} {y1 + bh}L{x1 + bw / 2} {mid}L{x2 + bw / 2} {mid}L{x2 + bw / 2} {y2 - 2}"
+        parts.append(f'<path d="{d}" fill="none" stroke="{ink}" stroke-width="2" marker-end="url(#fa)" data-el="el.{i}" data-build="{i}"/>')
+        if nodes[i].get("kind") == "decision":
+            parts.append(f'<text x="{x1 + bw + 4}" y="{y1 + bh / 2 - 8}" font-size="13" font-weight="700" fill="{A_}">{_esc(str(nodes[i].get("cont") or "Yes"))}</text>')
+    procs = [i for i, nd in enumerate(nodes) if nd.get("kind") == "process"]
+    for i, nd in enumerate(nodes):
+        if nd.get("kind") != "decision":
+            continue
+        x, y = pos[i]
+        low = y + bh + lane * 0.55
+        side = _esc(str(nd.get("side") or "No"))
+        if nd.get("back") and procs:
+            t = procs[min(len(procs), max(1, int(nd["back"]))) - 1]
+            tx, ty = pos[t]
+            route = (f"M{x + bw / 2} {y + bh + 6}L{x + bw / 2} {low}L{tx + bw / 2} {low}L{tx + bw / 2} {ty + bh + 2}" if ty == y else
+                     f"M{x + bw / 2} {y + bh + 6}L{x + bw / 2} {low}L{x0 - 14} {low}L{x0 - 14} {ty - 12}L{tx + bw / 2} {ty - 12}L{tx + bw / 2} {ty - 2}")
+            parts.append(f'<path d="{route}" fill="none" '
+                         f'stroke="{A_}" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#fb)" data-el="el.{n + i}" data-build="{n}"/>'
+                         f'<text x="{x + bw / 2 + 6}" y="{y + bh + 22}" font-size="13" font-weight="700" fill="{A_}">{side}</text>')
+        elif nd.get("side_text"):
+            sw = min(bw * 1.3, 230)
+            bx = x + bw / 2 - sw / 2
+            parts.append(f'<g data-el="el.{n + i}" data-build="{n}"><path d="M{x + bw / 2} {y + bh + 6}L{x + bw / 2} {y + bh + 22}" stroke="{A_}" '
+                         f'stroke-width="2" marker-end="url(#fb)"/><rect x="{bx}" y="{y + bh + 24}" width="{sw}" height="{lane - 30}" rx="10" '
+                         f'fill="{A_}18" stroke="{A_}"/>' + label(bx, y + bh + 24, sw, lane - 30, str(nd["side_text"]), ink, False, 13)
+                         + f'<text x="{x + bw / 2 + 6}" y="{y + bh + 18}" font-size="13" font-weight="700" fill="{A_}">{side}</text></g>')
+    return (f'<div style="margin-top:12px"><svg viewBox="0 0 {W} {H}" style="width:100%;height:auto" role="img" aria-label="Flowchart">'
+            + "".join(parts) + "</svg></div>")
+
+
 def _checklist(data: Dict[str, Any], theme) -> Optional[str]:
     items = data.get("items") or []
     if len(items) < 2:
@@ -1141,6 +1214,7 @@ _BUILDERS = {
     "ML_VIZ": _ml_regression,
     "ALGORITHM_TRACE": _algorithm_trace,
     "ALGORITHM": _algorithm_block,
+    "FLOWCHART": _flowchart_svg,
     "DATA_STRUCTURE": _data_structure,
     "GEOMETRY": _geometry,
     "LINEAR_ALGEBRA": _geometry,

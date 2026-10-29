@@ -191,6 +191,72 @@ _STEP_CUES = re.compile(
 _LOOP_CUES = re.compile(r"\b(cycle|loop|repeat(?:s|ing)?|iterat\w+|continuous(?:ly)?|recurr\w+|feedback|again and again|returns?)\b", re.I)
 
 
+_DECIDE = re.compile(r"^(?:if|whether|check (?:if|whether|that)|test (?:if|whether)|is|are|does|do|has|have|can|was|were|did)\b|\?\s*$|"
+                     r"\bif\b.+\b(?:then|otherwise|else)\b|\b(?:until|unless)\b", re.I)
+_LOOP = re.compile(r"\b(?:repeat|go back|return to|loop back|iterate|again|until)\b", re.I)
+
+
+def _question(s: str) -> Tuple[str, str, str]:
+    """'If the cost fell, keep alpha; otherwise halve it' → ('Cost fell?', 'keep alpha', 'halve it')."""
+    t = _LEAD_CUE.sub("", s).strip().rstrip(".")
+    m = re.match(r"(?i)^(?:repeat|continue|iterate)\b.*?\b(until|while)\b\s+(.+)$", t)
+    if m:                                                       # "repeat steps 2-4 until the cost stops falling"
+        return _cap(m.group(2).rstrip(".")) + "?", "", ""
+    m = re.match(r"(?i)^(?:if|whether|check (?:if|whether|that)|test (?:if|whether))\s+(.+?)(?:,\s*|\s+then\s+)(.+)$", t)
+    if m:
+        cond, rest = m.group(1), m.group(2)
+        parts = re.split(r"(?i)[;,]?\s*\b(?:otherwise|else)\b,?\s*", rest, maxsplit=1)
+        yes, no = (parts + [""])[:2]
+        return _cap(cond) + "?", _strip_end(re.sub(r"(?i)^then\s+", "", yes)), _strip_end(no)
+    m = re.match(r"(?i)^(?:if|whether)\s+(.+)$", t)
+    if m:
+        return _cap(m.group(1)) + "?", "", ""
+    return (t if t.endswith("?") else t + "?"), "", ""
+
+
+def det_flowchart(title: str, sents: List[str]) -> Det:
+    """A procedure that branches or loops is a flowchart — start, process boxes, decision diamonds with Yes / No — not a row of
+    chevrons, which cannot show a decision or a loop back."""
+    steps = [x for x in sents if len(x.split()) >= 2][:9]
+    if len(steps) < 3:
+        return None
+    branch = re.compile(r"\b(?:otherwise|else|until|unless|whether|repeat|go back|return to|loop back)\b|\?\s*$|^(?:check|test)\b", re.I)
+    # "If the germ returns, the body responds quickly" states a fact; a decision has a second branch, a loop or a test
+    decisions = [i for i, x in enumerate(steps) if _DECIDE.search(_LEAD_CUE.sub("", x)) and branch.search(_LEAD_CUE.sub("", x))]
+    if not decisions or len(decisions) > len(steps) // 2 + 1:
+        return None
+    if not (_PROC_TITLE.search(title) or any(_STEP_CUES.search(x) or _LEAD_CUE.match(x) for x in steps) or _LOOP.search(" ".join(steps))):
+        return None
+    # Decision node: the main flow continues down `cont` ("Yes"/"No"); the other branch either loops back to process step `back`
+    # (1-based) or leads to a side box `side_text`.
+    nodes: List[Dict[str, Any]] = [{"kind": "start", "text": "Start"}]
+    for i, x in enumerate(steps):
+        if i not in decisions:
+            nodes.append({"kind": "process", "text": _cap(_strip_end(_LEAD_CUE.sub("", x)))})
+            continue
+        q, yes, no = _question(x)
+        q = short_label(q, 8) + "?" if len(q.split()) > 9 else q
+        q = re.sub(r"^(?:The|A|An)\s+", "", q)
+        q = q[:1].upper() + q[1:]
+        step = re.search(r"(?i)\bstep\s*(\d+)", x)
+        back = int(step.group(1)) if step else 1
+        if yes and _LOOP.search(yes):                     # "if still falling, go back to step 2; otherwise stop"
+            nodes.append({"kind": "decision", "text": q, "cont": "No", "side": "Yes", "back": back})
+            if no:
+                nodes.append({"kind": "process", "text": _cap(no)})
+        elif no and _LOOP.search(no) or (not yes and not no):   # "repeat … until X" or "if X … otherwise go back"
+            nodes.append({"kind": "decision", "text": q, "cont": "Yes", "side": "No", "back": back})
+            if yes:
+                nodes.append({"kind": "process", "text": _cap(yes)})
+        else:                                              # a real branch: the other case gets its own box
+            nodes.append({"kind": "decision", "text": q, "cont": "Yes", "side": "No", "side_text": _cap(no) if no else ""})
+            if yes:
+                nodes.append({"kind": "process", "text": _cap(yes)})
+    nodes.append({"kind": "end", "text": "End"})
+    return ("FLOWCHART", "decision", 0.9, {"nodes": nodes},
+            f"{len(steps)} steps with {len(decisions)} decision(s) — drawn as a flowchart with Yes / No branches")
+
+
 def det_process(title: str, sents: List[str]) -> Det:
     cued = [s for s in sents if _STEP_CUES.search(s)]
     # A procedure: ≥3 sentences with sequence cues, OR ≥4 short imperative-ish sentences that each start with a cue.
@@ -1355,6 +1421,7 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     add(det_definition(title, sents))
     add(det_layers(title, sents))
     add(det_cycle(title, sents))
+    add(det_flowchart(title, sents))
     add(det_process(title, sents))
     add(det_process_implicit(title, sents))
     add(det_cause_effect(title, sents))
@@ -1369,6 +1436,8 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
         cands = [c for c in cands if c[0] not in {"STAT_TILES", "FUNNEL"}]
     if "SET_DIAGRAM" in fams:
         cands = [c for c in cands if c[0] not in {"COMPARE_TABLE", "STAT_TILES"}]
+    if "FLOWCHART" in fams:                              # a branching procedure is drawn once, as a flowchart
+        cands = [c for c in cands if c[0] not in {"PROCESS_LINEAR", "PROCESS_CYCLIC", "CHECKLIST", "KEY_POINTS"}]
     if "PROCESS_CYCLIC" in fams and "PROCESS_LINEAR" in fams:
         cands = [c for c in cands if c[0] != "PROCESS_LINEAR"]
     if {"FUNNEL", "STAT_TILES"} <= fams:
