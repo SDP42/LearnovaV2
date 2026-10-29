@@ -844,6 +844,30 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         .lv-illo .lvf1 {{ animation: lvDrift1 6.5s ease-in-out infinite; }}
         .lv-illo .lvf2 {{ animation: lvDrift2 7.5s ease-in-out infinite; }}
         @media (prefers-reduced-motion: reduce) {{ .lv-illo .lvf {{ animation: none !important; }} }}
+        /* ── Phone layout (see LV_MOBILE): full-width slides, stacked columns, readable text, vertical scroll ── */
+        html.lv-mobile, html.lv-mobile body {{ overflow: hidden; }}
+        html.lv-mobile .reveal .slides {{ width: 100vw !important; height: 100% !important; left: 0 !important; top: 0 !important;
+            transform: none !important; inset: 0 !important; }}
+        html.lv-mobile .reveal .slides > section {{ width: 100vw !important; height: 100% !important; top: 0 !important; left: 0 !important;
+            padding: 18px 16px 72px !important; box-sizing: border-box; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }}
+        html.lv-mobile .reveal .slides section * {{ max-width: 100%; box-sizing: border-box; }}
+        html.lv-mobile .reveal .slides section [style*="display:flex"], html.lv-mobile .reveal .slides section [style*="display: flex"] {{
+            flex-wrap: wrap !important; }}
+        html.lv-mobile .reveal .slides section [style*="display:flex"] > *, html.lv-mobile .reveal .slides section [style*="display: flex"] > * {{
+            min-width: 0 !important; }}
+        html.lv-mobile .reveal .slides section [style*="grid-template-columns"] {{ grid-template-columns: 1fr !important; }}
+        html.lv-mobile .reveal .slides section [style*="width:42%"], html.lv-mobile .reveal .slides section [style*="width:58%"],
+        html.lv-mobile .reveal .slides section [style*="width:40%"], html.lv-mobile .reveal .slides section [style*="width:60%"],
+        html.lv-mobile .reveal .slides section [style*="flex:1"], html.lv-mobile .reveal .slides section [style*="flex: 1"] {{
+            width: 100% !important; flex: 1 1 100% !important; }}
+        html.lv-mobile .reveal h1 {{ font-size: 1.9rem !important; line-height: 1.15 !important; }}
+        html.lv-mobile .reveal h2 {{ font-size: 1.35rem !important; line-height: 1.2 !important; }}
+        html.lv-mobile .reveal .slides section {{ font-size: 16px; }}
+        html.lv-mobile .reveal .slides section p, html.lv-mobile .reveal .slides section li {{ font-size: 1rem !important; line-height: 1.5 !important; }}
+        html.lv-mobile .reveal table {{ display: block; overflow-x: auto; font-size: .85rem !important; }}
+        html.lv-mobile .reveal .lv-illo, html.lv-mobile .reveal figure img {{ max-height: 46vh; object-fit: contain; }}
+        html.lv-mobile .reveal .lv-illo img {{ min-height: 0 !important; }}
+        html.lv-mobile .reveal .controls {{ bottom: 10px; right: 10px; }}
         /* Reveal fragments (staged flow / forced-build slides) fade + rise */
         .reveal .slides section .fragment.lv-step {{
             opacity: 0; transform: translateY(12px);
@@ -950,6 +974,11 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
 
         lvApplyBuilds();
 
+        // Phones (narrow screens): no fixed 16:9 stage scaled down to a postage stamp — each slide fills the screen at its
+        // natural width, columns stack, and a long slide scrolls vertically. Swipe left/right still moves between slides.
+        var LV_MOBILE = window.matchMedia('(max-width: 760px)').matches;
+        if (LV_MOBILE) document.documentElement.classList.add('lv-mobile');
+
         Reveal.initialize({{
             controls: true,
             progress: true,
@@ -962,7 +991,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
             margin: 0.045,
             minScale: 0.2,
             maxScale: 1.6,
-            disableLayout: false,
+            disableLayout: LV_MOBILE,
             // Hash routing calls history.replaceState with the page URL, which
             // throws a SecurityError inside a blob: iframe (the embedded
             // preview / presenter view) and kills Reveal init. The deck is
@@ -987,7 +1016,7 @@ def build_web_deck(slides_data: list[dict], topic_title: str = "Learnova Interac
         //                               postage stamp in the middle of the canvas)
         // Text is never cut; only the display adapts.
         function lvAutoFit(slide) {{
-            if (!slide) return;
+            if (!slide || LV_MOBILE) return;              // phone layout: content flows and scrolls instead of being scaled
             var body = slide.querySelector('.lv-body');
             if (!body) return;
             body.style.transform = '';
