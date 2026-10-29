@@ -1332,7 +1332,12 @@ def det_algorithm(title: str, text: str) -> Det:
     if markup >= 2 and markup >= 0.5 * n:            # XML / HTML examples are code, shown verbatim, never as equations
         return ("ALGORITHM", "code", 0.9, {"label": "Markup example", "lines": [{"text": l, "indent": d} for d, l in lines[:18]]},
                 f"{markup} of {n} lines are markup — shown verbatim as one block")
-    code = sum(1 for _, l in lines if _CODE_LINE.search(l))
+    def _is_code(l: str) -> bool:
+        if not _CODE_LINE.search(l):
+            return False
+        sentence = l.rstrip().endswith((".", "!")) and len(l.split()) >= 7 and not re.search(r":=|←|==|[\[\]{}]|\w\(.*\)\s*$", l)
+        return not sentence                         # "If α is too small, descent is slow." is prose, not pseudocode
+    code = sum(1 for _, l in lines if _is_code(l))
     eq = sum(1 for _, l in lines if _EQ_LINE.match(l) and len(_MATHCH.findall(l)) >= 2 and len(l.split()) <= 14)
     titled = bool(_ALGO_TITLE.search(title or ""))
     if code >= 3 and (code >= 0.5 * n or (titled and code >= 0.34 * n)):
