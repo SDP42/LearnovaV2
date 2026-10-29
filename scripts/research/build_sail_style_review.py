@@ -240,7 +240,7 @@ put(s, {15361: "LEARNOVA — IDEA",
         47: "PHASE 1 · Sep–Dec 2025", 48: "Research and design", 49: ["Literature + competitor study", "Problem, architecture, UI plan"],
         50: "PHASE 2 · Jan–Jul 2026", 51: "Build the platform", 52: ["Prototype V1 → Learnova V2", "Engine, builders, accounts"],
         53: "PHASE 3 · Aug–Oct 2026", 54: "Real decks, AI, research", 55: ["Reader + OCR, illustrations, labs", "AI key pool, papers, review"],
-        58: "LIVE CODE", 59: ["github.com/SDP42/LearnovaV2", "Open source · 755 tests · demo decks"],
+        58: "LIVE CODE", 59: ["github.com/SDP42/LearnovaV2", "Open source · 774 tests · demo decks"],
         2: TEAM, 7: FOOT})
 pair = __import__("PIL.Image", fromlist=["Image"])
 from PIL import Image, ImageDraw  # noqa: E402
@@ -316,11 +316,11 @@ put(s, {17409: "TECHNICAL APPROACH", 11: TEAM, 7: FOOT, 2: "System architecture 
             ("Documents: ", "python-pptx · PyMuPDF · LibreOffice · python-docx · Tesseract OCR"),
             ("AI / NLP: ", "Gemini (5-key pool) · Groq · NVIDIA NIM via failover router"),
             ("Maths & labs: ", "SymPy exact solvers · JavaScript lab engine · SVG"),
-            ("Quality & DevOps: ", "pytest (755 tests) · layout audit · GitHub · Docker")],
+            ("Quality & DevOps: ", "pytest (774 tests) · layout audit · GitHub · Docker")],
         13: "Data and storage", 15: "SQLite for users, decks and jobs; content-hash caches for PDFs, diagrams and labs",
         16: "API and jobs", 17: "FastAPI with about 70 REST routes, background job queue, live progress, OpenAPI docs",
         18: "Security", 19: "OTP e-mail sign-in, hashed codes, rate limits, SVG sanitiser, lab-code gate",
-        20: "Deploy and test", 21: "One laptop or server; Vercel-ready front end; 755 pytest tests on GitHub",
+        20: "Deploy and test", 21: "One laptop or server; Vercel-ready front end; 774 pytest tests on GitHub",
         22: "WORKING PROTOTYPE · real screens from Learnova"})
 logo = by_id(s)[8]
 lx, ly = Emu(logo.left).inches, Emu(logo.top).inches
@@ -348,13 +348,13 @@ for sid, f in ((23, "app-preview.jpg"), (24, "web_deck.png"), (25, "app-solve.jp
 s = SL[3]
 put(s, {17409: "FEASIBILITY AND VIABILITY", 2: TEAM, 7: FOOT,
         17488: "Running today  ·  pilot-ready  ·  every risk has a safeguard",
-        17509: ["TECHNICAL", "Built and running end to end: FastAPI back end, React front end, 16 pipeline stages as separate modules, 755 automated tests and a layout audit."],
+        17509: ["TECHNICAL", "Built and running end to end: FastAPI back end, React front end, 16 pipeline stages as separate modules, 774 automated tests and a layout audit."],
         17510: ["DATA", "No dataset to collect: input is the college's own PPTX, PDF and DOCX material. Verified on 7 real decks (15–216 pages) and 101 gold-labelled slides."],
         17511: ["ECONOMIC", "₹0 to run offline; free-tier Gemini keys (pool of 5) are optional. One department PC replaces paid AI-slide plans ($10–20 per teacher per month)."],
         17512: ["OPERATIONAL", "No retraining for staff: upload, review, download. Every slide stays editable, every choice shows its reason; students need only a browser or phone."],
         17513: ["SECURITY", "OTP sign-in with hashed codes and rate limits; AI diagrams sanitised, AI lab code checked before use; share links view-only; data stays on campus."],
         17514: ["SCALE", "Time grows linearly: a 216-page PDF becomes a full deck in ~35 s offline. Parallel workers, job queue and content-hash caches make re-runs instant."],
-        17515: "755 tests", 17516: "7 real decks", 17517: "₹0 offline", 17518: "editable", 17519: "sanitised", 17520: "~35 s / 216 pp",
+        17515: "774 tests", 17516: "7 real decks", 17517: "₹0 offline", 17518: "editable", 17519: "sanitised", 17520: "~35 s / 216 pp",
         17521: "Potential challenges and risks",
         17529: "Code", 17530: "Tests", 17531: "Gold sets", 17583: "Papers",
         17533: "ADOPTION PATH  ·  low-risk, one step at a time",
@@ -363,7 +363,7 @@ put(s, {17409: "FEASIBILITY AND VIABILITY", 2: TEAM, 7: FOOT,
         17540: "Strategies for overcoming these challenges",
         17562: "Faithful Reader", 17563: "Geometry rules, a DP title splitter and the γ ≤ 0.42 OCR test keep messy PDFs, logos and picture slides correct; 98–100% of facts kept.",
         17571: "Grounded AI", 17577: "An AI title or explanation is used only if it reuses the slide's own words and fits length rules; every number in a solution comes from SymPy.",
-        17572: "Key Pool + Offline", 17578: "5 Gemini keys paced 4.2 s apart, spent keys skipped for 15 min, Groq and NVIDIA as failover; offline rules always finish the deck.",
+        17572: "Key Pool + Offline", 17578: "Offline first: free Gemini and Groq key pools are used only when the rule result is weak; spent keys are skipped; offline rules always finish.",
         17573: "Glass-box Decisions", 17579: "Each visual records the detector that fired, its confidence and the runner-up; the teacher can switch it in the editor in one click.",
         17574: "Measured Layout", 17580: "Text is measured glyph by glyph with an 11 pt floor; long sections split by CLASS. Result on 7 decks: 0 overflow, 0 broken words.",
         17575: "Fast by Design", 17581: "Diagrams and labs run in parallel (2 requests per key) before the build; with 5 keys 40 diagrams take ≈ 42 s instead of 3 min.",
@@ -557,7 +557,7 @@ R = [(17491, ["THE PROBLEM", "why old decks fail learners"]),
      (17515, ["PyMuPDF + LibreOffice", "PDF geometry, PPTX → PDF", "pymupdf.readthedocs.io"]),
      (17517, ["python-pptx", "native, editable PowerPoint", "python-pptx.readthedocs.io"]),
      (17499, ["CODE AND TESTS", "open, testable, honest"]),
-     (17518, ["Source code", "755 tests, all modules", "github.com/SDP42/LearnovaV2"]),
+     (17518, ["Source code", "774 tests, all modules", "github.com/SDP42/LearnovaV2"]),
      (17427, ["Gold sets", "101 labelled slides", "tests/fixtures on GitHub"]),
      (17521, ["Measurement scripts", "every number on these slides", "scripts/research on GitHub"]),
      (17500, ["TRY IT", "run it today"]),
@@ -645,7 +645,7 @@ steps = [("1 · READ", BLUE, "file-text", ["PPTX → PDF with LibreOffice, cache
          ("3 · PLAN", ORANGE, "list-checks", ["Pages grouped into topics and sections", "CLASS splits long sections at least load cost",
                                                "Agenda, glossary and summary slides added", "Parts get names, never “(2/5)”", "Each part stays under the load limit"]),
          ("4 · DECIDE", RED, "brain", ["27 detectors score every slide", "Visual family d* = highest confidence",
-                                        "Exclusion rules stop clashing choices", "Reason and confidence stored per slide", "Process, timeline, compare, chart, cards…"]),
+                                        "Exclusion rules stop clashing choices", "Reason and confidence stored per slide", "Flowchart, algorithm, code, equations, charts…"]),
          ("5 · ENRICH", PURPLE, "sparkles", ["AI titles kept only if grounded in the slide", "Topic diagrams from the 5-key Gemini pool",
                                               "Exact step-by-step explainers (SymPy)", "Labs: built-in, AI-written + checked, or offline", "Quizzes and flashcards from slide facts"]),
          ("6 · BUILD + AUDIT", GREEN, "gauge", ["Glyph-measured fitting, 11 pt floor", "Editable PPTX, web deck and study pack",
@@ -682,7 +682,7 @@ for i, (ph, when) in enumerate((("Research + design", "Sep–Dec 2025"), ("Build
     for para in t.text_frame.paragraphs:
         para.alignment = PP_ALIGN.CENTER
 bullets(m, 8.08, 5.76, 4.9, 1.08, [("Agile:", "weekly sprints, reviewed with our guide every week"),
-                                   ("Test-first:", "755 automated tests, gold sets of 101 slides"),
+                                   ("Test-first:", "774 automated tests, gold sets of 101 slides"),
                                    ("Measured:", "every claim on these slides comes from a script"), ("Documented:", "IPD diary, report and two research papers")], 10.5, INK, "✓ ", GREEN)
 
 # ── Literature review ──
@@ -742,7 +742,7 @@ objs = [("Keep every point of the teacher's deck", "98–100% of facts kept on 7
         ("Illustrate every topic slide", "251 visual slides, 190 linked illustrations", GREEN),
         ("Explain solved problems step by step", "26 / 26 correct, 0 false alarms on 52 sentences", GREEN),
         ("No overflow, no broken words", "0 on every rebuilt deck", GREEN),
-        ("Work without paid AI", "full deck offline; 5-key pool when keys exist", GREEN),
+        ("Work on any uploaded file", "9 / 9 unseen files built; 2.3% slides flagged", GREEN),
         ("Lower cognitive load on every deck", "better on long PDFs, mixed on short decks", ORANGE)]
 for i, (o, r, col) in enumerate(objs):
     yy = 1.54 + i * 0.5
@@ -802,7 +802,7 @@ _w, _h = _Im.open(f"{IMG}/mobile-home.jpg").size
 _sc = min(2.28 / _w, 2.25 / _h)
 ty.shapes.add_picture(f"{IMG}/mobile-home.jpg", Inches(10.75 + (2.28 - _w * _sc) / 2), Inches(1.0 + (2.25 - _h * _sc) / 2), Inches(_w * _sc), Inches(_h * _sc))
 for i, (big, small, col) in enumerate(((f"{untitled}→0", "untitled slides", BLUE), ("98–100%", "facts kept", GREEN),
-                                        ("755", "automated tests", ORANGE), ("~35 s", "216-page deck", PURPLE))):
+                                        ("774", "automated tests", ORANGE), ("~35 s", "216-page deck", PURPLE))):
     x = 6.6 + i * 1.62
     rect(ty, x, 3.4, 1.52, 1.0, col, radius=0.12)
     t = tb(ty, x, 3.42, 1.52, 0.96, [(big, 19, True, WHITE), (small, 9.5, False, WHITE)], MSO_ANCHOR.MIDDLE)

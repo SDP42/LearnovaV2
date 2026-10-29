@@ -2,7 +2,9 @@
 
     /opt/anaconda3/bin/python docs/report/build.py      # needs pandoc, xelatex and docs/report/letterhead.jpeg
 """
+import os
 import pathlib
+import shutil
 import subprocess
 
 from docx import Document
@@ -59,9 +61,13 @@ def letterhead_docx(path):
     d.save(path)
 
 
+PANDOC = shutil.which("pandoc") or "/opt/anaconda3/bin/pandoc"
+os.environ["PATH"] = os.environ.get("PATH", "") + ":/Library/TeX/texbin:/usr/local/bin:/opt/homebrew/bin"
+
+
 def main():
-    subprocess.run(["pandoc", *SRC, "-o", PDF, "--pdf-engine=xelatex", "--top-level-division=section"], cwd=HERE, check=True)
-    subprocess.run(["pandoc", *SRC, "-o", DOCX, "--reference-doc=reference.docx", "--toc", "--number-sections"], cwd=HERE, check=True)
+    subprocess.run([PANDOC, *SRC, "-o", PDF, "--pdf-engine=xelatex", "--top-level-division=section"], cwd=HERE, check=True)
+    subprocess.run([PANDOC, *SRC, "-o", DOCX, "--reference-doc=reference.docx", "--toc", "--number-sections"], cwd=HERE, check=True)
     letterhead_docx(HERE / DOCX)
     print("built", PDF, DOCX)
 

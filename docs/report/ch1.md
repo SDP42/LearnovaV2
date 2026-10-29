@@ -165,7 +165,7 @@ For development and for running the system for one department, a laptop with a 6
 
 ## Feasibility Study
 
-**Technical feasibility.** Every component of the system relies on mature open-source libraries, and the complete pipeline runs on an ordinary laptop. The prototype is working end to end, with 757 automated tests.
+**Technical feasibility.** Every component of the system relies on mature open-source libraries, and the complete pipeline runs on an ordinary laptop. The prototype is working end to end, with 774 automated tests.
 
 **Economic feasibility.** Learnova can run entirely offline at no cost. The free tier of Gemini, used through a pool of five keys, is sufficient for AI titles, explanations and diagrams. A department server would cost less per year than a single paid licence of a commercial AI presentation tool.
 

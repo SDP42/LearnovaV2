@@ -66,7 +66,7 @@ Thank you, Swayam. Our method has six stages. **Read**: every word is read with 
 a title and what is a bullet. **Clean**: anything repeated on many pages, like a college logo or a footer, is removed, and titles
 that lost their spaces are split back into words using dynamic programming.
 
-Algorithms and equations are kept whole: pseudocode goes into one numbered panel with its indentation, and equations are written as real PowerPoint equations, the way Word shows them, not as plain text. **Plan**: long sections are split with our algorithm CLASS, which picks the split points with the lowest cognitive load.
+A procedure with decisions becomes a real flowchart with Yes and No branches, and program code appears like an editor, with a note for each line and its output. Algorithms and equations are kept whole: pseudocode goes into one numbered panel with its indentation, and equations are written as real PowerPoint equations, the way Word shows them, not as plain text. **Plan**: long sections are split with our algorithm CLASS, which picks the split points with the lowest cognitive load.
 **Decide**: 27 detectors score each slide, and the best one decides whether it becomes a process, a timeline, a comparison, and
 so on. **Enrich**: AI adds titles, diagrams and labs, but only after a check, and solved problems get exact steps. **Build and
 audit**: we produce the files and then score every slide.

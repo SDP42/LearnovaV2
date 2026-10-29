@@ -14,7 +14,7 @@ Table: Technology stack.
 | OCR | Tesseract | Reading picture-only slides |
 | AI | Google Gemini (five-key pool), Groq, NVIDIA NIM | Titles, explanations, diagrams, laboratories |
 | Mathematics | SymPy, exact fractions | Step-by-step solvers |
-| Quality | pytest, layout audit, gold-set evaluation | 757 automated tests |
+| Quality | pytest, layout audit, gold-set evaluation | 774 automated tests |
 
 ## Project Structure
 
@@ -46,7 +46,7 @@ The Create page accepts a file by drag and drop or a typed topic, and offers opt
 
 ## Testing
 
-The project has 757 automated tests that run in about 25 seconds. They cover each parser, each detector of the decision engine, the layout guarantees (no broken words, no overflow), the quiz rules, every solver, the laboratory policy, the diagram sanitiser, the key pool, the API endpoints and complete end-to-end generation. The tests always run without AI keys: the test configuration blanks every key, so that a key in the developer's environment cannot change the results. In addition, an end-to-end script drives the running API with real files, a layout-audit tool checks finished PowerPoint files, and the gold sets measure the accuracy of the decision engine.
+The project has 774 automated tests that run in about 25 seconds. They cover each parser, each detector of the decision engine, the layout guarantees (no broken words, no overflow), the quiz rules, every solver, the laboratory policy, the diagram sanitiser, the key pool, the API endpoints and complete end-to-end generation. The tests always run without AI keys: the test configuration blanks every key, so that a key in the developer's environment cannot change the results. In addition, an end-to-end script drives the running API with real files, a layout-audit tool checks finished PowerPoint files, and the gold sets measure the accuracy of the decision engine.
 
 
 ## Improvements after testing on the review decks
@@ -69,6 +69,10 @@ test where possible, and pushed to the repository as a separate change. The tabl
 | Word (.docx) notes failed to convert | the Word converter package was missing and the fallback assumed a PDF | a native Word reader keeps headings as sections, list levels and tables | Word notes always convert |
 | "Advantages / Trade-offs" boxes on slides that weigh nothing up | the AI's visual choice was accepted as given | a pros-and-cons layout needs the words that justify it, else plain cards | no misleading labels |
 | XML examples drawn as "equations" | lines containing "=" | markup lines are shown verbatim in a code panel | examples read as written |
+| A procedure with decisions drawn as a row of chevrons | the process visual cannot show a branch or a loop | a FLOWCHART visual: start/end, process boxes, decision diamonds, Yes/No labels, side boxes and loop-backs | decisions and loops are visible |
+| Code from notebook PDFs shown as paragraphs | OCR flattened the code and split keywords | keywords repaired, code cut into statements, an editor panel with line numbers, syntax colours, a note per line and an output console | code reads like code |
+| Training logs shown as walls of numbers | "Epoch / Cost" lines were treated as text | the log is drawn as a trend chart | the curve is visible at a glance |
+| Lab viva questions turned into fake flowcharts | questions ending in "?" were read as decisions | wh-questions with answers become flip cards; only yes/no tests are decisions | questions are practised, not drawn |
 
 Table: Problems found on real decks and how they were fixed.
 
@@ -84,6 +88,12 @@ On the eight test inputs (599 output slides) this kept 37% of picture reads, 30%
 requests offline. Titles were sent to the model in 97% of cases, because lecture decks almost always use topic labels such as
 "Linear Regression" rather than statements. During the run every free Gemini key and the Groq account reached their daily
 limit, and the remaining decks were completed by the offline logic without a single failed build.
+
+**Unseen inputs.** To make sure the rules work on files a teacher might upload, not only on the decks used during
+development, nine inputs that were never seen before were built without any key: two lecture PowerPoint files, two lab
+manuals, two research papers, a teaching guide, a Word file and a one-line topic. All nine built (482 slides in 89 seconds in
+total). The layout audit flagged 20 slides (4.1%) before the changes of this round and 11 (2.3%) after; nine of those are on a
+single notebook export where code sits beside a picture.
 
 The illustrations were also redesigned. Each slide is first classified into the kind of figure that would teach it — a
 *flow* for processes and apparatus, a *plot* for quantitative relations, an *anatomy* for parts and types, a *comparison*, or a

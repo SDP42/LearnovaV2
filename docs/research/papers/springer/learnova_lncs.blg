@@ -1,0 +1,48 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: learnova_lncs.aux
+The style file: splncs04.bst
+Database file #1: ../refs.bib
+Warning--can't use both volume and number fields in fu2022
+You've used 23 entries,
+            2850 wiz_defined-function locations,
+            737 strings with 8663 characters,
+and the built_in function-call counts, 13832 in all, are:
+= -- 1153
+> -- 421
+< -- 32
++ -- 177
+- -- 150
+* -- 882
+:= -- 1703
+add.period$ -- 26
+call.type$ -- 23
+change.case$ -- 154
+chr.to.int$ -- 0
+cite$ -- 24
+duplicate$ -- 1215
+empty$ -- 1221
+format.name$ -- 166
+if$ -- 3038
+int.to.chr$ -- 0
+int.to.str$ -- 23
+missing$ -- 243
+newline$ -- 75
+num.names$ -- 46
+pop$ -- 436
+preamble$ -- 1
+purify$ -- 119
+quote$ -- 0
+skip$ -- 405
+stack$ -- 0
+substring$ -- 843
+swap$ -- 753
+text.length$ -- 32
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 90
+warning$ -- 1
+while$ -- 118
+width$ -- 25
+write$ -- 237
+(There was 1 warning)

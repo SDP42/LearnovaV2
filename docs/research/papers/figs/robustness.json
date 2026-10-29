@@ -1,0 +1,181 @@
+[
+ {
+  "input": "/Users/swayampanchal/Downloads/Lesk_Algorithm_Lecture.pptx",
+  "ok": true,
+  "seconds": 15.8,
+  "slides": 47,
+  "flagged": 1,
+  "flagged_pct": 2,
+  "coverage": 0.82,
+  "min_pt": 9.5,
+  "flags": {
+   "overflow": 1
+  },
+  "examples": [
+   [
+    16,
+    [
+     "overflow"
+    ]
+   ]
+  ]
+ },
+ {
+  "input": "/Users/swayampanchal/Downloads/Lesk_Algorithm_30_Slides.pptx",
+  "ok": true,
+  "seconds": 13.2,
+  "slides": 39,
+  "flagged": 0,
+  "flagged_pct": 0,
+  "coverage": 0.81,
+  "min_pt": 9.0,
+  "flags": {},
+  "examples": []
+ },
+ {
+  "input": "/Users/swayampanchal/Downloads/S056 Vrindaa Talwar ML Lab 1 Linear Regression.pd",
+  "ok": true,
+  "seconds": 12.5,
+  "slides": 83,
+  "flagged": 9,
+  "flagged_pct": 11,
+  "coverage": 0.81,
+  "min_pt": 9.5,
+  "flags": {
+   "overflow": 9
+  },
+  "examples": [
+   [
+    17,
+    [
+     "overflow"
+    ]
+   ],
+   [
+    21,
+    [
+     "overflow"
+    ]
+   ],
+   [
+    26,
+    [
+     "overflow"
+    ]
+   ],
+   [
+    58,
+    [
+     "overflow"
+    ]
+   ],
+   [
+    67,
+    [
+     "overflow"
+    ]
+   ],
+   [
+    73,
+    [
+     "overflow"
+    ]
+   ],
+   [
+    74,
+    [
+     "overflow"
+    ]
+   ],
+   [
+    77,
+    [
+     "overflow"
+    ]
+   ]
+  ]
+ },
+ {
+  "input": "/Users/swayampanchal/Downloads/4 lab manual.pdf",
+  "ok": true,
+  "seconds": 5.3,
+  "slides": 27,
+  "flagged": 1,
+  "flagged_pct": 4,
+  "coverage": 0.82,
+  "min_pt": 7.9,
+  "flags": {
+   "sparse": 1,
+   "empty bottom": 1
+  },
+  "examples": [
+   [
+    7,
+    [
+     "sparse",
+     "empty bottom"
+    ]
+   ]
+  ]
+ },
+ {
+  "input": "/Users/swayampanchal/Downloads/2503.11728v1.pdf",
+  "ok": true,
+  "seconds": 10.9,
+  "slides": 74,
+  "flagged": 0,
+  "flagged_pct": 0,
+  "coverage": 0.83,
+  "min_pt": 6.8,
+  "flags": {},
+  "examples": []
+ },
+ {
+  "input": "/Users/swayampanchal/Downloads/Lesk_Algorithm_Teaching_Guide.pdf",
+  "ok": true,
+  "seconds": 7.5,
+  "slides": 45,
+  "flagged": 0,
+  "flagged_pct": 0,
+  "coverage": 0.83,
+  "min_pt": 6.8,
+  "flags": {},
+  "examples": []
+ },
+ {
+  "input": "/Users/swayampanchal/Downloads/13_Mrs.+Ira+Agarwal_JIDMIS_Q1.pdf",
+  "ok": true,
+  "seconds": 20.0,
+  "slides": 152,
+  "flagged": 0,
+  "flagged_pct": 0,
+  "coverage": 0.82,
+  "min_pt": 6.8,
+  "flags": {},
+  "examples": []
+ },
+ {
+  "input": "/Users/swayampanchal/Downloads/1.docx",
+  "ok": true,
+  "seconds": 2.4,
+  "slides": 12,
+  "flagged": 0,
+  "flagged_pct": 0,
+  "coverage": 0.82,
+  "min_pt": 7.4,
+  "flags": {},
+  "examples": []
+ },
+ {
+  "input": "topic:Explain how a binary search tree inserts and searches for a key, with its ",
+  "ok": true,
+  "seconds": 0.8,
+  "slides": 3,
+  "flagged": 0,
+  "flagged_pct": 0,
+  "coverage": 0.74,
+  "min_pt": 10.0,
+  "flags": {},
+  "examples": []
+ }
+]

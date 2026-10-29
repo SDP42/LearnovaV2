@@ -374,6 +374,44 @@ $d_i\leftarrow d_i-1$ when $\ell_i$ starts with \emph{end, until, else}. Equatio
 operators, which is written as Office Math in the PPTX, so PowerPoint shows a native, editable equation as Word does, and as
 MathML in the web deck; a Unicode form (\texttt{x\^{}2} becomes x$^2$, \texttt{beta\_0} becomes $\beta_0$) is the fallback for viewers without equation support.
 
+\subsection{Flowcharts, code and questions}
+A procedure is drawn as a flowchart only when one of its steps is a real decision: a step that starts with a test
+(\emph{if, whether, check}) \emph{and} has a second branch, a loop or a question mark, so a conditional fact such as ``if the germ
+returns, the body responds'' stays a process. Each decision is normalised to a main branch and a side branch; the side branch
+either loops back to the step it names (``go back to step~2'') or leads to its own box, and the drawing routes loops around the
+boxes rather than through them. Wh-questions followed by answers (lab viva questions, FAQs) are not decisions: they become flip
+cards with the question on the front. Program text, often flattened by PDF export or OCR (``impor t numpy a s np''), is repaired
+for common keyword splits, cut back into statements without breaking string literals, separated from its printed output, and
+shown in an editor panel with line numbers, syntax colours, a note per statement and a console strip; a training log
+(``Epoch $k$ $|$ Cost $=c$'') is drawn as a trend chart instead of text.
+
+To check that these rules hold beyond the decks they were developed on, we built nine inputs never used during development
+(two lecture PPTX files, two lab manuals, two research papers, a teaching guide, a Word file and a one-line topic) with no API
+key. All nine built (482 slides, 0.8--20\,s each). The layout audit flagged 20 slides (4.1\%) before the changes of this
+section and 11 (2.3\%) after; nine of the remaining flags are on one notebook export whose code sits beside a picture
+(Table~\ref{tab:robust}).
+
+\begin{table}[H]
+\centering
+\caption{Unseen inputs, built without a key}
+\label{tab:robust}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
+\toprule
+Input & Slides & Time (s) & Flagged before & after \\
+\midrule
+Lecture PPTX (Lesk, 2 decks) & 86 & 29.0 & 2 & 1 \\
+Lab manuals (2 PDFs) & 110 & 17.8 & 17 & 10 \\
+Research papers (2 PDFs) & 226 & 30.9 & 0 & 0 \\
+Teaching guide (PDF) & 45 & 7.5 & 1 & 0 \\
+Word file and typed topic & 15 & 3.2 & 0 & 0 \\
+\midrule
+Total & 482 & 88.4 & 20 & 11 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
 \section{Illustrations and Key Scheduling}
 \label{sec:ill}
 Every topic slide receives a picture, in this order: the source's own figure, a diagram written by a language model, and an

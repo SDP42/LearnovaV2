@@ -1,0 +1,122 @@
+\begin{thebibliography}{10}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+\providecommand{\doi}[1]{https://doi.org/#1}
+
+\bibitem{atkinson2000}
+Atkinson, R.K., Derry, S.J., Renkl, A., Wortham, D.: Learning from examples:
+  Instructional principles from the worked examples research. Review of
+  Educational Research  \textbf{70}(2),  181--214 (2000)
+
+\bibitem{canva}
+{Canva}: Magic design for presentations.
+  \url{https://www.canva.com/magic-design/} (2026), accessed Oct. 2026
+
+\bibitem{chi2014}
+Chi, M.T.H., Wylie, R.: The {ICAP} framework: Linking cognitive engagement to
+  active learning outcomes. Educational Psychologist  \textbf{49}(4),  219--243
+  (2014)
+
+\bibitem{freeman2014}
+Freeman, S., Eddy, S.L., McDonough, M., Smith, M.K., Okoroafor, N., Jordt, H.,
+  Wenderoth, M.P.: Active learning increases student performance in science,
+  engineering, and mathematics. Proceedings of the National Academy of Sciences
+   \textbf{111}(23),  8410--8415 (2014)
+
+\bibitem{fu2022}
+Fu, T.J., Wang, W.Y., McDuff, D., Song, Y.: {DOC2PPT}: Automatic presentation
+  slides generation from scientific documents. In: Proceedings of the AAAI
+  Conference on Artificial Intelligence. vol.~36, pp. 634--642 (2022)
+
+\bibitem{gamma}
+{Gamma Tech}: Gamma: {AI}-powered presentations. \url{https://gamma.app}
+  (2026), accessed Oct. 2026
+
+\bibitem{geminislides}
+{Google}: Gemini in {Google} {Slides}.
+  \url{https://workspace.google.com/products/slides/} (2026), accessed Oct.
+  2026
+
+\bibitem{hu2015}
+Hu, Y., Wan, X.: {PPSGen}: Learning-based presentation slides generation for
+  academic papers. IEEE Transactions on Knowledge and Data Engineering
+  \textbf{27}(4),  1085--1097 (2015)
+
+\bibitem{hundhausen2002}
+Hundhausen, C.D., Douglas, S.A., Stasko, J.T.: A meta-study of algorithm
+  visualization effectiveness. Journal of Visual Languages and Computing
+  \textbf{13}(3),  259--290 (2002)
+
+\bibitem{ji2023}
+Ji, Z., Lee, N., Frieske, R., Yu, T., Su, D., Xu, Y., Ishii, E., Bang, Y.J.,
+  Madotto, A., Fung, P.: Survey of hallucination in natural language
+  generation. ACM Computing Surveys  \textbf{55}(12),  1--38 (2023)
+
+\bibitem{jurafsky2025}
+Jurafsky, D., Martin, J.H.: Speech and Language Processing. Stanford
+  University, 3rd (draft) edn. (2025), online manuscript,
+  \url{https://web.stanford.edu/~jurafsky/slp3/}
+
+\bibitem{kasneci2023}
+Kasneci, E., et~al.: {ChatGPT} for good? {On} opportunities and challenges of
+  large language models for education. Learning and Individual Differences
+  \textbf{103},  102274 (2023)
+
+\bibitem{maynez2020}
+Maynez, J., Narayan, S., Bohnet, B., McDonald, R.: On faithfulness and
+  factuality in abstractive summarization. In: Proceedings of the 58th Annual
+  Meeting of the Association for Computational Linguistics. pp. 1906--1919
+  (2020)
+
+\bibitem{meurer2017}
+Meurer, A., Smith, C.P., Paprocki, M., {\v{C}}ert{\'i}k, O., et~al.: {SymPy}:
+  Symbolic computing in {Python}. PeerJ Computer Science  \textbf{3}, ~e103
+  (2017)
+
+\bibitem{copilotppt}
+{Microsoft}: Copilot in {PowerPoint}.
+  \url{https://support.microsoft.com/copilot-powerpoint} (2026), accessed Oct.
+  2026
+
+\bibitem{naps2002}
+Naps, T.L., R{\"o}{\ss}ling, G., Almstrum, V., Dann, W., Fleischer, R.,
+  Hundhausen, C., Korhonen, A., Malmi, L., McNally, M., Rodger, S.,
+  Vel{\'a}zquez-Iturbide, J.{\'A}.: Exploring the role of visualization and
+  engagement in computer science education. ACM SIGCSE Bulletin
+  \textbf{35}(2),  131--152 (2003)
+
+\bibitem{renkl2014}
+Renkl, A.: Toward an instructionally oriented theory of example-based learning.
+  Cognitive Science  \textbf{38}(1),  1--37 (2014)
+
+\bibitem{roediger2006}
+Roediger, H.L., Karpicke, J.D.: Test-enhanced learning: Taking memory tests
+  improves long-term retention. Psychological Science  \textbf{17}(3),
+  249--255 (2006)
+
+\bibitem{sun2021}
+Sun, E., Hou, Y., Wang, D., Zhang, Y., Wang, N.X.R.: {D2S}: Document-to-slide
+  generation via query-based text summarization. In: Proceedings of the 2021
+  Conference of the North American Chapter of the Association for Computational
+  Linguistics. pp. 1405--1418 (2021)
+
+\bibitem{sweller1985}
+Sweller, J., Cooper, G.A.: The use of worked examples as a substitute for
+  problem solving in learning algebra. Cognition and Instruction
+  \textbf{2}(1),  59--89 (1985)
+
+\bibitem{vanlehn2011}
+VanLehn, K.: The relative effectiveness of human tutoring, intelligent tutoring
+  systems, and other tutoring systems. Educational Psychologist
+  \textbf{46}(4),  197--221 (2011)
+
+\bibitem{wieman2008}
+Wieman, C.E., Adams, W.K., Perkins, K.K.: {PhET}: Simulations that enhance
+  learning. Science  \textbf{322}(5902),  682--683 (2008)
+
+\bibitem{wolframalpha}
+{Wolfram Research}: {Wolfram|Alpha} step-by-step solutions.
+  \url{https://www.wolframalpha.com/pro/step-by-step-math-solver} (2026),
+  accessed Oct. 2026
+
+\end{thebibliography}

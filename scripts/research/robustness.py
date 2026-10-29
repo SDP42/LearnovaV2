@@ -29,12 +29,16 @@ for item in inputs:
         else:
             res = run_all(item, source_name=pathlib.Path(item).name, config=PipelineConfig())
         rep = audit_pptx(res.pptx_bytes)
-        row.update(ok=True, seconds=round(time.time() - t0, 1), slides=len(res.final_deck),
-                   audit={k: v for k, v in rep.items() if k != "slides"},
-                   issues=[(s["index"], s.get("issues")) for s in rep.get("slides", []) if s.get("issues")][:12])
+        flags = {}
+        for sl in rep["per_slide"][1:]:
+            for f in sl["flags"]:
+                flags[f.split(":")[0]] = flags.get(f.split(":")[0], 0) + 1
+        row.update(ok=True, seconds=round(time.time() - t0, 1), slides=rep["slides"], flagged=rep["flagged"],
+                   flagged_pct=rep["flagged_pct"], coverage=rep["mean_coverage"], min_pt=rep["min_pt"], flags=flags,
+                   examples=[(sl["index"], sl["flags"]) for sl in rep["per_slide"] if sl["flags"]][:8])
     except Exception as exc:
         row.update(ok=False, seconds=round(time.time() - t0, 1), error=f"{type(exc).__name__}: {exc}"[:300],
                    trace=traceback.format_exc()[-1200:])
     rows.append(row)
-    print(json.dumps({k: row.get(k) for k in ("input", "ok", "seconds", "slides", "error")}), flush=True)
+    print(json.dumps({k: row.get(k) for k in ("input", "ok", "seconds", "slides", "flagged", "flags", "min_pt", "error")}), flush=True)
 pathlib.Path(out).write_text(json.dumps(rows, indent=1, default=str))
