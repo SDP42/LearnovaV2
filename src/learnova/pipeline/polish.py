@@ -210,8 +210,32 @@ def name_parts(entries: List[dict]) -> int:
     return named
 
 
+_PAGE_TITLE = re.compile(r"^\s*(?:page|slide|section)\s*\d+\b(?:\s*\((?:notes|continued|\d+/\d+)\))*(?:\s*\(\d+\))?\s*(?::.*)?$", re.I)
+
+
+def retitle_page_numbers(entries: List[dict]) -> int:
+    """"Page 1 (notes) (2)" says nothing: such a title becomes a short heading from the slide's own first sentence."""
+    from learnova.visuals.engine import heading_for
+
+    n = 0
+    for e in entries:
+        imp = e.get("improved") or {}
+        if not _PAGE_TITLE.match(str(imp.get("title") or "")):
+            continue
+        first = next((str(b) for b in (imp.get("bullets") or []) if len(re.findall(r"[A-Za-z]{3,}", str(b))) >= 3), "")
+        if not first:
+            first = str((e.get("original") or {}).get("text") or "")
+        head = heading_for(re.split(r"(?<=[.!?])\s", first.strip())[0])[:70] if first else ""
+        if head and len(head.split()) >= 2:
+            imp["source_title"] = imp.get("title")
+            imp["title"] = head[:1].upper() + head[1:]
+            n += 1
+    return n
+
+
 def polish_deck(entries: List[dict]) -> Dict[str, int]:
     merged = merge_thin_parts(entries)
+    retitle_page_numbers(entries)
     stats = {"retitled": retitle(entries), "merged_thin": merged, "context_added": add_context(entries)}
     stats["parts_named"] = name_parts(entries)
     return stats

@@ -1375,6 +1375,97 @@ _KW = re.compile(r"^(step\s*\d+|input|output|begin|end|for each|foreach|for|whil
                  r"set|update|compute|calculate|let|loop|break|continue|print|def|function|procedure|call|stop|exit)\b:?", re.I)
 
 
+_SYN_KW = {"import", "from", "as", "def", "return", "for", "in", "while", "if", "else", "elif", "class", "int", "float", "void", "char",
+           "double", "include", "True", "False", "None", "and", "or", "not", "with", "try", "except", "lambda", "public", "static"}
+_SYN = re.compile(r'(?P<s>"[^"]*"?|\'[^\']*\'?)|(?P<c>#.*$|//.*$)|(?P<n>\b\d+(?:\.\d+)?\b)|(?P<f>\b[A-Za-z_]\w*(?=\s*\())|(?P<w>\b[A-Za-z_]\w*\b)|(?P<o>[^\w\s]+|\s+)')
+_SYN_RGB = {"s": RGBColor(0xC3, 0xE8, 0x8D), "c": RGBColor(0x69, 0x70, 0x98), "n": RGBColor(0xF7, 0x8C, 0x6C), "f": RGBColor(0x82, 0xAA, 0xFF),
+            "k": RGBColor(0xC7, 0x92, 0xEA), "w": RGBColor(0xEE, 0xFF, 0xFF), "o": RGBColor(0x89, 0xDD, 0xFF)}
+
+
+def _syntax_runs(line: str):
+    """(text, colour key) runs of one code line: keywords, strings, numbers, comments, calls."""
+    out = []
+    for m in _SYN.finditer(line):
+        k = m.lastgroup
+        tok = m.group(0)
+        if k == "w" and tok in _SYN_KW:
+            k = "k"
+        out.append((tok, k))
+    return out
+
+
+def _code(c: _Canvas, data) -> bool:
+    """Code as a teacher shows it: a dark editor panel (line numbers, syntax colours), a numbered "what it does" column that
+    matches the line numbers, and the program's output in a console strip below."""
+    lines = [str(x.get("text", "")) for x in (data.get("lines") or []) if str(x.get("text", "")).strip()]
+    if len(lines) < 2:
+        return False
+    notes = [n for n in (data.get("notes") or []) if isinstance(n, dict) and n.get("text")]
+    output = [str(o) for o in (data.get("output") or []) if str(o).strip()]
+    out_h = (0.32 + 0.24 * min(4, len(output))) if output else 0.0
+    gap = 0.18
+    code_w = c.w * (0.6 if notes else 1.0)
+    code_h = c.h - (out_h + gap if output else 0)
+    bg, head = RGBColor(0x1E, 0x1E, 0x2E), RGBColor(0x2A, 0x2A, 0x3C)
+    with c.group():
+        c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, c.y, code_w, code_h, bg, radius=0.03)
+        c.shape(MSO_SHAPE.RECTANGLE, c.x, c.y, code_w, 0.36, head)
+        for k, col in enumerate((RGBColor(0xFF, 0x5F, 0x57), RGBColor(0xFE, 0xBC, 0x2E), RGBColor(0x28, 0xC8, 0x40))):
+            c.shape(MSO_SHAPE.OVAL, c.x + 0.15 + k * 0.2, c.y + 0.12, 0.12, 0.12, col)
+        c.tb(c.x + 0.85, c.y, code_w - 1.0, 0.36, [P(str(data.get("label") or "Code"), 11, True, RGBColor(0xB0, 0xB8, 0xD0))], MSO_ANCHOR.MIDDLE)
+    tw = code_w - 0.75
+    size = 16.0
+    while size > 9.5:
+        if sum(L.estimate_lines(t, tw, size) for t in lines) * size * 1.3 / 72 <= code_h - 0.55:
+            break
+        size -= 0.5
+    y = c.y + 0.46
+    for i, t in enumerate(lines):
+        h = L.estimate_lines(t, tw, size) * size * 1.3 / 72
+        with c.group():
+            nb = c.s.shapes.add_textbox(Inches(c.x + 0.1), Inches(y), Inches(0.42), Inches(h))
+            r = nb.text_frame.paragraphs[0].add_run()
+            r.text, r.font.size, r.font.name, r.font.color.rgb = str(i + 1), Pt(size * 0.8), "Consolas", RGBColor(0x6E, 0x73, 0x8D)
+            nb.text_frame.paragraphs[0].alignment = PP_ALIGN.RIGHT
+            box = c.s.shapes.add_textbox(Inches(c.x + 0.6), Inches(y), Inches(tw), Inches(h))
+            tf = box.text_frame
+            tf.word_wrap = True
+            tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+            para = tf.paragraphs[0]
+            for tok, k in _syntax_runs(t):
+                rr = para.add_run()
+                rr.text, rr.font.size, rr.font.name, rr.font.color.rgb = tok, Pt(size), "Consolas", _SYN_RGB[k]
+        y += h
+    if data.get("more"):
+        c.tb(c.x + 0.6, c.y + code_h - 0.32, tw, 0.28, [P(f"… {data['more']} more lines in the source", 10, False, RGBColor(0x6E, 0x73, 0x8D))])
+    if notes:
+        nx, nw = c.x + code_w + gap, c.w - code_w - gap
+        with c.group():
+            c.tb(nx, c.y, nw, 0.36, [P("WHAT EACH LINE DOES", 11, True, _readable_accent(c.t))], MSO_ANCHOR.MIDDLE)
+        ny = c.y + 0.42
+        per = (code_h - 0.42) / max(1, len(notes))
+        nsz = min(13.0, c.fit([n["text"] for n in notes], nw - 0.45, per - 0.06, 13, 9.5))
+        for n in notes:
+            with c.group():
+                c.shape(MSO_SHAPE.OVAL, nx, ny + 0.03, 0.3, 0.3, c.t.primary_rgb)
+                c.tb(nx, ny + 0.03, 0.3, 0.3, [P(str(n["line"]), 10, True, _on(c.t.primary_rgb))], MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER)
+                c.tb(nx + 0.4, ny, nw - 0.42, per, [P(str(n["text"]), nsz, False, c.t.text_rgb)], MSO_ANCHOR.TOP)
+            ny += per
+    if output:
+        oy = c.y + code_h + gap
+        with c.group():
+            c.shape(MSO_SHAPE.ROUNDED_RECTANGLE, c.x, oy, c.w, out_h, RGBColor(0x0D, 0x11, 0x17), radius=0.06)
+            c.tb(c.x + 0.15, oy + 0.04, 1.5, 0.26, [P("OUTPUT", 10, True, RGBColor(0x7E, 0xE7, 0x87))], MSO_ANCHOR.MIDDLE)
+            box = c.s.shapes.add_textbox(Inches(c.x + 0.15), Inches(oy + 0.3), Inches(c.w - 0.3), Inches(out_h - 0.32))
+            tf = box.text_frame
+            tf.word_wrap = True
+            for k, o in enumerate(output[:4]):
+                para = tf.paragraphs[0] if k == 0 else tf.add_paragraph()
+                rr = para.add_run()
+                rr.text, rr.font.size, rr.font.name, rr.font.color.rgb = o, Pt(11), "Consolas", RGBColor(0xD7, 0xDE, 0xE8)
+    return True
+
+
 def _algorithm(c: _Canvas, data) -> bool:
     """Pseudocode or a derivation in ONE panel: numbered lines, indentation kept, keywords bold (code) or centred maths (math)."""
     lines = [(str(x.get("text", "")), int(x.get("indent", 0))) for x in (data.get("lines") or []) if str(x.get("text", "")).strip()]
@@ -1597,6 +1688,8 @@ def draw_family(slide, sp, theme, band) -> bool:
             ok = _prose(c, data)
         elif family == "FLOWCHART":
             ok = _flowchart(c, data)
+        elif family == "ALGORITHM" and str(data.get("label", "")).lower().endswith("code"):
+            ok = _code(c, data)
         elif family == "ALGORITHM":
             ok = _algorithm(c, {**data, "variant": getattr(sp, "variant", "") or data.get("variant", "")})
         elif family == "SECTIONS":

@@ -220,6 +220,11 @@ def det_flowchart(title: str, sents: List[str]) -> Det:
     steps = [x for x in sents if len(x.split()) >= 2][:9]
     if len(steps) < 3:
         return None
+    wh = re.compile(r"^(?:what|which|why|how|who|when|where|explain|define|describe|list|state|name|give)\b", re.I)
+    if sum(1 for x in steps if x.rstrip().endswith("?") and wh.match(_LEAD_CUE.sub("", x))) >= 1:
+        return None                                   # questions and answers (a lab's viva) are not a procedure
+    if sum(1 for x in steps if _STEP_CUES.search(x) or _LEAD_CUE.match(x)) < 2 and not _PROC_TITLE.search(title):
+        return None
     branch = re.compile(r"\b(?:otherwise|else|until|unless|whether|repeat|go back|return to|loop back)\b|\?\s*$|^(?:check|test)\b", re.I)
     # "If the germ returns, the body responds quickly" states a fact; a decision has a second branch, a loop or a test
     decisions = [i for i, x in enumerate(steps) if _DECIDE.search(_LEAD_CUE.sub("", x)) and branch.search(_LEAD_CUE.sub("", x))]
@@ -1368,6 +1373,129 @@ def _dedupe_sents(sents: List[str]) -> List[str]:
     return kept
 
 
+_QWORD = re.compile(r"^(?:q\s*\d*[.:)]\s*)?(?:what|which|why|how|who|when|where|explain|define|describe|differentiate|compare|"
+                    r"list|state|name|give|is|are|does|do|can)\b", re.I)
+
+
+def det_qa(title: str, text: str) -> Det:
+    """Questions each followed by their answer (viva questions, FAQs, "Answer:" lines) become flip cards: the question on the
+    front, the answer revealed on a click — retrieval practice instead of reading both at once."""
+    t = re.sub(r"\s+", " ", text or "")
+    qs = list(re.finditer(r"(?:(?<=^)|(?<=[.!?:]\s)|(?<=\s-\s))((?:Q\s*\d*[.:)]\s*)?(?:What|Which|Why|How|Who|When|Where|Explain|Define|"
+                          r"Describe|Differentiate|Compare|List|State|Name|Give|Is|Are|Does|Do|Can)\b[^?]{3,200}\?)", t))
+    pairs = []
+    for k, m in enumerate(qs):
+        end = qs[k + 1].start() if k + 1 < len(qs) else len(t)
+        a = re.sub(r"^\s*(?:ans(?:wer)?\s*[:.\-]\s*)", "", t[m.end():end], flags=re.I).strip()
+        q = re.sub(r"^Q\s*\d*[.:)]\s*", "", m.group(1)).strip()
+        if 3 <= len(a.split()) <= 70 and 3 <= len(q.split()) <= 25:
+            pairs.append({"heading": q, "body": _strip_end(a)})
+    if len(pairs) < 2:
+        return None
+    return ("LIST_STRUCTURED", "qa", 0.92, {"cards": pairs[:6], "flip": True, "qa": True},
+            f"{len(pairs)} questions with their answers — shown as flip cards (question first, answer on click)")
+
+
+def _split_code(t: str) -> List[str]:
+    """Statements of flattened code: split before keywords, assignments and after ';' — never inside a string literal."""
+    cuts = [0]
+    pat = re.compile(r";\s+|\s+(?=(?:import|from|def|print|for|while|if|elif|else|return|printf|scanf|plt\.|#)\b)|"
+                     r"\s+(?=[A-Za-z_]\w*(?:\[[^\]]*\])?\s*=\s*[^=])")
+    for m in pat.finditer(t):
+        before = t[:m.start()]
+        if before.count('"') % 2 == 0 and before.count("'") % 2 == 0 and before.count("(") <= before.count(")"):
+            cuts.append(m.end())
+    cuts.append(len(t))
+    return [t[x:y].strip(" ;") for x, y in zip(cuts, cuts[1:]) if t[x:y].strip(" ;")]
+
+
+_CODE_TOK = re.compile(r"\b(?:import\s+\w+|from\s+\w+\s+import|def\s+\w+\(|print\s*\(|return\b|np\.\w+|pd\.\w+|plt\.\w+|df\[|range\(|"
+                       r"printf\s*\(|scanf\s*\(|#include|int\s+main|for\s*\(|while\s*\(|System\.out|console\.log|\w+\s*\+=)")
+
+
+_LOG = re.compile(r"\b(epoch|iteration|iter|step)\s*(\d+)\s*[|:,]?\s*(cost|loss|error|mse|accuracy|acc)\s*[=:]\s*(-?[\d.]+(?:e[-+]?\d+)?)", re.I)
+
+
+def det_series(title: str, text: str) -> Det:
+    """A training log ("Epoch 100 | Cost = 1.2e8 …") is a curve, not a paragraph of numbers: shown as a trend chart."""
+    pts = [(int(m.group(2)), float(m.group(4)), m.group(1), m.group(3)) for m in _LOG.finditer(text or "")]
+    if len(pts) < 4:
+        return None
+    pts.sort()
+    step = max(1, len(pts) // 9)
+    keep = pts[::step][:9] + ([pts[-1]] if pts[::step][-1] != pts[-1] else [])
+    x, y = pts[0][2].capitalize(), pts[0][3].capitalize()
+    return ("CHART_TREND", "line", 0.95, {"points": [{"label": f"{x} {p[0]}", "value": round(p[1], 4)} for p in keep],
+                                           "x_label": x, "y_label": y},
+            f"{len(pts)} logged {y.lower()} values — drawn as a curve over {x.lower()}s")
+
+
+def _explain_stmt(st: str) -> str:
+    """A plain-words note for one statement (offline; covers the common Python and C forms)."""
+    t = st.strip()
+    rules = [
+        (r"^import\s+([\w.]+)(?:\s+as\s+(\w+))?", lambda m: f"Load the {m.group(1)} library" + (f" (called {m.group(2)})" if m.group(2) else "")),
+        (r"^from\s+([\w.]+)\s+import\s+(.+)", lambda m: f"Use {m.group(2)[:30]} from {m.group(1)}"),
+        (r"^def\s+(\w+)\s*\(([^)]*)\)", lambda m: f"Define a function {m.group(1)}({m.group(2)[:24]})"),
+        (r"^class\s+(\w+)", lambda m: f"Define a class {m.group(1)}"),
+        (r"^for\s+(\w+)\s+in\s+(.+?):?$", lambda m: f"Repeat for each {m.group(1)} in {m.group(2)[:30]}"),
+        (r"^for\s*\((.*)\)", lambda m: f"Loop: {m.group(1)[:40]}"),
+        (r"^while\s*\(?(.+?)\)?:?$", lambda m: f"Keep repeating while {m.group(1)[:36]}"),
+        (r"^if\s*\(?(.+?)\)?:?$", lambda m: f"Check whether {m.group(1)[:40]}"),
+        (r"^return\s+(.+)", lambda m: f"Give back {m.group(1)[:36]}"),
+        (r"^print\s*\((.*)\)", lambda m: "Show the result on screen"),
+        (r"^printf\s*\(", lambda m: "Print a message"),
+        (r"^scanf\s*\(", lambda m: "Read input from the user"),
+        (r"^plt\.(\w+)", lambda m: {"plot": "Draw the line plot", "scatter": "Draw the data points", "show": "Display the figure",
+                                    "xlabel": "Label the x-axis", "ylabel": "Label the y-axis", "title": "Give the plot a title",
+                                    "legend": "Add the legend", "figure": "Start a new figure"}.get(m.group(1), f"Plot: {m.group(1)}")),
+        (r"^([A-Za-z_]\w*(?:\[[^\]]*\])?)\s*=\s*np\.(mean|sum|sqrt|dot|array|zeros|ones|random\.\w+)\b",
+         lambda m: f"{m.group(1)} ← {m.group(2).split('.')[-1]} of the data"),
+        (r"^([A-Za-z_]\w*(?:\[[^\]]*\])?)\s*=\s*(?:pd\.)?read_csv\(", lambda m: f"Read the CSV data into {m.group(1)}"),
+        (r"^([A-Za-z_]\w*(?:\[[^\]]*\])?)\s*=\s*(.+)", lambda m: f"Compute {m.group(1)} = {m.group(2)[:28]}"),
+        (r"^([A-Za-z_]\w*)\s*\+=\s*(.+)", lambda m: f"Add {m.group(2)[:24]} to {m.group(1)}"),
+    ]
+    for pat, fn in rules:
+        m = re.match(pat, t, re.I)
+        if m:
+            return fn(m)
+    return ""
+
+
+def det_code(title: str, text: str) -> Det:
+    """Program text (often flattened by PDF export or OCR) is shown as code: statements split back onto lines in an editor
+    panel with line numbers, a "what it does" note per statement, and the program's printed output in a separate console."""
+    t = re.sub(r"\s+", " ", text or "")
+    hits = len(_CODE_TOK.findall(t))
+    sym = len(re.findall(r"[=()\[\]{};]", t)) / max(1, len(t))
+    if hits < 3 or sym < 0.025:
+        return None
+    t = re.sub(r"\s*\|(?:\s*\|)+\s*", " ", t)                 # table-rule debris
+    code, output = [], []
+    pieces = []
+    for x in _split_code(t):                                   # "beta1 = a / b 1 39343.0 36187.1 …": code, then printed numbers
+        m = re.search(r"\s(?=(?:-?\d[\d.,]*\s+){3,})", x)
+        pieces += [x[:m.start()], x[m.start():]] if m and m.start() > 3 else [x]
+    for x in pieces:
+        x = x.strip()
+        if len(x) < 3:
+            continue
+        digits = sum(ch.isdigit() for ch in x) / max(1, len(x))
+        if digits > 0.3 and not _CODE_TOK.search(x) and "(" not in x:
+            output.append(x)                                   # printed numbers belong to the console, not the code
+        else:
+            code.append(x)
+    if len(code) < 3:
+        return None
+    lang = "C" if re.search(r"printf|scanf|#include|int\s+main", t) else "Java" if "System.out" in t else "Python"
+    shown = code[:14]
+    notes = [{"line": i + 1, "text": n} for i, x in enumerate(shown) if (n := _explain_stmt(x))][:8]
+    out = [o[:90] for o in output[:3]] + ([f"… {len(output) - 4} more lines …", output[-1][:90]] if len(output) > 4 else output[3:4])
+    return ("ALGORITHM", "code", 0.94, {"label": f"{lang} code", "lines": [{"text": x[:100], "indent": 0} for x in shown],
+                                         "notes": notes, "output": out, "more": max(0, len(code) - len(shown))},
+            f"{hits} programming statements — an editor panel with line notes and the output in a console")
+
+
 def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any = None, outline: Optional[List[Dict[str, Any]]] = None) -> Decision:
     """
     Pick the visual and build its data.
@@ -1389,6 +1517,16 @@ def decide(title: str, text: str, bullets: Optional[List[str]] = None, vms: Any 
     ref = det_references(title, text)
     if ref:
         return Decision(ref[0], ref[1], ref[2], ref[3], ref[4], [], takeaway="")
+    ser = det_series(title, raw_text)                    # before the table-debris filter: a log line is full of "|"
+    if ser:
+        return Decision(ser[0], ser[1], ser[2], ser[3], ser[4], [], takeaway=f"{ser[3]['y_label']} changes over {ser[3]['x_label'].lower()}s")
+    raw_text = "\n".join(l for l in raw_text.split("\n") if not (l.count("|") >= 4 and len(re.findall(r"[A-Za-z]", l)) < 0.4 * len(l)))
+    code = det_code(title, raw_text)
+    if code:
+        return Decision(code[0], code[1], code[2], code[3], code[4], [], takeaway="")
+    qa = det_qa(title, raw_text)
+    if qa:
+        return Decision(qa[0], qa[1], qa[2], qa[3], qa[4], [], takeaway="")
     alg = det_algorithm(title, raw_text)
     if alg:
         return Decision(alg[0], alg[1], alg[2], alg[3], alg[4], [], takeaway="")

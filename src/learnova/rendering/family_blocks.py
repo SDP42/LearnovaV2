@@ -671,7 +671,43 @@ def _math_html(text: str) -> str:
     return _subs_html(text)
 
 
+_SYN_HTML = re.compile(r'(?P<s>"[^"]*"?|\'[^\']*\'?)|(?P<c>#.*$|//.*$)|(?P<n>\b\d+(?:\.\d+)?\b)|(?P<f>\b[A-Za-z_]\w*(?=\s*\())|(?P<w>\b[A-Za-z_]\w*\b)|(?P<o>[^\w\s]+|\s+)')
+_SYN_KW_HTML = {"import", "from", "as", "def", "return", "for", "in", "while", "if", "else", "elif", "class", "int", "float", "void", "char",
+                "double", "include", "True", "False", "None", "and", "or", "not", "with", "try", "except", "lambda", "public", "static"}
+_SYN_COL = {"s": "#C3E88D", "c": "#697098", "n": "#F78C6C", "f": "#82AAFF", "k": "#C792EA", "w": "#EEFFFF", "o": "#89DDFF"}
+
+
+def _code_block(data: Dict[str, Any], theme) -> Optional[str]:
+    lines = [str(x.get("text", "")) for x in (data.get("lines") or []) if str(x.get("text", "")).strip()]
+    if len(lines) < 2:
+        return None
+    rows = ""
+    for i, t in enumerate(lines):
+        toks = "".join(f'<span style="color:{_SYN_COL["k" if m.lastgroup == "w" and m.group(0) in _SYN_KW_HTML else m.lastgroup]}">{_esc(m.group(0))}</span>'
+                       for m in _SYN_HTML.finditer(t))
+        rows += (f'<div data-el="el.{i}" data-build="{i}" class="lv-codeline" data-line="{i + 1}" style="white-space:pre-wrap;padding:1px 0;">'
+                 f'<span style="display:inline-block;width:2.4em;color:#6E738D;text-align:right;margin-right:1em;user-select:none">{i + 1}</span>{toks}</div>')
+    notes = "".join(f'<li data-line="{n["line"]}" style="margin-bottom:8px;cursor:pointer" onmouseenter="lvHL(this,1)" onmouseleave="lvHL(this,0)">'
+                    f'<b style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:{theme.primary_hex};color:{_on(theme)};'
+                    f'align-items:center;justify-content:center;font-size:.75rem;margin-right:8px">{n["line"]}</b>{_esc(str(n["text"]))}</li>'
+                    for n in (data.get("notes") or []) if isinstance(n, dict) and n.get("text"))
+    out = "".join(f"<div>{_esc(str(o))}</div>" for o in (data.get("output") or []))
+    script = ('<script>function lvHL(el,on){var b=el.closest(".lv-code");if(!b)return;var l=b.querySelector(\'.lv-codeline[data-line="\'+el.dataset.line+\'"]\');'
+              'if(l)l.style.background=on?"rgba(130,170,255,.18)":"transparent";}</script>')
+    return (f'<div class="lv-code" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;text-align:left">'
+            f'<div style="flex:3 1 380px;min-width:0;background:#1E1E2E;border-radius:14px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.18)">'
+            f'<div style="background:#2A2A3C;padding:8px 12px;font:600 .75rem Inter,Arial;color:#B0B8D0">● ● ● &nbsp; {_esc(str(data.get("label") or "Code"))}</div>'
+            f'<div style="padding:12px 14px;font:0.95rem/1.5 Consolas,\'SFMono-Regular\',Menlo,monospace;overflow-x:auto">{rows}</div></div>'
+            + (f'<ol style="flex:2 1 240px;list-style:none;padding:0;margin:0;font-size:.95rem;color:{theme.text_hex}">'
+               f'<li style="font-weight:800;letter-spacing:.08em;font-size:.75rem;color:{theme.accent_hex};margin-bottom:10px">WHAT EACH LINE DOES</li>{notes}</ol>' if notes else "")
+            + (f'<div style="flex:1 1 100%;background:#0D1117;border-radius:12px;padding:10px 14px;font:.85rem/1.45 Consolas,Menlo,monospace;color:#D7DEE8">'
+               f'<div style="color:#7EE787;font-weight:700;font-size:.7rem;margin-bottom:4px">OUTPUT</div>{out}</div>' if out else "")
+            + "</div>" + script)
+
+
 def _algorithm_block(data: Dict[str, Any], theme) -> Optional[str]:
+    if str(data.get("label", "")).lower().endswith("code"):
+        return _code_block(data, theme)
     lines = [(str(x.get("text", "")), int(x.get("indent", 0))) for x in (data.get("lines") or []) if str(x.get("text", "")).strip()]
     if len(lines) < 2:
         return None
