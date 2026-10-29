@@ -737,6 +737,8 @@ def build_pptx(slides_data: list[dict], topic_title: str = "Learnova Presentatio
                 n_steps = len(anim.get("steps") or [])
                 if n_steps >= 2 and len(groups) > n_steps:
                     groups = merge_groups(groups, n_steps)
+                if len(groups) > 8:                       # segmenting helps; twenty clicks on one slide does not
+                    groups = merge_groups(groups, 8)
                 apply_click_builds(meta["slide"], groups, static_first=True)
 
         # Validate: the file must still round-trip through python-pptx.

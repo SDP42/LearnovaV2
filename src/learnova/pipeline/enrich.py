@@ -138,11 +138,18 @@ _THINK = {
     "CHECKLIST": "Which of these would you do first, and why?",
     "SET_DIAGRAM": "Name one more thing that belongs in the overlap.",
     "REFERENCES": "",
+    "FLOWCHART": "Trace the flowchart with an input of your own: which branch do you take at each decision, and why?",
+    "ALGORITHM": "Dry-run the algorithm on a tiny example: what changes after the first pass through the loop?",
+    "STEPPER": "Change one number in the problem: which steps change, and which stay the same?",
+    "WORKED_EXAMPLE": "Change one number in the problem: which steps change, and which stay the same?",
+    "KEY_POINTS": "Which of these points would you explain first to a friend, and how?",
+    "PROSE": "Summarise the idea of {topic} in one sentence, then give an example from real life.",
+    "DEFINITION": "Give one real-life example of {topic}, and one thing that is not an example.",
 }
 
 
 def attach_prompts(entries: List[dict]) -> int:
-    n = 0
+    n = seen = 0
     for e in entries:
         imp = e.get("improved") or {}
         if str(imp.get("layout_type", "")).upper() == "QUIZ" or imp.get("is_glossary"):
@@ -152,10 +159,16 @@ def attach_prompts(entries: List[dict]) -> int:
             fam = decide(str(imp.get("title", "")), text, [str(b) for b in (imp.get("bullets") or [])]).family
         except Exception:
             fam = ""
-        q = _THINK.get(fam, "Explain this slide in your own words, in one sentence.") if fam != "REFERENCES" else ""
+        q = _THINK.get(fam, "Explain {topic} in your own words, in one sentence.") if fam != "REFERENCES" else ""
+        topic = re.sub(r"\s*\((?:\d+/\d+|continued)\)\s*$", "", str(imp.get("source_title") or imp.get("title") or "this idea")).strip()
+        topic = topic if len(topic.split()) <= 7 else "this idea"
         if q:
-            imp["think"] = q
+            imp["think"] = q.replace("{topic}", topic[:1].lower() + topic[1:] if topic != topic.upper() else topic)
             n += 1
+            seen += 1
+            # every third content slide shows its question to the class (between the checkpoint quizzes); the rest stay in the notes
+            if seen % 3 == 0 and not imp.get("is_agenda") and not imp.get("is_summary"):
+                imp["think_visible"] = True
     return n
 
 
